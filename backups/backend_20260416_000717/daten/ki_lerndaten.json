@@ -1,0 +1,42 @@
+[
+  {
+    "eingabe": {
+      "spannungsebene": "MS",
+      "nennspannung": 20,
+      "leistung_mw": 10,
+      "cos_phi": 0.95,
+      "anschlussart": "Einspeisung",
+      "entfernung_km": 5,
+      "leitungstyp": "NAYY150",
+      "parallele_systeme": 2,
+      "redundanz": true
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 303.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 270,
+      "auslastung_prozent": 56.3,
+      "parallele_systeme": 2,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden."
+    },
+    "spannung": {
+      "delta_u_prozent": 1.45,
+      "delta_u_v": 290.4,
+      "grenzwert_prozent": 2.0,
+      "spannungsebene": "MS",
+      "parallele_systeme": 2,
+      "bewertung": "GELB",
+      "text": "Spannungsfall akzeptabel, aber eingeschraenkte Reserve."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "n1_auslastung_prozent": 112.6,
+      "redundanz": true,
+      "parallele_systeme": 2,
+      "bewertung": "ROT",
+      "text": "Trotz Redundanz: N-1 fuehrt zu Ueberlastung!"
+    },
+    "fazit": "KRITISCH: Netzanschluss in dieser Konfiguration nicht realisierbar. Anpassungen zwingend erforderlich."
+  }
+]

@@ -1,0 +1,536 @@
+﻿"use client";
+import { useState } from "react";
+import { berechneNetzanalyse } from "../lib/engine";
+import { ProjectInput, NetzAnalyse } from "../types";
+
+const INITIAL_FORM: ProjectInput = {
+  plz: "",
+  ort: "",
+  strasse: "",
+  flurstueck: "",
+  bundesland: "",
+  anschlussleistung_kw: 1000,
+  spannungsebene: "MS",
+  anschlussart: "Einspeisung",
+  erzeugungstyp: "PV",
+  cos_phi: 0.95,
+  gleichzeitigkeitsfaktor: 0.9,
+  einspeiseleistung_kw: undefined,
+  bezugsleistung_kw: undefined,
+  speicherkapazitaet_kwh: undefined,
+  projektname: "",
+  projektierer: "",
+  datum: new Date().toISOString().split("T")[0],
+};
+
+export default function GridCheckForm() {
+  const [step, setStep] = useState(1);
+  const [result, setResult] = useState<NetzAnalyse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState<ProjectInput>({ ...INITIAL_FORM });
+
+  const u = (field: keyof ProjectInput, val: any) =>
+    setForm((p) => ({ ...p, [field]: val }));
+
+  const canStep2 =
+    form.projektname.trim() !== "" &&
+    form.plz.trim() !== "" &&
+    form.anschlussleistung_kw > 0;
+
+  const handleRun = () => {
+    setLoading(true);
+    try {
+      const r = berechneNetzanalyse(form);
+      setResult(r);
+      setStep(3);
+    } catch (e) {
+      alert("Fehler bei der Analyse: " + e);
+    }
+    setLoading(false);
+  };
+
+  const scoreColor = (s: number) =>
+    s >= 70 ? "text-green-400" : s >= 40 ? "text-yellow-400" : "text-red-400";
+
+  const scoreBg = (s: number) =>
+    s >= 70 ? "bg-green-600" : s >= 40 ? "bg-yellow-500" : "bg-red-600";
+
+  const scoreLabel = (s: number) =>
+    s >= 70 ? "Anschluss machbar" : s >= 40 ? "Bedingt machbar" : "Kritisch";
+
+  return (
+    <div className="max-w-5xl mx-auto p-6">
+      {/* Header */}
+      <div className="mb-8 text-center">
+        <h1 className="text-3xl font-bold text-white">⚡ GridCheck Pro</h1>
+        <p className="text-gray-400 mt-2">
+          Pre-Netzanschluss Diagnose mit N-1 Analyse
+        </p>
+      </div>
+
+      {/* Stepper */}
+      <div className="flex gap-2 mb-6 justify-center">
+        {["Projektdaten", "Netzparameter", "Ergebnis"].map((label, i) => (
+          <div
+            key={i}
+            className={px-4 py-2 rounded-full text-sm font-medium }
+          >
+            {i + 1}. {label}
+          </div>
+        ))}
+      </div>
+
+      {/* ========== STEP 1: Projektdaten ========== */}
+      {step === 1 && (
+        <div className="bg-gray-800 rounded-xl p-6 space-y-4">
+          <h2 className="text-xl font-semibold text-white">Projektdaten</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">
+                Projektname *
+              </label>
+              <input
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.projektname}
+                onChange={(e) => u("projektname", e.target.value)}
+                placeholder="z.B. Solarpark Musterstadt"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">
+                Projektierer
+              </label>
+              <input
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.projektierer}
+                onChange={(e) => u("projektierer", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">PLZ *</label>
+              <input
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.plz}
+                onChange={(e) => u("plz", e.target.value)}
+                maxLength={5}
+                placeholder="12345"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">Ort</label>
+              <input
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.ort}
+                onChange={(e) => u("ort", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">
+                Straße
+              </label>
+              <input
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.strasse}
+                onChange={(e) => u("strasse", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">
+                Flurstück
+              </label>
+              <input
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.flurstueck}
+                onChange={(e) => u("flurstueck", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">
+                Bundesland
+              </label>
+              <select
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.bundesland}
+                onChange={(e) => u("bundesland", e.target.value)}
+              >
+                <option value="">Bitte wählen</option>
+                {[
+                  "Baden-Württemberg","Bayern","Berlin","Brandenburg","Bremen",
+                  "Hamburg","Hessen","Mecklenburg-Vorpommern","Niedersachsen",
+                  "Nordrhein-Westfalen","Rheinland-Pfalz","Saarland","Sachsen",
+                  "Sachsen-Anhalt","Schleswig-Holstein","Thüringen",
+                ].map((bl) => (
+                  <option key={bl} value={bl}>{bl}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">
+                Anlagentyp
+              </label>
+              <select
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.erzeugungstyp || ""}
+                onChange={(e) => u("erzeugungstyp", e.target.value || undefined)}
+              >
+                <option value="PV">☀️ Photovoltaik</option>
+                <option value="Wind">💨 Windkraft</option>
+                <option value="BESS">🔋 Batteriespeicher</option>
+                <option value="BioGas">🌿 Biogas</option>
+                <option value="Hybrid">⚡ Hybrid</option>
+                <option value="Keine">🔌 Verbraucher (kein Erzeuger)</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end pt-4">
+            <button
+              onClick={() => canStep2 && setStep(2)}
+              disabled={!canStep2}
+              className={px-6 py-2 rounded-lg font-medium }
+            >
+              Weiter →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========== STEP 2: Netzparameter ========== */}
+      {step === 2 && (
+        <div className="bg-gray-800 rounded-xl p-6 space-y-4">
+          <h2 className="text-xl font-semibold text-white">Netzparameter</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">
+                Anschlussleistung (kW) *
+              </label>
+              <input
+                type="number"
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.anschlussleistung_kw}
+                onChange={(e) =>
+                  u("anschlussleistung_kw", parseFloat(e.target.value) || 0)
+                }
+                min={1}
+              />
+              <span className="text-gray-500 text-xs">
+                = {(form.anschlussleistung_kw / 1000).toFixed(2)} MW
+              </span>
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">
+                Spannungsebene
+              </label>
+              <select
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.spannungsebene}
+                onChange={(e) => u("spannungsebene", e.target.value)}
+              >
+                <option value="NS">Niederspannung (0,4 kV)</option>
+                <option value="MS">Mittelspannung (10-30 kV)</option>
+                <option value="HS">Hochspannung (110 kV)</option>
+                <option value="HöS">Höchstspannung (220/380 kV)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">
+                Anschlussart
+              </label>
+              <select
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.anschlussart}
+                onChange={(e) => u("anschlussart", e.target.value)}
+              >
+                <option value="Einspeisung">Einspeisung</option>
+                <option value="Bezug">Bezug</option>
+                <option value="Bidirektional">Bidirektional</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">
+                cos φ (Leistungsfaktor)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.8"
+                max="1"
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.cos_phi}
+                onChange={(e) =>
+                  u("cos_phi", parseFloat(e.target.value) || 0.95)
+                }
+              />
+            </div>
+            <div>
+              <label className="block text-gray-300 text-sm mb-1">
+                Gleichzeitigkeitsfaktor
+              </label>
+              <input
+                type="number"
+                step="0.05"
+                min="0.1"
+                max="1"
+                className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                value={form.gleichzeitigkeitsfaktor}
+                onChange={(e) =>
+                  u(
+                    "gleichzeitigkeitsfaktor",
+                    parseFloat(e.target.value) || 0.9
+                  )
+                }
+              />
+            </div>
+            {form.erzeugungstyp === "BESS" && (
+              <div>
+                <label className="block text-gray-300 text-sm mb-1">
+                  Speicherkapazität (kWh)
+                </label>
+                <input
+                  type="number"
+                  className="w-full bg-gray-700 text-white rounded px-3 py-2"
+                  value={form.speicherkapazitaet_kwh || ""}
+                  onChange={(e) =>
+                    u(
+                      "speicherkapazitaet_kwh",
+                      parseFloat(e.target.value) || undefined
+                    )
+                  }
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Leistungs-Hinweis */}
+          <div className="bg-gray-700 rounded-lg p-3 text-sm text-gray-300">
+            💡 Empfohlene Spannungsebene für{" "}
+            {form.anschlussleistung_kw.toLocaleString()} kW:{" "}
+            <span className="text-blue-400 font-medium">
+              {form.anschlussleistung_kw <= 100
+                ? "NS"
+                : form.anschlussleistung_kw <= 20000
+                ? "MS"
+                : form.anschlussleistung_kw <= 200000
+                ? "HS"
+                : "HöS"}
+            </span>
+            {form.spannungsebene === "NS" &&
+              form.anschlussleistung_kw > 100 && (
+                <span className="text-yellow-400 ml-2">
+                  ⚠️ Leistung zu hoch für NS!
+                </span>
+              )}
+          </div>
+
+          <div className="flex justify-between pt-4">
+            <button
+              onClick={() => setStep(1)}
+              className="bg-gray-600 hover:bg-gray-500 text-white px-6 py-2 rounded-lg"
+            >
+              ← Zurück
+            </button>
+            <button
+              onClick={handleRun}
+              disabled={loading}
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium"
+            >
+              {loading ? "⏳ Berechne..." : "🔍 Analyse starten"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========== STEP 3: Ergebnis ========== */}
+      {step === 3 && result && (
+        <div className="space-y-4">
+          {/* Score-Header */}
+          <div className="bg-gray-800 rounded-xl p-6 text-center">
+            <div
+              className={inline-block px-4 py-1 rounded-full text-sm font-bold text-white mb-3 }
+            >
+              {scoreLabel(result.score)}
+            </div>
+            <div className={	ext-5xl font-bold }>
+              {result.score}
+              <span className="text-lg text-gray-400">/100</span>
+            </div>
+            <p className="text-gray-400 text-sm mt-2">
+              Konfidenz: {result.konfidenz}% · Projekt: {form.projektname}
+            </p>
+          </div>
+
+          {/* Technische Details */}
+          <div className="bg-gray-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">
+              📊 Technische Bewertung
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-white">
+                  {result.spannungsaenderung_prozent}%
+                </div>
+                <div className="text-gray-400 text-xs">Spannungsänderung</div>
+                <div
+                  className={	ext-xs mt-1 }
+                >
+                  {result.spannungsaenderung_prozent <= 2
+                    ? "✅ OK"
+                    : result.spannungsaenderung_prozent <= 3
+                    ? "⚠️ Grenzwertig"
+                    : "❌ Überschritten"}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-white">
+                  {result.thermische_auslastung_prozent}%
+                </div>
+                <div className="text-gray-400 text-xs">Therm. Auslastung</div>
+                <div
+                  className={	ext-xs mt-1 }
+                >
+                  {result.thermische_auslastung_prozent <= 50
+                    ? "✅ OK"
+                    : result.thermische_auslastung_prozent <= 70
+                    ? "⚠️ Erhöht"
+                    : "❌ Kritisch"}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-white">
+                  {result.kurzschlussleistung_mva} MVA
+                </div>
+                <div className="text-gray-400 text-xs">
+                  Kurzschlussleistung
+                </div>
+              </div>
+              <div className="text-center">
+                <div
+                  className={	ext-2xl font-bold }
+                >
+                  {result.n1_sicher ? "✅ Ja" : "❌ Nein"}
+                </div>
+                <div className="text-gray-400 text-xs">N-1 sicher</div>
+              </div>
+            </div>
+          </div>
+
+          {/* NVP Info */}
+          <div className="bg-gray-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-3">
+              📍 Netzverknüpfungspunkt
+            </h3>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="text-lg font-bold text-white">
+                  {result.nvp_bezeichnung}
+                </div>
+                <div className="text-gray-400 text-xs">Bezeichnung</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-white">
+                  {result.nvp_entfernung_km} km
+                </div>
+                <div className="text-gray-400 text-xs">Entfernung</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-white">
+                  {result.nvp_freie_kapazitaet_kw.toLocaleString()} kW
+                </div>
+                <div className="text-gray-400 text-xs">Freie Kapazität</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Einschränkungen */}
+          {result.einschraenkungen.length > 0 && (
+            <div className="bg-gray-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-red-400 mb-3">
+                ⚠️ Einschränkungen
+              </h3>
+              <ul className="space-y-2">
+                {result.einschraenkungen.map((e, i) => (
+                  <li key={i} className="flex items-start gap-2 text-gray-300">
+                    <span className="text-red-400 mt-0.5">✗</span>
+                    <span className="text-sm">{e}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Empfehlungen */}
+          <div className="bg-gray-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-3">
+              💡 Empfehlungen
+            </h3>
+            <ul className="space-y-2">
+              {result.empfehlungen.map((e, i) => (
+                <li key={i} className="flex items-start gap-2 text-gray-300">
+                  <span className="text-blue-400 mt-0.5">→</span>
+                  <span className="text-sm">{e}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Kosten & Zeit */}
+          <div className="bg-gray-800 rounded-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-3">
+              💰 Kosten & Zeitrahmen
+            </h3>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="text-xl font-bold text-blue-400">
+                  {(result.kosten_indikation_eur / 1000).toFixed(0)}k €
+                </div>
+                <div className="text-gray-400 text-xs">
+                  Geschätzte Kosten
+                </div>
+                <div className="text-gray-500 text-xs mt-1">
+                  Klasse: {result.kostenklasse}
+                </div>
+              </div>
+              <div>
+                <div className="text-xl font-bold text-white">
+                  {result.geschaetzte_bearbeitungszeit_wochen} Wo.
+                </div>
+                <div className="text-gray-400 text-xs">Bearbeitungszeit</div>
+              </div>
+              <div>
+                <div
+                  className={	ext-xl font-bold }
+                >
+                  {result.netzausbau_erforderlich ? "Ja" : "Nein"}
+                </div>
+                <div className="text-gray-400 text-xs">Netzausbau nötig</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Aktionen */}
+          <div className="flex justify-between">
+            <button
+              onClick={() => {
+                setStep(1);
+                setResult(null);
+                setForm({ ...INITIAL_FORM });
+              }}
+              className="bg-gray-600 hover:bg-gray-500 text-white px-6 py-2 rounded-lg"
+            >
+              🔄 Neue Analyse
+            </button>
+            <button
+              onClick={() =>
+                navigator.clipboard.writeText(
+                  JSON.stringify({ input: form, analyse: result }, null, 2)
+                )
+              }
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
+            >
+              📋 JSON kopieren
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

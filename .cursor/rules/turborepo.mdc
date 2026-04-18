@@ -1,0 +1,15 @@
+﻿---
+alwaysApply: true
+---
+# Turborepo Rules
+
+## Monorepo Struktur
+- apps/frontend → React App
+- apps/backend → FastAPI (separater Python Service)
+- packages/shared → geteilte TypeScript Types
+
+## Wichtig
+- Backend (Python/FastAPI) läuft NICHT in Turborepo Pipeline
+- Turborepo nur für Frontend und shared packages
+- Backend eigene Railway Service
+- Shared Types in packages/shared/types/

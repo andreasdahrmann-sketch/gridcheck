@@ -1,0 +1,44 @@
+import sys
+import os
+
+print("=" * 50)
+print("GRIDCHECK DIAGNOSIS")
+print("=" * 50)
+
+print(f"\nPython Version: {sys.version}")
+print(f"Python Pfad: {sys.executable}")
+print(f"Arbeitsverzeichnis: {os.getcwd()}")
+
+print("\n--- Projektstruktur ---")
+base = r"C:\Users\andre\Desktop\GridCheck"
+for root, dirs, files in os.walk(base):
+    dirs[:] = [d for d in dirs if d not in ('__pycache__', 'venv', '.git', 'node_modules')]
+    level = root.replace(base, "").count(os.sep)
+    indent = "  " * level
+    print(f"{indent}{os.path.basename(root)}/")
+    subindent = "  " * (level + 1)
+    for file in files:
+        size = os.path.getsize(os.path.join(root, file))
+        print(f"{subindent}{file} ({size} bytes)")
+
+print("\n--- Module Tests ---")
+modules = ['flask', 'flask_cors', 'flask_sqlalchemy', 'flask_login', 'werkzeug', 'sqlalchemy']
+for mod in modules:
+    try:
+        __import__(mod)
+        print(f"OK: {mod}")
+    except ImportError as e:
+        print(f"FEHLT: {mod} - {e}")
+
+print("\n--- App Import Test ---")
+sys.path.insert(0, base)
+try:
+    from backend.app import app
+    print("OK: backend.app importiert")
+    print(f"  Routes: {[rule.rule for rule in app.url_map.iter_rules()]}")
+except Exception as e:
+    print(f"FEHLER: {type(e).__name__}: {e}")
+
+print("\n" + "=" * 50)
+print("DIAGNOSIS FERTIG")
+print("=" * 50)

@@ -1,0 +1,572 @@
+﻿"use client";
+import { useState } from "react";
+import { berechneGridCheckResult } from "../lib/engine";
+import { GridCheckInput, GridCheckResult } from "../types";
+
+// -- Kundentypen --
+type CustomerType = "projektierer" | "speicherbetreiber" | "netzbetreiber";
+
+const CUSTOMER_LABELS: Record<CustomerType, string> = {
+  projektierer: "??? Projektierer / EPC",
+  speicherbetreiber: "?? Speicher- / Parkbetreiber",
+  netzbetreiber: "? Netzbetreiber",
+};
+
+const CUSTOMER_DESC: Record<CustomerType, string> = {
+  projektierer: "Prüfung ob Netzanschluss technisch machbar ist, welche Kapazität verfügbar ist und was optimiert werden kann.",
+  speicherbetreiber: "Bewertung bestehender oder geplanter Anschlüsse inkl. Speicherdimensionierung und Einspeise-/Bezugsoptimierung.",
+  netzbetreiber: "N-1 Analyse, Engpasserkennung, Kapazitätsbewertung und Ausbauplanung für das eigene Netzgebiet.",
+};
+
+// -- Erzeugungstypen je Kundentyp --
+const ERZEUGUNGS_OPTIONEN: Record<CustomerType, string[]> = {
+  projektierer: ["PV", "Wind", "PV + Speicher", "Wind + Speicher", "Hybridpark"],
+  speicherbetreiber: ["BESS (Stand-alone)", "PV + Speicher", "Wind + Speicher", "Hybridpark"],
+  netzbetreiber: ["Alle Einspeiser", "PV-Park", "Windpark", "BESS", "Mischgebiet"],
+};
+
+// -- Anschlussart je Kundentyp --
+const ANSCHLUSS_OPTIONEN: Record<CustomerType, string[]> = {
+  projektierer: ["Einspeisung", "Bezug + Einspeisung"],
+  speicherbetreiber: ["Bezug + Einspeisung", "Einspeisung"],
+  netzbetreiber: ["Einspeisung", "Bezug", "Bezug + Einspeisung", "Durchleitung"],
+};
+
+// -- Spannungsebenen --
+const SPANNUNGSEBENEN = ["MS (10 kV)", "MS (20 kV)", "MS (30 kV)", ];
+
+// -- Kabelquerschnitte --
+const KABELQUERSCHNITTE = ["unbekannt", "3x1x150", "3x1x185", "3x1x240", "3x1x300", "3x1x400", "3x1x500"];
+
+// -- Netzverknüpfungspunkt-Typen --
+const NVP_TYPEN = ["UW vorhanden", "Neues UW erforderlich", "Schaltanlage / Abzweig", "unbekannt"];
+
+interface FormData {
+  // Basis
+  kundentyp: CustomerType | "";
+  projektname: string;
+  projektierer: string;
+  plz: string;
+  ort: string;
+  strasse: string;
+  flurstueck: string;
+  bundesland: string;
+  // Technisch
+  anschlussleistung_kw: number;
+  spannungsebene: string;
+  anschlussart: string;
+  erzeugungstyp: string;
+  cos_phi: number;
+  gleichzeitigkeitsfaktor: number;
+  einspeiseleistung_kw: number | undefined;
+  bezugsleistung_kw: number | undefined;
+  speicherkapazitaet_kwh: number | undefined;
+  // Netzinfra
+  entfernung_uvp_km: number | undefined;
+  kabelquerschnitt: string;
+  nvp_typ: string;
+  trafo_leistung_mva: number | undefined;
+  kurzschlussleistung_mva: number | undefined;
+  // Netzbetreiber-spezifisch
+  anzahl_abgaenge: number | undefined;
+  bestehende_einspeisung_mw: number | undefined;
+  thermische_grenzleistung_mw: number | undefined;
+  // Meta
+  datum: string;
+  bemerkungen: string;
+}
+
+const INITIAL_FORM: FormData = {
+  kundentyp: "",
+  projektname: "",
+  projektierer: "",
+  plz: "",
+  ort: "",
+  strasse: "",
+  flurstueck: "",
+  bundesland: "",
+  anschlussleistung_kw: 10000,
+  spannungsebene: "MS (20 kV)",
+  anschlussart: "Einspeisung",
+  erzeugungstyp: "PV",
+  cos_phi: 0.95,
+  gleichzeitigkeitsfaktor: 0.9,
+  einspeiseleistung_kw: undefined,
+  bezugsleistung_kw: undefined,
+  speicherkapazitaet_kwh: undefined,
+  entfernung_uvp_km: undefined,
+  kabelquerschnitt: "unbekannt",
+  nvp_typ: "unbekannt",
+  trafo_leistung_mva: undefined,
+  kurzschlussleistung_mva: undefined,
+  anzahl_abgaenge: undefined,
+  bestehende_einspeisung_mw: undefined,
+  thermische_grenzleistung_mw: undefined,
+  datum: new Date().toISOString().split("T")[0],
+  bemerkungen: "",
+};
+
+// -- Styles --
+const inputClass = "w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2.5 text-white text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition";
+const labelClass = "block text-gray-300 text-sm font-medium mb-1.5";
+const sectionClass = "bg-gray-800/50 border border-gray-700 rounded-xl p-5 space-y-4";
+const sectionTitle = "text-lg font-semibold text-white flex items-center gap-2 mb-3";
+
+export default function GridCheckForm() {
+  const [step, setStep] = useState(0); // 0=Kundentyp, 1=Eingabe, 2=Ergebnis
+  const [result, setResult] = useState<GridCheckResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState<FormData>({ ...INITIAL_FORM });
+
+  const u = (field: keyof FormData, val: FormData[keyof FormData]) =>
+    setForm((p) => ({ ...p, [field]: val }));
+
+  const selectCustomerType = (ct: CustomerType) => {
+    u("kundentyp", ct);
+    // Defaults je Typ
+    if (ct === "speicherbetreiber") {
+      u("anschlussart", "Bezug + Einspeisung");
+      u("erzeugungstyp", "BESS (Stand-alone)");
+    } else if (ct === "netzbetreiber") {
+      u("anschlussart", "Einspeisung");
+      u("erzeugungstyp", "Alle Einspeiser");
+    } else {
+      u("anschlussart", "Einspeisung");
+      u("erzeugungstyp", "PV");
+    }
+    setStep(1);
+  };
+
+  const canRun =
+    form.projektname.trim() !== "" &&
+    form.plz.trim() !== "" &&
+    form.anschlussleistung_kw > 0;
+
+  const handleRun = () => {
+    setLoading(true);
+    try {
+      const engineInput: GridCheckInput = {
+        plz: form.plz,
+        ort: form.ort,
+        strasse: form.strasse,
+        flurstueck: form.flurstueck,
+        bundesland: form.bundesland,
+        anschlussleistung_kw: form.anschlussleistung_kw,
+        spannungsebene: "MS" as const,
+        anschlussart: form.anschlussart.includes("Bezug + Einspeisung") ? "Bidirektional" : form.anschlussart.includes("Bezug") ? "Bezug" : "Einspeisung",
+        erzeugungstyp: form.erzeugungstyp.includes("PV") ? "PV" : form.erzeugungstyp.includes("Wind") ? "Wind" : "BESS",
+        cos_phi: form.cos_phi,
+        gleichzeitigkeitsfaktor: form.gleichzeitigkeitsfaktor,
+        einspeiseleistung_kw: form.einspeiseleistung_kw,
+        bezugsleistung_kw: form.bezugsleistung_kw,
+        speicherkapazitaet_kwh: form.speicherkapazitaet_kwh,
+        projektname: form.projektname,
+        projektierer: form.projektierer,
+        datum: form.datum,
+      };
+      const r = berechneGridCheckResult(engineInput);
+      setResult(r);
+      setStep(2);
+    } catch (e) {
+      alert("Fehler bei der Analyse: " + e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ----------------------------------------
+  // STEP 0: Kundentyp-Auswahl
+  // ----------------------------------------
+  if (step === 0) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-bold text-white mb-3">? GridCheck Pro</h1>
+          <p className="text-gray-400 text-lg">Pre-Netzanschluss-Diagnose für Mittelspannungsprojekte (10–30 MW)</p>
+          <div className="mt-2 inline-block bg-blue-900/30 border border-blue-700 rounded-lg px-4 py-1.5 text-blue-300 text-sm">
+            B2B • Mittelspannung • Revisionssicher
+          </div>
+        </div>
+
+        <h2 className="text-xl text-white font-semibold mb-6 text-center">Wählen Sie Ihren Anwendungsfall:</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {(Object.keys(CUSTOMER_LABELS) as CustomerType[]).map((ct) => (
+            <button
+              key={ct}
+              onClick={() => selectCustomerType(ct)}
+              className="bg-gray-800 border-2 border-gray-600 hover:border-blue-500 rounded-2xl p-6 text-left transition-all hover:bg-gray-750 hover:shadow-lg hover:shadow-blue-900/20 group"
+            >
+              <div className="text-2xl mb-3">{CUSTOMER_LABELS[ct].split(" ")[0]}</div>
+              <div className="text-white font-semibold text-lg mb-2">{CUSTOMER_LABELS[ct].substring(CUSTOMER_LABELS[ct].indexOf(" ") + 1)}</div>
+              <p className="text-gray-400 text-sm leading-relaxed">{CUSTOMER_DESC[ct]}</p>
+              <div className="mt-4 text-blue-400 text-sm font-medium group-hover:text-blue-300">
+                Auswählen ?
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-10 text-center text-gray-500 text-xs">
+          GridCheck Pro v1.0 • Alle Analysen revisionssicher gespeichert • Keine Gewähr für Netzbetreiber-Zusagen
+        </div>
+      </div>
+    );
+  }
+
+  // ----------------------------------------
+  // STEP 1: Eingabemaske (differenziert)
+  // ----------------------------------------
+  if (step === 1) {
+    const ct = form.kundentyp as CustomerType;
+    const isNB = ct === "netzbetreiber";
+    const isSP = ct === "speicherbetreiber";
+
+    return (
+      <div className="max-w-5xl mx-auto p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <button onClick={() => setStep(0)} className="text-gray-400 hover:text-white text-sm mb-2 flex items-center gap-1">
+              ? Zurück zur Auswahl
+            </button>
+            <h1 className="text-3xl font-bold text-white">? GridCheck Pro</h1>
+            <div className="mt-1 inline-block bg-blue-900/30 border border-blue-700 rounded px-3 py-1 text-blue-300 text-sm">
+              {CUSTOMER_LABELS[ct]}
+            </div>
+          </div>
+          <div className="text-right text-gray-400 text-sm">
+            Datum: {form.datum}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {/* -- Projektdaten -- */}
+          <div className={sectionClass}>
+            <h3 className={sectionTitle}>?? Projektdaten</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Projektname *</label>
+                <input className={inputClass} value={form.projektname} onChange={(e) => u("projektname", e.target.value)} placeholder="z.B. Solarpark Musterstadt" />
+              </div>
+              <div>
+                <label className={labelClass}>{isNB ? "Bearbeiter" : "Projektierer / Firma"}</label>
+                <input className={inputClass} value={form.projektierer} onChange={(e) => u("projektierer", e.target.value)} placeholder={isNB ? "Name Sachbearbeiter" : "Firma"} />
+              </div>
+            </div>
+          </div>
+
+          {/* -- Standort -- */}
+          <div className={sectionClass}>
+            <h3 className={sectionTitle}>?? Standort / Netzgebiet</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label className={labelClass}>PLZ *</label>
+                <input className={inputClass} value={form.plz} onChange={(e) => u("plz", e.target.value)} placeholder="12345" maxLength={5} />
+              </div>
+              <div>
+                <label className={labelClass}>Ort</label>
+                <input className={inputClass} value={form.ort} onChange={(e) => u("ort", e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>Straße / Flur</label>
+                <input className={inputClass} value={form.strasse} onChange={(e) => u("strasse", e.target.value)} />
+              </div>
+              <div>
+                <label className={labelClass}>Bundesland</label>
+                <select className={inputClass} value={form.bundesland} onChange={(e) => u("bundesland", e.target.value)}>
+                  <option value="">-- wählen --</option>
+                  {["Baden-Württemberg","Bayern","Berlin","Brandenburg","Bremen","Hamburg","Hessen","Mecklenburg-Vorpommern","Niedersachsen","Nordrhein-Westfalen","Rheinland-Pfalz","Saarland","Sachsen","Sachsen-Anhalt","Schleswig-Holstein","Thüringen"].map(bl => (
+                    <option key={bl} value={bl}>{bl}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {!isNB && (
+              <div>
+                <label className={labelClass}>Flurstück</label>
+                <input className={inputClass} value={form.flurstueck} onChange={(e) => u("flurstueck", e.target.value)} placeholder="z.B. Flur 3, Flurstück 124/2" />
+              </div>
+            )}
+          </div>
+
+          {/* -- Technische Parameter -- */}
+          <div className={sectionClass}>
+            <h3 className={sectionTitle}>?? Technische Parameter</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={labelClass}>Anschlussleistung (kW) *</label>
+                <input type="number" className={inputClass} value={form.anschlussleistung_kw || ""} onChange={(e) => u("anschlussleistung_kw", Number(e.target.value))} min={0} step={100} />
+                <span className="text-gray-500 text-xs mt-1 block">{(form.anschlussleistung_kw / 1000).toFixed(1)} MW</span>
+              </div>
+              <div>
+                <label className={labelClass}>Spannungsebene</label>
+                <select className={inputClass} value={form.spannungsebene} onChange={(e) => u("spannungsebene", e.target.value)}>
+                  {SPANNUNGSEBENEN.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Anschlussart</label>
+                <select className={inputClass} value={form.anschlussart} onChange={(e) => u("anschlussart", e.target.value)}>
+                  {ANSCHLUSS_OPTIONEN[ct].map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={labelClass}>Erzeugungstyp / Anlage</label>
+                <select className={inputClass} value={form.erzeugungstyp} onChange={(e) => u("erzeugungstyp", e.target.value)}>
+                  {ERZEUGUNGS_OPTIONEN[ct].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>cos f</label>
+                <input type="number" className={inputClass} value={form.cos_phi} onChange={(e) => u("cos_phi", Number(e.target.value))} min={0.8} max={1} step={0.01} />
+              </div>
+              <div>
+                <label className={labelClass}>Gleichzeitigkeitsfaktor</label>
+                <input type="number" className={inputClass} value={form.gleichzeitigkeitsfaktor} onChange={(e) => u("gleichzeitigkeitsfaktor", Number(e.target.value))} min={0.1} max={1} step={0.05} />
+              </div>
+            </div>
+
+            {/* Leistungsfelder kontextbezogen */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {(form.anschlussart.includes("Einspeisung") || isNB) && (
+                <div>
+                  <label className={labelClass}>Einspeiseleistung (kW)</label>
+                  <input type="number" className={inputClass} value={form.einspeiseleistung_kw ?? ""} onChange={(e) => u("einspeiseleistung_kw", e.target.value ? Number(e.target.value) : undefined)} />
+                </div>
+              )}
+              {(form.anschlussart.includes("Bezug") || isSP) && (
+                <div>
+                  <label className={labelClass}>Bezugsleistung (kW)</label>
+                  <input type="number" className={inputClass} value={form.bezugsleistung_kw ?? ""} onChange={(e) => u("bezugsleistung_kw", e.target.value ? Number(e.target.value) : undefined)} />
+                </div>
+              )}
+              {(form.erzeugungstyp.includes("Speicher") || form.erzeugungstyp.includes("BESS") || isSP) && (
+                <div>
+                  <label className={labelClass}>Speicherkapazität (kWh)</label>
+                  <input type="number" className={inputClass} value={form.speicherkapazitaet_kwh ?? ""} onChange={(e) => u("speicherkapazitaet_kwh", e.target.value ? Number(e.target.value) : undefined)} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* -- Netzinfrastruktur -- */}
+          <div className={sectionClass}>
+            <h3 className={sectionTitle}>?? Netzinfrastruktur</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={labelClass}>Entfernung zum UW (km)</label>
+                <input type="number" className={inputClass} value={form.entfernung_uvp_km ?? ""} onChange={(e) => u("entfernung_uvp_km", e.target.value ? Number(e.target.value) : undefined)} step={0.1} />
+              </div>
+              <div>
+                <label className={labelClass}>Kabelquerschnitt</label>
+                <select className={inputClass} value={form.kabelquerschnitt} onChange={(e) => u("kabelquerschnitt", e.target.value)}>
+                  {KABELQUERSCHNITTE.map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Netzverknüpfungspunkt</label>
+                <select className={inputClass} value={form.nvp_typ} onChange={(e) => u("nvp_typ", e.target.value)}>
+                  {NVP_TYPEN.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={labelClass}>Trafo-Leistung (MVA)</label>
+                <input type="number" className={inputClass} value={form.trafo_leistung_mva ?? ""} onChange={(e) => u("trafo_leistung_mva", e.target.value ? Number(e.target.value) : undefined)} step={0.5} />
+              </div>
+              <div>
+                <label className={labelClass}>Kurzschlussleistung Sk&quot; (MVA)</label>
+                <input type="number" className={inputClass} value={form.kurzschlussleistung_mva ?? ""} onChange={(e) => u("kurzschlussleistung_mva", e.target.value ? Number(e.target.value) : undefined)} step={1} />
+              </div>
+              {isNB && (
+                <div>
+                  <label className={labelClass}>Anzahl Abgänge am UW</label>
+                  <input type="number" className={inputClass} value={form.anzahl_abgaenge ?? ""} onChange={(e) => u("anzahl_abgaenge", e.target.value ? Number(e.target.value) : undefined)} />
+                </div>
+              )}
+            </div>
+            {isNB && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Bestehende Einspeisung (MW)</label>
+                  <input type="number" className={inputClass} value={form.bestehende_einspeisung_mw ?? ""} onChange={(e) => u("bestehende_einspeisung_mw", e.target.value ? Number(e.target.value) : undefined)} step={0.5} />
+                </div>
+                <div>
+                  <label className={labelClass}>Thermische Grenzleistung (MW)</label>
+                  <input type="number" className={inputClass} value={form.thermische_grenzleistung_mw ?? ""} onChange={(e) => u("thermische_grenzleistung_mw", e.target.value ? Number(e.target.value) : undefined)} step={0.5} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* -- Bemerkungen -- */}
+          <div className={sectionClass}>
+            <h3 className={sectionTitle}>?? Bemerkungen</h3>
+            <textarea className={inputClass + " h-24 resize-none"} value={form.bemerkungen} onChange={(e) => u("bemerkungen", e.target.value)} placeholder="Zusätzliche Informationen, Besonderheiten..." />
+          </div>
+
+          {/* -- Buttons -- */}
+          <div className="flex justify-between items-center pt-4">
+            <button onClick={() => setStep(0)} className="text-gray-400 hover:text-white border border-gray-600 px-6 py-2.5 rounded-lg text-sm transition">
+              ? Zurück
+            </button>
+            <button
+              onClick={handleRun}
+              disabled={!canRun || loading}
+              className="bg-green-600 hover:bg-green-700 disabled:opacity-30 text-white px-10 py-3 rounded-lg text-sm font-semibold transition shadow-lg shadow-green-900/30"
+            >
+              {loading ? "? Berechne..." : "? Analyse starten"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ----------------------------------------
+  // STEP 2: Ergebnis (differenziert nach Kundentyp)
+  // ----------------------------------------
+  if (step === 2 && result) {
+    const ct = form.kundentyp as CustomerType;
+    const ampelStatus = result.score >= 70 ? "grün" : result.score >= 40 ? "gelb" : "rot";
+    const ampelColor = ampelStatus === "grün" ? "text-green-400 bg-green-900/30 border-green-700"
+      : ampelStatus === "gelb" ? "text-yellow-400 bg-yellow-900/30 border-yellow-700"
+      : "text-red-400 bg-red-900/30 border-red-700";
+    const ampelIcon = ampelStatus === "grün" ? "✅" : ampelStatus === "gelb" ? "⚠️" : "❌";
+
+    return (
+      <div className="max-w-5xl mx-auto p-6">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-white">? Analyseergebnis</h1>
+            <p className="text-gray-400 mt-1">{form.projektname} • {CUSTOMER_LABELS[ct]}</p>
+          </div>
+          <div className="text-right text-gray-400 text-sm">
+            {form.datum} • Ref: GC-{Date.now().toString(36).toUpperCase()}
+          </div>
+        </div>
+
+        {/* Ampel-Status */}
+        <div className={`border-2 rounded-2xl p-6 mb-6 ${ampelColor}`}>
+          <div className="text-3xl font-bold mb-2">{ampelIcon} Netzanschluss: {ampelStatus.toUpperCase()}</div>
+          <p className="text-lg opacity-90">{result.machbar ? "Netzanschluss ist unter den gegebenen Bedingungen realisierbar." : "Netzanschluss ist unter den aktuellen Bedingungen nicht ohne Weiteres möglich."}</p>
+        </div>
+
+        {/* Technische Kennwerte */}
+        <div className={sectionClass + " mb-6"}>
+          <h3 className={sectionTitle}>?? Technische Kennwerte</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-900 rounded-lg p-3">
+              <div className="text-gray-400 text-xs">Scheinleistung</div>
+              <div className="text-white text-lg font-bold">{result.scheinleistung_kva?.toFixed(0)} kVA</div>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-3">
+              <div className="text-gray-400 text-xs">Strom (3-phasig)</div>
+              <div className="text-white text-lg font-bold">{result.strom_a?.toFixed(1)} A</div>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-3">
+              <div className="text-gray-400 text-xs">Spannungsänderung</div>
+              <div className="text-white text-lg font-bold">{result.spannungsaenderung_pct?.toFixed(2)} %</div>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-3">
+              <div className="text-gray-400 text-xs">Kurzschluss-Anteil</div>
+              <div className="text-white text-lg font-bold">{result.kurzschluss_anteil_pct?.toFixed(1)} %</div>
+            </div>
+          </div>
+        </div>
+
+        {/* N-1 Analyse */}
+        <div className={sectionClass + " mb-6"}>
+          <h3 className={sectionTitle}>?? N-1 Analyse</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-gray-900 rounded-lg p-3">
+              <div className="text-gray-400 text-xs">N-1 Status</div>
+              <div className={`text-lg font-bold ${result.n1_ok ? "text-green-400" : "text-red-400"}`}>
+                {result.n1_ok ? "? N-1 erfüllt" : "? N-1 kritisch"}
+              </div>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-3">
+              <div className="text-gray-400 text-xs">N-1 Bewertung</div>
+              <div className="text-white text-sm">{result.n1_detail || "Standardbewertung auf Basis der Eingangsdaten"}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Empfehlungen */}
+        {result.empfehlungen && result.empfehlungen.length > 0 && (
+          <div className={sectionClass + " mb-6"}>
+            <h3 className={sectionTitle}>?? Empfehlungen</h3>
+            <ul className="space-y-2">
+              {result.empfehlungen.map((e, i) => (
+                <li key={i} className="flex items-start gap-2 text-gray-300 text-sm">
+                  <span className="text-blue-400 mt-0.5">?</span>
+                  <span>{e}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Kundentyp-spezifische Zusatzinfos */}
+        {ct === "netzbetreiber" && (
+          <div className={sectionClass + " mb-6"}>
+            <h3 className={sectionTitle}>?? Netzbetreiber-Bewertung</h3>
+            <div className="text-gray-300 text-sm space-y-2">
+              <p>• Bestehende Einspeisung im Netzgebiet: {form.bestehende_einspeisung_mw ?? "k.A."} MW</p>
+              <p>• Thermische Grenzleistung: {form.thermische_grenzleistung_mw ?? "k.A."} MW</p>
+              <p>• Verbleibende Kapazität: {form.thermische_grenzleistung_mw && form.bestehende_einspeisung_mw ? ((form.thermische_grenzleistung_mw - form.bestehende_einspeisung_mw) * 1000).toFixed(0) + " kW" : "nicht berechenbar"}</p>
+              <p>• Anzahl Abgänge: {form.anzahl_abgaenge ?? "k.A."}</p>
+            </div>
+          </div>
+        )}
+
+        {ct === "speicherbetreiber" && form.speicherkapazitaet_kwh && (
+          <div className={sectionClass + " mb-6"}>
+            <h3 className={sectionTitle}>?? Speicher-Bewertung</h3>
+            <div className="text-gray-300 text-sm space-y-2">
+              <p>• Speicherkapazität: {form.speicherkapazitaet_kwh} kWh ({(form.speicherkapazitaet_kwh / 1000).toFixed(1)} MWh)</p>
+              <p>• C-Rate (bei Nennleistung): {(form.anschlussleistung_kw / form.speicherkapazitaet_kwh).toFixed(2)}</p>
+              <p>• Vollzyklen/Tag (theoretisch): {(24 / (form.speicherkapazitaet_kwh / form.anschlussleistung_kw * 2)).toFixed(1)}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Buttons */}
+        <div className="flex justify-between items-center pt-6">
+          <button onClick={() => setStep(1)} className="text-gray-400 hover:text-white border border-gray-600 px-6 py-2.5 rounded-lg text-sm transition">
+            ? Eingaben bearbeiten
+          </button>
+          <div className="flex gap-3">
+            <button onClick={() => { setStep(0); setForm({ ...INITIAL_FORM }); setResult(null); }}
+              className="border border-gray-600 text-gray-300 hover:text-white px-6 py-2.5 rounded-lg text-sm transition">
+              ?? Neue Analyse
+            </button>
+            <button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-lg text-sm font-semibold transition">
+              ?? PDF Export
+            </button>
+          </div>
+        </div>
+
+        {/* Revisionssicherheit */}
+        <div className="mt-8 border-t border-gray-700 pt-4 text-center text-gray-500 text-xs">
+          Analyse-ID: GC-{Date.now().toString(36).toUpperCase()} • Erstellt: {new Date().toLocaleString("de-DE")} • Revisionssicher gespeichert • Keine Gewähr für Netzbetreiber-Zusagen
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+
+
+
+
+
+
+

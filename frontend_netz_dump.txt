@@ -1,0 +1,103 @@
+﻿import { useState } from 'react';
+
+export default function StepNetzparameter({ data, onNext, onBack }) {
+  const [form, setForm] = useState({
+    netztyp: data.netztyp || 'Strahlennetz',
+    entfernung_ums_km: data.entfernung_ums_km || '',
+    trafo_leistung_mva: data.trafo_leistung_mva || '',
+    skv_mva: data.skv_mva || '',
+    bestehende_einspeisung_kw: data.bestehende_einspeisung_kw || '0',
+    leitungstyp: data.leitungstyp || 'NAYY 150',
+    leitungslaenge_km: data.leitungslaenge_km || '',
+  });
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = () => {
+    if (!form.entfernung_ums_km || !form.trafo_leistung_mva) {
+      alert('Bitte alle Pflichtfelder ausfuellen');
+      return;
+    }
+    onNext(form);
+  };
+
+  return (
+    <div>
+      <h2 className="text-xl font-bold text-blue-400 mb-6">Netzparameter</h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">Netztyp *</label>
+          <select name="netztyp" value={form.netztyp} onChange={handleChange}
+            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none">
+            <option value="Strahlennetz">Strahlennetz</option>
+            <option value="Ringnetz">Ringnetz</option>
+            <option value="Maschennetz">Maschennetz</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">Entfernung zum UW (km) *</label>
+          <input type="number" step="0.1" name="entfernung_ums_km" value={form.entfernung_ums_km} onChange={handleChange}
+            placeholder="z.B. 5.2"
+            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">Trafo-Leistung (MVA) *</label>
+          <input type="number" step="0.1" name="trafo_leistung_mva" value={form.trafo_leistung_mva} onChange={handleChange}
+            placeholder="z.B. 40"
+            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">Kurzschlussleistung Skv (MVA)</label>
+          <input type="number" step="0.1" name="skv_mva" value={form.skv_mva} onChange={handleChange}
+            placeholder="z.B. 250 (optional)"
+            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+          <p className="text-xs text-gray-500 mt-1">Falls unbekannt, wird geschaetzt</p>
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">Bestehende Einspeisung (kW)</label>
+          <input type="number" name="bestehende_einspeisung_kw" value={form.bestehende_einspeisung_kw} onChange={handleChange}
+            placeholder="0"
+            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">Leitungstyp</label>
+          <select name="leitungstyp" value={form.leitungstyp} onChange={handleChange}
+            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:outline-none">
+            <option value="NAYY 150">NAYY 150mmÂ²</option>
+            <option value="NAYY 240">NAYY 240mmÂ²</option>
+            <option value="NA2XS2Y 150">NA2XS2Y 150mmÂ²</option>
+            <option value="NA2XS2Y 240">NA2XS2Y 240mmÂ²</option>
+            <option value="Al/St 240/40">Freileitung Al/St 240/40</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">Leitungslaenge (km)</label>
+          <input type="number" step="0.1" name="leitungslaenge_km" value={form.leitungslaenge_km} onChange={handleChange}
+            placeholder="z.B. 3.5"
+            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none" />
+        </div>
+      </div>
+
+      <div className="flex justify-between mt-8">
+        <button onClick={onBack}
+          className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg text-white transition-colors">
+          Zurueck
+        </button>
+        <button onClick={handleSubmit}
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-semibold transition-colors">
+          Analyse starten ðŸš€
+        </button>
+      </div>
+    </div>
+  );
+}
+

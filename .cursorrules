@@ -1,0 +1,27 @@
+﻿# GridCheck Pro - Cursor Rules
+
+## STACK
+- Frontend: Vite + React (JavaScript), localhost:5173
+- Backend: Python FastAPI, localhost:8000
+- Root: C:\Users\andre\gridcheck\
+
+## STRUKTUR
+- frontend/src/App.jsx
+- backend/main.py, engine.py, models.py, constants.py
+- backend/audit_log/
+
+## REGELN
+- Backend ist Single Source of Truth
+- Keine Business-Logik im Frontend
+- Revisionssicherheit: Audit-Log, immutable Ergebnisse
+- Normen: VDE-AR-N 4105/4110/4120
+- N-1 Analyse IMMER
+- Vollstaendige Dateien ausgeben, kein Code abschneiden
+
+# === KRITISCHE REGEL (aus Fehler gelernt) ===
+# NIEMALS funktionierenden Code überschreiben ohne explizite Aufforderung!
+# Immer zuerst prüfen was existiert bevor etwas erstellt wird.
+# Chatverlauf sorgfältig prüfen - der Projektstand ist heilig.
+# Vor jeder Codeänderung: Was existiert? Was funktioniert? Was fehlt konkret?
+# Bestehenden Code nur anfassen wenn explizit gewünscht.
+# Im Zweifel FRAGEN, nicht handeln.

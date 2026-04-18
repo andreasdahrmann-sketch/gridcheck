@@ -1,0 +1,26 @@
+﻿---
+alwaysApply: true
+---
+# Security Rules
+
+## Authentication
+- JWT mit Refresh Token Rotation
+- Passwörter: bcrypt salt rounds >= 12
+- Access Token: 8h, Refresh Token: 30d
+
+## API Security
+- CORS nur für bekannte Origins
+- Rate Limiting: 100 req/min pro IP
+- Nur ORM, nie string concatenation (SQL Injection)
+- Input immer via Pydantic validieren
+
+## Revisionssicherheit
+- Jede Berechnung als unveränderlicher Snapshot (JSONB)
+- Audit Log bei: Login, Berechnung, Export, Änderung
+- Soft Delete: deleted_at statt echtem DELETE
+- DSGVO: Daten nur EU Region
+
+## Secrets
+- Niemals Secrets im Code
+- Immer .env / Railway Environment Variables
+- .env in .gitignore

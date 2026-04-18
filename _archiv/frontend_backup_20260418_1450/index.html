@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GridCheck Pro - Netzanschluss Pre-Check</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0e17;--card:#111827;--border:#1e2a3a;--accent:#3b82f6;--green:#10b981;--yellow:#f59e0b;--red:#ef4444;--text:#e2e8f0;--muted:#64748b;--input-bg:#0f172a}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:linear-gradient(135deg,#0f172a,#1e293b);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:20px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .badge{font-size:11px;background:var(--accent);color:#fff;padding:2px 8px;border-radius:10px}
+.container{max-width:1200px;margin:0 auto;padding:24px}
+.steps{display:flex;gap:8px;margin-bottom:24px}
+.step{flex:1;padding:10px;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--muted);cursor:pointer;transition:.2s}
+.step.active{border-color:var(--accent);color:var(--accent);font-weight:600}
+.step.done{border-color:var(--green);color:var(--green)}
+.panel{display:none;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px}
+.panel.active{display:block}
+.panel h2{font-size:18px;margin-bottom:16px;color:var(--accent)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group.full{grid-column:1/-1}
+label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+input,select{background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:14px;outline:none;transition:.2s}
+input:focus,select:focus{border-color:var(--accent)}
+select option{background:var(--input-bg);color:var(--text)}
+.hint{font-size:11px;color:var(--muted)}
+.btn{padding:12px 24px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:.2s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#2563eb}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+.btn-row{display:flex;gap:12px;justify-content:flex-end;margin-top:20px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.result-header{display:flex;align-items:center;gap:16px;margin-bottom:24px;padding:20px;border-radius:12px}
+.result-header.green{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3)}
+.result-header.yellow{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3)}
+.result-header.red{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3)}
+.ampel-dot{width:48px;height:48px;border-radius:50%}
+.ampel-dot.green{background:var(--green);box-shadow:0 0 20px rgba(16,185,129,.5)}
+.ampel-dot.yellow{background:var(--yellow);box-shadow:0 0 20px rgba(245,158,11,.5)}
+.ampel-dot.red{background:var(--red);box-shadow:0 0 20px rgba(239,68,68,.5)}
+.result-title{font-size:20px;font-weight:700}
+.result-sub{font-size:13px;color:var(--muted)}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:24px}
+.metric-card{background:var(--input-bg);border:1px solid var(--border);border-radius:10px;padding:16px}
+.metric-card h4{font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;margin-bottom:8px}
+.metric-val{font-size:24px;font-weight:700}
+.metric-bar{height:6px;background:var(--border);border-radius:3px;margin-top:8px;overflow:hidden}
+.metric-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.metric-detail{font-size:11px;color:var(--muted);margin-top:4px}
+.check-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.check-icon{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff}
+.check-icon.pass{background:var(--green)}
+.check-icon.fail{background:var(--red)}
+.detail-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}
+.detail-table td{padding:6px 8px;border-bottom:1px solid var(--border)}
+.detail-table td:first-child{color:var(--muted);width:50%}
+.detail-table td:last-child{text-align:right;font-weight:600}
+.history-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer;transition:.2s}
+.history-item:hover{border-color:var(--accent)}
+@media(max-width:640px){.form-grid{grid-template-columns:1fr}.metrics{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div><h1>? GridCheck Pro</h1><span style="font-size:11px;color:var(--muted)">Netzanschluss Pre-Check v2.0</span></div>
+  <span class="badge">BETA</span>
+</div>
+
+<div class="container">
+  <div class="steps">
+    <div class="step active" id="step1-tab" onclick="showStep(1)">? Projekt</div>
+    <div class="step" id="step2-tab" onclick="showStep(2)">? Netzparameter</div>
+    <div class="step" id="step3-tab" onclick="showStep(3)">? Ergebnis</div>
+  </div>
+
+  <div class="panel active" id="step1">
+    <h2>Projektdaten</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Projektname *</label><input id="f-name" placeholder="z.B. Solarpark Musterstadt" maxlength="255"></div>
+      <div class="form-group"><label>PLZ *</label><input id="f-plz" placeholder="12345" maxlength="5" pattern="\d{5}"></div>
+      <div class="form-group"><label>Anlagentyp *</label>
+        <select id="f-type">
+          <option value="pv">?? Photovoltaik</option>
+          <option value="wind">?? Windenergie</option>
+          <option value="battery">?? Batteriespeicher</option>
+          <option value="charging">?? Ladeinfrastruktur</option>
+          <option value="industry">?? Industrie</option>
+          <option value="heat_pump">?? Wärmepumpe</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Anschlussleistung (kW) *</label><input id="f-power" type="number" min="1" max="50000" placeholder="z.B. 5000"></div>
+      <div class="form-group"><label>Spannungsebene</label>
+        <select id="f-voltage">
+          <option value="10kV">10 kV (MS)</option>
+          <option value="20kV" selected>20 kV (MS)</option>
+          <option value="30kV">30 kV (MS)</option>
+        </select>
+      </div>
+      <div class="form-group"><label>cos f</label><input id="f-cosphi" type="number" min="0.8" max="1.0" step="0.01" value="0.95"><span class="hint">Standard: 0,95 (VDE-AR-N 4110)</span></div>
+    </div>
+    <div class="btn-row"><button class="btn btn-primary" onclick="createProject()">Weiter ? Netzparameter</button></div>
+  </div>
+
+  <div class="panel" id="step2">
+    <h2>Netzparameter</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Falls unbekannt, werden Standardwerte verwendet (konservativ).</p>
+    <div class="form-grid">
+      <div class="form-group"><label>Kurzschlussleistung Sk (MVA)</label><input id="f-sk" type="number" min="50" max="2000" value="250" step="10"><span class="hint">Typisch MS: 150–500 MVA</span></div>
+      <div class="form-group"><label>Kabeltyp</label>
+        <select id="f-cable">
+          <option value="NA2XS2Y_1x240">NA2XS2Y 1x240mm² (Standard)</option>
+          <option value="NA2XS2Y_1x185">NA2XS2Y 1x185mm²</option>
+          <option value="NA2XS2Y_1x150">NA2XS2Y 1x150mm²</option>
+          <option value="NAYY_1x240">NAYY 1x240mm²</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Kabellänge (km)</label><input id="f-length" type="number" min="0.1" max="50" step="0.1" value="5.0"></div>
+      <div class="form-group"><label>Trafo-Nennleistung (kVA)</label><input id="f-trafo" type="number" min="100" max="63000" value="40000" step="100"><span class="hint">Typisch: 20.000–40.000 kVA</span></div>
+      <div class="form-group"><label>uk (%) - Kurzschlussspannung Trafo</label><input id="f-uk" type="number" min="4" max="20" step="0.1" value="12.0"></div>
+      <div class="form-group"><label>Bestehende Last (kW)</label><input id="f-existing" type="number" min="0" max="50000" value="0"><span class="hint">Bereits angeschlossene Verbraucher/Erzeuger</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="showStep(1)">? Zurück</button>
+      <button class="btn btn-primary" onclick="runCalculation()">? Berechnung starten</button>
+    </div>
+  </div>
+
+  <div class="panel" id="step3">
+    <div id="result-content"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="showStep(2)">? Parameter ändern</button>
+      <button class="btn btn-secondary" onclick="showStep(1)">+ Neues Projekt</button>
+    </div>
+  </div>
+
+  <div style="margin-top:32px">
+    <h3 style="font-size:14px;color:var(--muted);margin-bottom:12px">?? Letzte Berechnungen</h3>
+    <div id="history-list"><span style="font-size:12px;color:var(--muted)">Noch keine Berechnungen.</span></div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000/api';
+let currentProjectId = null;
+
+function showStep(n) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step'+n).classList.add('active');
+  document.getElementById('step'+n+'-tab').classList.add('active');
+  for(let i=1;i<n;i++) document.getElementById('step'+i+'-tab').classList.add('done');
+}
+
+async function createProject() {
+  const name = document.getElementById('f-name').value.trim();
+  const plz = document.getElementById('f-plz').value.trim();
+  const power = parseFloat(document.getElementById('f-power').value);
+  const type = document.getElementById('f-type').value;
+  const voltage = document.getElementById('f-voltage').value;
+  const cos_phi = parseFloat(document.getElementById('f-cosphi').value);
+
+  if(!name||!plz||!power){alert('Bitte alle Pflichtfelder ausfüllen.');return;}
+  if(!/^\d{5}$/.test(plz)){alert('PLZ muss 5 Ziffern haben.');return;}
+  if(power<=0||power>50000){alert('Leistung: 1–50.000 kW');return;}
+
+  try {
+    const res = await fetch(API+'/projects', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,plz,power_kw:power,plant_type:type,voltage_kv:voltage,cos_phi})
+    });
+    if(!res.ok){const e=await res.json();throw new Error(JSON.stringify(e.detail||e));}
+    const data = await res.json();
+    currentProjectId = data.id;
+    showStep(2);
+  } catch(e) { alert('Fehler: '+e.message); }
+}
+
+async function runCalculation() {
+  if(!currentProjectId){alert('Kein Projekt. Bitte Schritt 1 zuerst.');return;}
+  const body = {
+    project_id: currentProjectId,
+    sk_mv: parseFloat(document.getElementById('f-sk').value),
+    cable_type: document.getElementById('f-cable').value,
+    cable_length_km: parseFloat(document.getElementById('f-length').value),
+    transformer_sn_kva: parseFloat(document.getElementById('f-trafo').value),
+    uk_percent: parseFloat(document.getElementById('f-uk').value),
+    existing_load_kw: parseFloat(document.getElementById('f-existing').value),
+  };
+  try {
+    const res = await fetch(API+'/calculate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    if(!res.ok){const e=await res.json();throw new Error(JSON.stringify(e.detail||e));}
+    const data = await res.json();
+    renderResult(data.result, data.calculation_id);
+    showStep(3);
+    loadHistory();
+  } catch(e) { alert('Berechnungsfehler: '+e.message); }
+}
+
+function colorFor(ampel){ return ampel==='green'?'var(--green)':ampel==='yellow'?'var(--yellow)':'var(--red)'; }
+function pct(v){ return Math.min(100, Math.max(0, v||0)).toFixed(1); }
+function num(v,d=2){ return (v==null||isNaN(v))?'—':Number(v).toFixed(d); }
+function passIcon(ok){ return '<div class="check-icon '+(ok?'pass':'fail')+'">'+(ok?'?':'?')+'</div>'; }
+
+function renderResult(r, calcId) {
+  const ampel = r.ampel || 'yellow';
+  const labels = {green:'Anschluss voraussichtlich möglich',yellow:'Anschluss bedingt möglich – Maßnahmen erforderlich',red:'Anschluss kritisch – erhebliche Maßnahmen nötig'};
+  const skRatio = r.sk_ratio_percent ?? 0;
+  const duVal = r.delta_u_percent ?? 0;
+  const cableUtil = r.cable_utilization_percent ?? 0;
+  const trafoUtil = r.transformer_utilization_percent ?? 0;
+  const skLimit = r.sk_ratio_limit_percent ?? 2;
+  const duLimit = r.delta_u_limit_percent ?? 2;
+  const c = colorFor(ampel);
+
+  const html =
+    '<div class="result-header '+ampel+'">'+
+      '<div class="ampel-dot '+ampel+'"></div>'+
+      '<div>'+
+        '<div class="result-title">'+labels[ampel]+'</div>'+
+        '<div class="result-sub">Berechnung #'+calcId+' | '+num(r.power_kw,0)+' kW @ '+(r.voltage_kv||'—')+' | '+(r.plant_type||'—')+'</div>'+
+      '</div>'+
+    '</div>'+
+
+    '<div class="metrics">'+
+      '<div class="metric-card">'+
+        '<h4>Sk-Verhältnis (S/Sk)</h4>'+
+        '<div class="metric-val" style="color:'+c+'">'+num(skRatio)+'%</div>'+
+        '<div class="metric-bar"><div class="metric-bar-fill" style="width:'+pct(skRatio/skLimit*100)+'%;background:'+c+'"></div></div>'+
+        '<div class="metric-detail">Grenzwert: '+num(skLimit,1)+'% (VDE-AR-N 4110) | Sk am AP: '+num(r.sk_at_poc_mva)+' MVA</div>'+
+      '</div>'+
+      '<div class="metric-card">'+
+        '<h4>Spannungsänderung ?u</h4>'+
+        '<div class="metric-val" style="color:'+c+'">'+num(duVal)+'%</div>'+
+        '<div class="metric-bar"><div class="metric-bar-fill" style="width:'+pct(duVal/duLimit*100)+'%;background:'+c+'"></div></div>'+
+        '<div class="metric-detail">Grenzwert: '+num(duLimit,1)+'% (MS)</div>'+
+      '</div>'+
+      '<div class="metric-card">'+
+        '<h4>Thermische Auslastung Kabel</h4>'+
+        '<div class="metric-val" style="color:'+c+'">'+num(cableUtil)+'%</div>'+
+        '<div class="metric-bar"><div class="metric-bar-fill" style="width:'+pct(cableUtil)+'%;background:'+c+'"></div></div>'+
+        '<div class="metric-detail">'+num(r.current_a,1)+' A / '+num(r.cable_ampacity_a,0)+' A (inkl. Bestand)</div>'+
+      '</div>'+
+      '<div class="metric-card">'+
+        '<h4>Trafo-Auslastung</h4>'+
+        '<div class="metric-val" style="color:'+c+'">'+num(trafoUtil)+'%</div>'+
+        '<div class="metric-bar"><div class="metric-bar-fill" style="width:'+pct(trafoUtil)+'%;background:'+c+'"></div></div>'+
+        '<div class="metric-detail">Grenzwert: 80%</div>'+
+      '</div>'+
+    '</div>'+
+
+    '<h3 style="font-size:14px;margin-bottom:8px">Prüfungen</h3>'+
+    '<div style="margin-bottom:20px">'+
+      '<div class="check-row">'+passIcon(skRatio<skLimit)+'Sk-Verhältnis &lt; '+num(skLimit,1)+'%</div>'+
+      '<div class="check-row">'+passIcon(duVal<duLimit)+'Spannungsänderung &lt; '+num(duLimit,1)+'%</div>'+
+      '<div class="check-row">'+passIcon(cableUtil<80)+'Kabel thermisch &lt; 80%</div>'+
+      '<div class="check-row">'+passIcon(trafoUtil<80)+'Trafo-Auslastung &lt; 80%</div>'+
+    '</div>'+
+
+    '<details style="margin-bottom:16px">'+
+      '<summary style="cursor:pointer;font-size:13px;color:var(--accent)">?? Detaildaten anzeigen</summary>'+
+      '<table class="detail-table">'+
+        '<tr><td>Scheinleistung</td><td>'+num(r.s_mva)+' MVA</td></tr>'+
+        '<tr><td>cos f</td><td>'+num(r.cos_phi,2)+'</td></tr>'+
+        '<tr><td>Sk am VAP</td><td>'+num(r.sk_grid_mva)+' MVA</td></tr>'+
+        '<tr><td>Sk am Anschlusspunkt</td><td>'+num(r.sk_at_poc_mva)+' MVA</td></tr>'+
+        '<tr><td>Ik am VAP</td><td>'+num(r.ik_grid_ka,2)+' kA</td></tr>'+
+        '<tr><td>Z Netz</td><td>'+num(r.z_grid_ohm,4)+' O</td></tr>'+
+        '<tr><td>Z Kabel (R/X)</td><td>'+num(r.r_cable_ohm,4)+' / '+num(r.x_cable_ohm,4)+' O</td></tr>'+
+        '<tr><td>Z Trafo</td><td>'+num(r.z_trafo_ohm,4)+' O</td></tr>'+
+        '<tr><td>Z Gesamt</td><td>'+num(r.z_total_ohm,4)+' O</td></tr>'+
+        '<tr><td>Betriebsstrom</td><td>'+num(r.current_a,1)+' A</td></tr>'+
+      '</table>'+
+    '</details>';
+
+  document.getElementById('result-content').innerHTML = html;
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch(API+'/history');
+    if(!res.ok) return;
+    const data = await res.json();
+    if(!data.length) return;
+    let html = '';
+    data.forEach(c => {
+      const color = c.ampel || 'muted';
+      const cssVar = color==='green'?'--green':color==='yellow'?'--yellow':color==='red'?'--red':'--muted';
+      html += '<div class="history-item">'+
+        '<div><span style="color:var('+cssVar+')">?</span> Projekt #'+(c.project_id||'—')+' | ?u='+num(c.delta_u_percent,2)+'% | '+num(c.cable_utilization_percent,1)+'% therm.</div>'+
+        '<div style="font-size:11px;color:var(--muted)">#'+(c.id||'')+'</div>'+
+      '</div>';
+    });
+    document.getElementById('history-list').innerHTML = html;
+  } catch(e) {}
+}
+
+loadHistory();
+</script>
+</body>
+</html>

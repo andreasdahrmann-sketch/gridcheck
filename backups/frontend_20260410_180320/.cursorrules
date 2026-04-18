@@ -1,0 +1,21 @@
+﻿# GridCheck Cursor Rules
+
+## Code-Ausgabe Regeln
+1. **Ordner-Pruefung**: Vor jeder Code-Generierung fuer eine Datei MUSS geprueft werden, ob der Zielordner existiert. Falls nicht, wird er zuerst angelegt.
+2. **Datei-Pruefung**: Vor Aenderungen an bestehenden Dateien MUSS geprueft werden, ob die Datei existiert und der aktuelle Inhalt bekannt ist.
+3. **Abhaengigkeits-Pruefung**: Jeder neue Code wird vor Ausgabe auf Konflikte mit bestehendem Code geprueft (Imports, Types, Interfaces).
+4. **Konsistenz**: Gleiche Aufgaben werden immer mit den gleichen Tools/Patterns geloest.
+5. **Keine Wiederholung von Fehlern**: Bekannte Fehler werden dokumentiert und nie wiederholt.
+6. **Revisionssicherheit**: Alle Aenderungen muessen nachvollziehbar sein.
+
+## Technische Standards
+- TypeScript strict mode
+- Alle Properties muessen gegen die definierten Interfaces validiert werden
+- Keine optionalen Zugriffe auf nicht-existierende Properties ohne Fallback
+- Engine-Berechnungen basieren auf VDE-AR-N 4105/4110/4120
+
+## Projekt-Struktur
+- Frontend: frontend-new/src/
+- Types: frontend-new/src/types/index.ts
+- Engine: frontend-new/src/lib/engine.ts
+- Komponenten: frontend-new/src/components/

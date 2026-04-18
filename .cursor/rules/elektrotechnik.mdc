@@ -1,0 +1,23 @@
+﻿---
+alwaysApply: true
+---
+# Elektrotechnik & Normen
+
+## Gültige Normen
+- VDE-AR-N 4105 (Niederspannung bis 135 kVA)
+- VDE-AR-N 4110 (Mittelspannung bis 20 kV)
+- VDE-AR-N 4120 (Hochspannung)
+- TAB 2019 (Technische Anschlussbedingungen)
+- DIN EN 50160 (Spannungsqualität)
+
+## Berechnungsregeln
+- Kurzschlussstrom immer nach IEC 60909
+- Spannungsfall max 3% NS / 2% MS
+- N-1 Analyse bei allen MS/HS Projekten
+- Auslastung Betriebsmittel max 100% (N-0), max 100% nach N-1
+- Schutzzeiten nach VDE 0100
+
+## Ausgaberegeln
+- Immer Einheit angeben (kW, kVA, kV, A)
+- Immer Norm-Referenz bei Grenzwerten
+- Revisionssicherer Snapshot bei jeder Berechnung

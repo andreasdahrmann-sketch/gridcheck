@@ -1,0 +1,2320 @@
+﻿===== C:\Users\andre\gridcheck\backend\app\models\project.py =====
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, JSON
+from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
+from app.database import Base
+
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    plz = Column(String(10), nullable=False)
+    leistung_kw = Column(Float, nullable=False)
+    spannung_kv = Column(Float, nullable=False)
+    typ = Column(String(50), nullable=False)
+
+    # Projektierer-Kriterien
+    einsatzzweck = Column(String(100))
+    anlagentyp = Column(String(100))
+    co2_relevanz = Column(String(20), default="mittel")
+    netzdienlichkeit_selbst = Column(String(20), default="mittel")
+    zeitdruck = Column(String(20), default="normal")
+    bereits_beantragt_bei = Column(Text)  # JSON-String: ["Netzbetreiber A","Netzbetreiber B"]
+    anzahl_bisherige_antraege = Column(Integer, default=0)
+
+    # Analyse-Ergebnisse
+    ampel = Column(String(10))
+    ergebnis = Column(Text)
+    empfehlungen = Column(Text)
+    n1_bestanden = Column(Boolean)
+    prioritaets_score = Column(Float)  # Berechneter Score aus NB-Gewichtung
+
+    # Revisionssicherheit
+    zeitstempel = Column(String(50))
+    hash = Column(String(64), nullable=False)
+    erstellt_von = Column(String(100), default="system")
+    is_archived = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class NetzbetreiberPrio(Base):
+    __tablename__ = "netzbetreiber_prio"
+
+    id = Column(Integer, primary_key=True, index=True)
+    netzbetreiber_name = Column(String(255), nullable=False, unique=True)
+
+    # Gewichtungen 1-10
+    prio_netzdienlichkeit = Column(Integer, default=5)
+    prio_co2 = Column(Integer, default=5)
+    prio_versorgungssicherheit = Column(Integer, default=5)
+    prio_regionaler_bedarf = Column(Integer, default=5)
+    prio_zeitdruck = Column(Integer, default=3)
+
+    # Bevorzugte Typen (JSON-Arrays)
+    bevorzugte_anlagentypen = Column(Text)  # JSON: ["PV-Freiflaeche","BESS"]
+    bevorzugte_einsatzzwecke = Column(Text)  # JSON: ["Netzstabilisierung","Regelenergie"]
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class Duplikatcheck(Base):
+    __tablename__ = "duplikatcheck"
+
+    id = Column(Integer, primary_key=True, index=True)
+    plz = Column(String(10), nullable=False)
+    leistung_kw = Column(Float, nullable=False)
+    anlagentyp = Column(String(100))
+    fingerprint = Column(String(64), nullable=False, index=True)
+    project_ids = Column(Text)  # JSON: [1, 5, 12]
+    anzahl = Column(Integer, default=1)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+===== C:\Users\andre\gridcheck\backend\app\models\__init__.py =====
+
+===== C:\Users\andre\gridcheck\backend\app\routers\projects.py =====
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional, List
+from app.database import SessionLocal
+from app.models.project import Project, NetzbetreiberPrio, Duplikatcheck
+from datetime import datetime
+import hashlib, json
+
+router = APIRouter(prefix="/api/projects", tags=["projects"])
+
+EINSATZZWECKE = [
+    "Eigenverbrauch", "Netzstabilisierung", "Direktvermarktung",
+    "Regelenergie", "Inselbetrieb", "E-Mobilitaet-Laden",
+    "Waermeversorgung", "Industrieprozess", "Quartiersversorgung"
+]
+ANLAGENTYPEN = [
+    "PV-Freiflaeche", "PV-Dach", "Wind", "BESS",
+    "Biogas", "Wasserstoff", "Waermepumpe", "Ladesaeule", "KWK"
+]
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# === SCHEMAS ===
+
+class ProjectCreate(BaseModel):
+    name: str
+    plz: str
+    leistung_kw: float
+    spannung_kv: float
+    typ: str
+    einsatzzweck: Optional[str] = "Eigenverbrauch"
+    anlagentyp: Optional[str] = "PV-Freiflaeche"
+    co2_relevanz: Optional[str] = "mittel"
+    netzdienlichkeit_selbst: Optional[str] = "mittel"
+    zeitdruck: Optional[str] = "normal"
+    bereits_beantragt_bei: Optional[List[str]] = []
+    erstellt_von: Optional[str] = "system"
+
+class ProjectOut(BaseModel):
+    id: int
+    name: str
+    plz: str
+    leistung_kw: float
+    spannung_kv: float
+    typ: str
+    einsatzzweck: Optional[str]
+    anlagentyp: Optional[str]
+    co2_relevanz: Optional[str]
+    netzdienlichkeit_selbst: Optional[str]
+    zeitdruck: Optional[str]
+    bereits_beantragt_bei: Optional[str]
+    anzahl_bisherige_antraege: Optional[int]
+    ampel: Optional[str]
+    ergebnis: Optional[str]
+    empfehlungen: Optional[str]
+    n1_bestanden: Optional[bool]
+    prioritaets_score: Optional[float]
+    zeitstempel: str
+    hash: str
+    class Config:
+        from_attributes = True
+
+class PrioCreate(BaseModel):
+    netzbetreiber_name: str
+    prio_netzdienlichkeit: int = 5
+    prio_co2: int = 5
+    prio_versorgungssicherheit: int = 5
+    prio_regionaler_bedarf: int = 5
+    prio_zeitdruck: int = 3
+    bevorzugte_anlagentypen: Optional[List[str]] = []
+    bevorzugte_einsatzzwecke: Optional[List[str]] = []
+
+class PrioOut(BaseModel):
+    id: int
+    netzbetreiber_name: str
+    prio_netzdienlichkeit: int
+    prio_co2: int
+    prio_versorgungssicherheit: int
+    prio_regionaler_bedarf: int
+    prio_zeitdruck: int
+    bevorzugte_anlagentypen: Optional[str]
+    bevorzugte_einsatzzwecke: Optional[str]
+    class Config:
+        from_attributes = True
+
+# === HELPER ===
+
+def berechne_hash(data: dict) -> str:
+    raw = json.dumps(data, sort_keys=True)
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+def duplikat_fingerprint(plz: str, leistung_kw: float, anlagentyp: str) -> str:
+    raw = f"{plz}|{round(leistung_kw, -1)}|{anlagentyp}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+def berechne_prioritaets_score(p: ProjectCreate, prio: NetzbetreiberPrio) -> float:
+    """Score 0-100 basierend auf NB-Gewichtung und Projekt-Eigenschaften"""
+    score = 0.0
+    max_score = 0.0
+
+    # Netzdienlichkeit
+    nd_map = {"hoch": 10, "mittel": 5, "gering": 2}
+    nd_wert = nd_map.get(p.netzdienlichkeit_selbst, 5)
+    score += nd_wert * prio.prio_netzdienlichkeit
+    max_score += 10 * prio.prio_netzdienlichkeit
+
+    # CO2
+    co2_map = {"hoch": 10, "mittel": 5, "gering": 2}
+    co2_wert = co2_map.get(p.co2_relevanz, 5)
+    score += co2_wert * prio.prio_co2
+    max_score += 10 * prio.prio_co2
+
+    # Zeitdruck
+    zd_map = {"kritisch": 10, "eilig": 7, "normal": 3}
+    zd_wert = zd_map.get(p.zeitdruck, 3)
+    score += zd_wert * prio.prio_zeitdruck
+    max_score += 10 * prio.prio_zeitdruck
+
+    # Bevorzugter Anlagentyp
+    bev_typen = json.loads(prio.bevorzugte_anlagentypen or "[]")
+    if p.anlagentyp in bev_typen:
+        score += 10 * prio.prio_regionaler_bedarf
+    max_score += 10 * prio.prio_regionaler_bedarf
+
+    # Bevorzugter Einsatzzweck
+    bev_zwecke = json.loads(prio.bevorzugte_einsatzzwecke or "[]")
+    if p.einsatzzweck in bev_zwecke:
+        score += 10 * prio.prio_versorgungssicherheit
+    max_score += 10 * prio.prio_versorgungssicherheit
+
+    return round((score / max_score) * 100, 1) if max_score > 0 else 50.0
+
+def netzanalyse(p: ProjectCreate) -> dict:
+    issues = []
+    empfehlungen = []
+    n1_ok = True
+
+    if p.spannung_kv == 0.4:
+        if p.leistung_kw > 100:
+            issues.append("Leistung zu hoch fuer NS-Netz (max ~100kW)")
+            empfehlungen.append("Wechsel auf MS-Ebene (10/20kV) empfohlen")
+            n1_ok = False
+        elif p.leistung_kw > 70:
+            issues.append("Grenzbereich NS-Netz, Trafopruefung noetig")
+            empfehlungen.append("Trafoauslastung und Leitungsquerschnitt pruefen")
+    elif p.spannung_kv in [10, 20]:
+        if p.leistung_kw > 20000:
+            issues.append("Leistung zu hoch fuer MS-Netz")
+            empfehlungen.append("HS-Anschluss (110kV) erforderlich")
+            n1_ok = False
+        elif p.leistung_kw > 10000:
+            issues.append("N-1: Redundanz im MS-Netz pruefen")
+            empfehlungen.append("Zweite Einspeisung oder Ringschluss empfohlen")
+    elif p.spannung_kv == 110:
+        if p.leistung_kw > 200000:
+            issues.append("Leistung kritisch fuer 110kV-Ebene")
+            empfehlungen.append("HoeS-Anschluss oder Netzteilung pruefen")
+            n1_ok = False
+        elif p.leistung_kw > 100000:
+            issues.append("N-1: Transformator-Redundanz erforderlich")
+            empfehlungen.append("Doppelsammelschiene und Reservetrafo vorsehen")
+
+    skv_min = {"0.4": 5, "10": 100, "20": 200, "110": 2000}
+    sk = skv_min.get(str(p.spannung_kv), 100)
+    verhaeltnis = (sk * 1000) / p.leistung_kw if p.leistung_kw > 0 else 999
+    if verhaeltnis < 20:
+        issues.append(f"Sk/P-Verhaeltnis={verhaeltnis:.1f} zu gering (min 20)")
+        empfehlungen.append("Netzverstaerkung oder Blindleistungskompensation")
+        n1_ok = False
+    elif verhaeltnis < 50:
+        empfehlungen.append(f"Sk/P={verhaeltnis:.1f} - Oberschwingungsanalyse empfohlen")
+
+    if not issues:
+        ampel = "gruen"
+        ergebnis = "Netzanschluss technisch machbar"
+    elif n1_ok:
+        ampel = "gelb"
+        ergebnis = "Machbar mit Auflagen"
+    else:
+        ampel = "rot"
+        ergebnis = "Netzanschluss kritisch - Massnahmen erforderlich"
+
+    return {
+        "ampel": ampel, "ergebnis": ergebnis,
+        "n1_bestanden": n1_ok,
+        "empfehlungen": "; ".join(empfehlungen) if empfehlungen else "Keine"
+    }
+
+# === ROUTES ===
+
+@router.get("/optionen")
+def get_optionen():
+    return {"einsatzzwecke": EINSATZZWECKE, "anlagentypen": ANLAGENTYPEN}
+
+@router.post("/", response_model=ProjectOut)
+def create_project(p: ProjectCreate, db: Session = Depends(get_db)):
+    analyse = netzanalyse(p)
+
+    # Duplikatcheck
+    fp = duplikat_fingerprint(p.plz, p.leistung_kw, p.anlagentyp or "")
+    dup = db.query(Duplikatcheck).filter(Duplikatcheck.fingerprint == fp).first()
+    anzahl_vorher = 0
+    if dup:
+        dup.anzahl += 1
+        anzahl_vorher = dup.anzahl
+    else:
+        dup = Duplikatcheck(
+            plz=p.plz, leistung_kw=p.leistung_kw,
+            anlagentyp=p.anlagentyp or "", fingerprint=fp,
+            project_ids="[]", anzahl=1
+        )
+        db.add(dup)
+        anzahl_vorher = 1
+
+    # Prioritaets-Score (erster NB oder Default)
+    nb_prio = db.query(NetzbetreiberPrio).first()
+    prio_score = berechne_prioritaets_score(p, nb_prio) if nb_prio else 50.0
+
+    hash_data = {
+        "name": p.name, "plz": p.plz, "leistung_kw": p.leistung_kw,
+        "spannung_kv": p.spannung_kv, "typ": p.typ,
+        "einsatzzweck": p.einsatzzweck, "anlagentyp": p.anlagentyp,
+        "ergebnis": analyse["ergebnis"]
+    }
+
+    projekt = Project(
+        name=p.name, plz=p.plz, leistung_kw=p.leistung_kw,
+        spannung_kv=p.spannung_kv, typ=p.typ,
+        einsatzzweck=p.einsatzzweck, anlagentyp=p.anlagentyp,
+        co2_relevanz=p.co2_relevanz,
+        netzdienlichkeit_selbst=p.netzdienlichkeit_selbst,
+        zeitdruck=p.zeitdruck,
+        bereits_beantragt_bei=json.dumps(p.bereits_beantragt_bei or []),
+        anzahl_bisherige_antraege=anzahl_vorher,
+        ampel=analyse["ampel"], ergebnis=analyse["ergebnis"],
+        n1_bestanden=analyse["n1_bestanden"],
+        empfehlungen=analyse["empfehlungen"],
+        prioritaets_score=prio_score,
+        zeitstempel=datetime.utcnow().isoformat(),
+        hash=berechne_hash(hash_data),
+        erstellt_von=p.erstellt_von
+    )
+    db.add(projekt)
+    db.commit()
+    db.refresh(projekt)
+
+    # Duplikat project_ids aktualisieren
+    ids = json.loads(dup.project_ids or "[]")
+    ids.append(projekt.id)
+    dup.project_ids = json.dumps(ids)
+    db.commit()
+
+    return projekt
+
+@router.get("/", response_model=List[ProjectOut])
+def list_projects(sortby: str = "score", db: Session = Depends(get_db)):
+    q = db.query(Project).filter(Project.is_archived == False)
+    if sortby == "score":
+        q = q.order_by(Project.prioritaets_score.desc())
+    elif sortby == "zeit":
+        q = q.order_by(Project.id.desc())
+    elif sortby == "duplikate":
+        q = q.order_by(Project.anzahl_bisherige_antraege.desc())
+    else:
+        q = q.order_by(Project.id.desc())
+    return q.all()
+
+@router.get("/duplikate")
+def list_duplikate(db: Session = Depends(get_db)):
+    return db.query(Duplikatcheck).filter(Duplikatcheck.anzahl > 1).all()
+
+@router.get("/{project_id}", response_model=ProjectOut)
+def get_project(project_id: int, db: Session = Depends(get_db)):
+    p = db.query(Project).filter(Project.id == project_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden")
+    return p
+
+# === NETZBETREIBER PRIO ===
+
+nb_router = APIRouter(prefix="/api/netzbetreiber", tags=["netzbetreiber"])
+
+@nb_router.post("/prio", response_model=PrioOut)
+def set_prio(p: PrioCreate, db: Session = Depends(get_db)):
+    existing = db.query(NetzbetreiberPrio).filter(
+        NetzbetreiberPrio.netzbetreiber_name == p.netzbetreiber_name
+    ).first()
+    data = {
+        "prio_netzdienlichkeit": p.prio_netzdienlichkeit,
+        "prio_co2": p.prio_co2,
+        "prio_versorgungssicherheit": p.prio_versorgungssicherheit,
+        "prio_regionaler_bedarf": p.prio_regionaler_bedarf,
+        "prio_zeitdruck": p.prio_zeitdruck,
+        "bevorzugte_anlagentypen": json.dumps(p.bevorzugte_anlagentypen or []),
+        "bevorzugte_einsatzzwecke": json.dumps(p.bevorzugte_einsatzzwecke or []),
+    }
+    if existing:
+        for k, v in data.items():
+            setattr(existing, k, v)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    else:
+        nb = NetzbetreiberPrio(netzbetreiber_name=p.netzbetreiber_name, **data)
+        db.add(nb)
+        db.commit()
+        db.refresh(nb)
+        return nb
+
+@nb_router.get("/prio", response_model=List[PrioOut])
+def get_prios(db: Session = Depends(get_db)):
+    return db.query(NetzbetreiberPrio).all()
+
+===== C:\Users\andre\gridcheck\backend\app\routers\__init__.py =====
+
+
+===== C:\Users\andre\gridcheck\backend\app\database.py =====
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+===== C:\Users\andre\gridcheck\backend\app\main.py =====
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.routers.projects import router, nb_router
+
+app = FastAPI(title="GridCheck API", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(router)
+app.include_router(nb_router)
+
+@app.get("/")
+def root():
+    return {"status": "GridCheck API running"}
+
+===== C:\Users\andre\gridcheck\backend\app\__init__.py =====
+
+
+===== C:\Users\andre\gridcheck\backend\engine\berechnung.py =====
+import math
+from typing import Optional
+
+# =============================================================================
+# BETRIEBSMITTELDATEN
+# =============================================================================
+
+LEITUNGSDATEN = {
+    'NAYY150':      {'i_max': 270, 'r_km': 0.206, 'x_km': 0.080, 'ebene': 'NS', 'material': 'Al', 'querschnitt': 150},
+    'NAYY185':      {'i_max': 310, 'r_km': 0.164, 'x_km': 0.080, 'ebene': 'NS', 'material': 'Al', 'querschnitt': 185},
+    'NAY2Y150':     {'i_max': 270, 'r_km': 0.206, 'x_km': 0.080, 'ebene': 'NS', 'material': 'Al', 'querschnitt': 150},
+    'NA2XS2Y110':   {'i_max': 355, 'r_km': 0.164, 'x_km': 0.113, 'ebene': 'MS', 'material': 'Al', 'querschnitt': 110},
+    'NA2XS2Y150':   {'i_max': 410, 'r_km': 0.124, 'x_km': 0.110, 'ebene': 'MS', 'material': 'Al', 'querschnitt': 150},
+    'NA2XS2Y185':   {'i_max': 455, 'r_km': 0.099, 'x_km': 0.108, 'ebene': 'MS', 'material': 'Al', 'querschnitt': 185},
+    'NA2XS2Y240':   {'i_max': 530, 'r_km': 0.077, 'x_km': 0.105, 'ebene': 'MS', 'material': 'Al', 'querschnitt': 240},
+    'NA2XS2Y300':   {'i_max': 590, 'r_km': 0.060, 'x_km': 0.102, 'ebene': 'MS', 'material': 'Al', 'querschnitt': 300},
+    'AL240':        {'i_max': 645, 'r_km': 0.120, 'x_km': 0.390, 'ebene': 'HS', 'material': 'Al', 'querschnitt': 240},
+    'AL_STAHL240':  {'i_max': 645, 'r_km': 0.120, 'x_km': 0.390, 'ebene': 'HS', 'material': 'AlSt', 'querschnitt': 240},
+    'ACSR240':      {'i_max': 645, 'r_km': 0.120, 'x_km': 0.390, 'ebene': 'HS', 'material': 'AlSt', 'querschnitt': 240},
+}
+
+# Typische R/X-Verhältnisse Vorgelagertes Netz
+RX_RATIO_DEFAULT = {
+    'NS': 2.5,
+    'MS': 1.5,
+    'HS': 0.1,
+}
+
+# Typische Sk-Werte je Spannungsebene (MVA) - konservative Defaults
+SK_DEFAULT = {
+    'NS': 10,
+    'MS': 250,
+    'HS': 3000,
+}
+
+# Standard-Trafodaten
+TRAFO_DEFAULTS = {
+    'NS': {'s_mva': 0.63, 'uk_prozent': 4.0},
+    'MS': {'s_mva': 25.0, 'uk_prozent': 12.0},
+    'HS': {'s_mva': 63.0, 'uk_prozent': 13.0},
+}
+
+# Referenzkosten für Kostenschätzung
+REFERENZKOSTEN = {
+    'NS': {'tiefbau_eur_m': 120, 'kabel_eur_m': 45, 'trafostation_eur': 35000,
+            'schaltanlage_eur': 15000, 'planung_prozent': 12, 'genehmigung_eur': 5000},
+    'MS': {'tiefbau_eur_m': 160, 'kabel_eur_m': 85, 'trafostation_eur': 120000,
+            'schaltanlage_eur': 85000, 'planung_prozent': 10, 'genehmigung_eur': 15000},
+    'HS': {'tiefbau_eur_m': 280, 'kabel_eur_m': 220, 'trafostation_eur': 800000,
+            'schaltanlage_eur': 450000, 'planung_prozent': 8, 'genehmigung_eur': 50000},
+}
+
+ALPHA_AL = 0.00403   # Temperaturkoeffizient Aluminium
+ALPHA_CU = 0.00393   # Temperaturkoeffizient Kupfer
+
+# =============================================================================
+# HILFSFUNKTIONEN
+# =============================================================================
+
+def _float_or(val, default):
+    if val is None or val == '' or val == 'None':
+        return default
+    try:
+        v = float(val)
+        return v if v > 0 else default
+    except (ValueError, TypeError):
+        return default
+
+
+def _float_or_none(val):
+    if val is None or val == '' or val == 'None':
+        return None
+    try:
+        v = float(val)
+        return v if v > 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _is_valid_number(val):
+    if val is None or val == '' or val == 'None':
+        return False
+    try:
+        return float(val) > 0
+    except (ValueError, TypeError):
+        return False
+
+
+def bestimme_spannungsebene(u_kv):
+    if u_kv >= 60:
+        return 'HS'
+    elif u_kv >= 1:
+        return 'MS'
+    else:
+        return 'NS'
+
+
+# =============================================================================
+# P-Q-S GRUNDMODELL
+# =============================================================================
+
+def berechne_pqs(p_mw, cos_phi):
+    """Berechnet P, Q, S konsistent aus P und cos_phi"""
+    p_mw = abs(p_mw)
+    cos_phi = max(0.8, min(1.0, cos_phi))
+    s_mva = p_mw / cos_phi
+    q_mvar = p_mw * math.tan(math.acos(cos_phi))
+    return {
+        'p_mw': round(p_mw, 4),
+        'q_mvar': round(q_mvar, 4),
+        's_mva': round(s_mva, 4),
+        'cos_phi': round(cos_phi, 4),
+    }
+
+
+def berechne_betriebsstrom(s_mva, u_kv):
+    """I = S / (sqrt(3) * U) - immer S-basiert"""
+    u_v = u_kv * 1000.0
+    s_va = s_mva * 1e6
+    return s_va / (math.sqrt(3) * u_v)
+
+
+# =============================================================================
+# IMPEDANZMODELL: Quelle + Trafo + Leitung
+# =============================================================================
+
+def berechne_quellenimpedanz(u_kv, sk_mva, rx_ratio):
+    """Z_Q = U² / S_k, aufgeteilt in R_Q und X_Q"""
+    u_v = u_kv * 1000.0
+    z_q = (u_v ** 2) / (sk_mva * 1e6)
+    r_q = z_q / math.sqrt(1 + rx_ratio ** 2)
+    x_q = r_q * rx_ratio
+    return r_q, x_q
+
+
+def berechne_trafoimpedanz(u_kv, s_trafo_mva, uk_prozent):
+    """Z_T = (uk/100) * U² / S_T"""
+    u_v = u_kv * 1000.0
+    z_t = (uk_prozent / 100.0) * (u_v ** 2) / (s_trafo_mva * 1e6)
+    # Vereinfachung: R_T << X_T, daher X_T ≈ Z_T
+    r_t = z_t * 0.1  # typisch 10% R-Anteil
+    x_t = z_t * math.sqrt(1 - 0.1**2)
+    return r_t, x_t
+
+
+def berechne_leitungsimpedanz(leitungstyp, entfernung_km, parallele_systeme, temperatur_c=20):
+    """Leitungsimpedanz mit Temperaturkorrektur und Parallelschaltung"""
+    daten = LEITUNGSDATEN[leitungstyp]
+    alpha = ALPHA_AL if daten['material'] in ('Al', 'AlSt') else ALPHA_CU
+
+    r_km_korr = daten['r_km'] * (1 + alpha * (temperatur_c - 20))
+    r_l = (r_km_korr * entfernung_km) / parallele_systeme
+    x_l = (daten['x_km'] * entfernung_km) / parallele_systeme
+    return r_l, x_l
+
+
+def berechne_gesamtimpedanz(r_q, x_q, r_t, x_t, r_l, x_l):
+    """Z_ges = Z_Q + Z_T + Z_L"""
+    r_ges = r_q + r_t + r_l
+    x_ges = x_q + x_t + x_l
+    z_ges = math.sqrt(r_ges**2 + x_ges**2)
+    return r_ges, x_ges, z_ges
+
+
+# =============================================================================
+# VALIDIERUNG
+# =============================================================================
+
+def validiere_eingabe(eingabe):
+    fehler = []
+    warnungen = []
+
+    pflichtfelder = ['nennspannung', 'leistung_mw', 'leitungstyp', 'entfernung_km', 'anschlussart']
+    for feld in pflichtfelder:
+        if feld not in eingabe:
+            fehler.append(f'Pflichtfeld fehlt: {feld}')
+
+    if fehler:
+        return fehler, warnungen
+
+    # Nennspannung
+    try:
+        u = float(eingabe['nennspannung'])
+        if u <= 0 or u > 380:
+            fehler.append(f'Nennspannung unrealistisch: {u} kV')
+    except (ValueError, TypeError):
+        fehler.append('Nennspannung ist keine gueltige Zahl')
+        return fehler, warnungen
+
+    # Leistung
+    try:
+        p = float(eingabe['leistung_mw'])
+        if p <= 0 or p > 2000:
+            fehler.append(f'Leistung unrealistisch: {p} MW')
+        # Plausibilitaet: Leistung vs Spannungsebene
+        ebene = bestimme_spannungsebene(u)
+        if ebene == 'NS' and p > 0.3:
+            warnungen.append(f'Leistung {p} MW in NS unueblich. MS-Anschluss pruefen.')
+        if ebene == 'NS' and p > 1.0:
+            fehler.append(f'{p} MW in NS nicht realisierbar. MS oder HS waehlen.')
+        if ebene == 'MS' and p > 50:
+            warnungen.append(f'Leistung {p} MW in MS unueblich. HS-Anschluss pruefen.')
+        if ebene == 'MS' and p < 0.01:
+            warnungen.append(f'Leistung {p} MW sehr klein fuer MS. NS-Anschluss pruefen.')
+    except (ValueError, TypeError):
+        fehler.append('Leistung ist keine gueltige Zahl')
+
+    # Entfernung
+    try:
+        d = float(eingabe['entfernung_km'])
+        if d <= 0 or d > 500:
+            fehler.append(f'Entfernung unrealistisch: {d} km')
+        if d < 0.01:
+            warnungen.append('Entfernung < 10m: Direkt am UW? Leitungsimpedanz vernachlaessigbar.')
+    except (ValueError, TypeError):
+        fehler.append('Entfernung ist keine gueltige Zahl')
+
+    # Leitungstyp
+    lt = eingabe.get('leitungstyp', '')
+    if lt not in LEITUNGSDATEN:
+        fehler.append(f'Unbekannter Leitungstyp: {lt}')
+
+    # Anschlussart
+    aa = eingabe.get('anschlussart', '')
+    if aa not in ('Einspeisung', 'Entnahme', 'Speicher'):
+        fehler.append(f'Anschlussart ungueltig: {aa}')
+
+    # cos_phi
+    try:
+        cp = float(eingabe.get('cos_phi', 0.95))
+        if cp < 0.8 or cp > 1.0:
+            fehler.append(f'cos phi ausserhalb 0.8-1.0: {cp}')
+        # Widerspruch: cos_phi=1 bei netzdienlicher Regelung
+        if cp == 1.0 and eingabe.get('blindleistung_modus') in ('Q(U)', 'Q(P)'):
+            warnungen.append('cos phi = 1.0 bei aktiver Blindleistungsregelung ist widersprüchlich.')
+    except (ValueError, TypeError):
+        pass
+
+    # Parallele Systeme
+    try:
+        ps = int(eingabe.get('parallele_systeme', 1))
+        if ps < 1 or ps > 6:
+            fehler.append(f'Parallele Systeme: 1-6 erlaubt, eingegeben: {ps}')
+    except (ValueError, TypeError):
+        fehler.append('Parallele Systeme ist keine gueltige Zahl')
+
+    return fehler, warnungen
+
+
+# =============================================================================
+# DATENQUALITAET / CONFIDENCE SCORE
+# =============================================================================
+
+def berechne_datenqualitaet(eingabe):
+    """Bewertet Guete der Eingabedaten: A=real, B=projektdaten, C=regional, D=heuristik"""
+
+    # Gewichtete Felder
+    feld_gewichte = {
+        'sk_mva':           ('A', 12),
+        'trafo_s_mva':      ('A', 10),
+        'trafo_uk_prozent':  ('A', 8),
+        'entfernung_km':    ('B', 10),
+        'leitungstyp':      ('B', 8),
+        'leistung_mw':      ('B', 10),
+        'cos_phi':          ('B', 5),
+        'nennspannung':     ('B', 8),
+        'rx_ratio':         ('A', 5),
+        'temperatur_c':     ('B', 3),
+        'bestand_trafo_auslastung': ('A', 8),
+        'bestand_strang_auslastung': ('A', 8),
+        'topologie':        ('A', 5),
+    }
+
+    gesamt_gewicht = sum(g for _, g in feld_gewichte.values())
+    erreicht = 0
+    felder_mit_daten = 0
+    felder_gesamt = len(feld_gewichte)
+    felder_referenz = 0
+
+    for feld, (klasse, gewicht) in feld_gewichte.items():
+        if _is_valid_number(eingabe.get(feld)):
+            erreicht += gewicht
+            felder_mit_daten += 1
+        elif feld in ('leitungstyp', 'nennspannung', 'leistung_mw', 'entfernung_km', 'cos_phi', 'topologie'):
+            # Pflichtfelder oder Standard-Defaults gelten als vorhanden
+            if eingabe.get(feld) is not None and eingabe.get(feld) != '':
+                erreicht += gewicht * 0.7
+                felder_mit_daten += 1
+        else:
+            felder_referenz += 1
+
+    score = round((erreicht / gesamt_gewicht) * 100)
+
+    if score >= 80:
+        klasse = 'A'
+        text = 'Gute Datenbasis. Ergebnis belastbar.'
+    elif score >= 60:
+        klasse = 'B'
+        text = 'Solide Projektdaten. Ergebnis plausibel.'
+    elif score >= 40:
+        klasse = 'C'
+        text = 'Teilweise Referenzdaten. Ergebnis eingeschraenkt belastbar.'
+    else:
+        klasse = 'D'
+        text = 'Ueberwiegend Heuristik/Defaults. Nur grober Vorcheck.'
+
+    referenz_anteil = (felder_referenz / felder_gesamt) * 100 if felder_gesamt > 0 else 0
+
+    return {
+        'score': score,
+        'klasse': klasse,
+        'text': text,
+        'felder_mit_daten': felder_mit_daten,
+        'felder_gesamt': felder_gesamt,
+        'referenz_anteil_prozent': round(referenz_anteil),
+        'belastbar': score >= 40,
+        'warnung': 'Ergebnis nur eingeschraenkt belastbar' if referenz_anteil > 40 else None,
+    }
+
+
+# =============================================================================
+# THERMISCHE ANALYSE (S-basiert)
+# =============================================================================
+
+def berechne_thermisch(s_mva, u_kv, leitungstyp, parallele_systeme=1):
+    """Thermische Prüfung: I_betrieb vs I_zul — immer auf S-Basis"""
+    daten = LEITUNGSDATEN[leitungstyp]
+    i_max = daten['i_max']
+
+    i_gesamt = berechne_betriebsstrom(s_mva, u_kv)
+    i_pro_system = i_gesamt / parallele_systeme
+    auslastung = (i_pro_system / i_max) * 100.0
+
+    if auslastung <= 60:
+        bewertung, text = 'GRUEN', 'Thermisch unkritisch. Genuegend Reserve vorhanden.'
+    elif auslastung <= 80:
+        bewertung, text = 'GELB', 'Thermisch akzeptabel. Reserve eingeschraenkt.'
+    elif auslastung <= 100:
+        bewertung, text = 'ORANGE', 'Thermisch grenzwertig. Kaum Reserve fuer N-1.'
+    else:
+        bewertung, text = 'ROT', 'Thermische Ueberlastung! Leitung nicht ausreichend dimensioniert.'
+
+    return {
+        'i_betrieb_gesamt_a': round(i_gesamt, 1),
+        'i_pro_system_a': round(i_pro_system, 1),
+        'i_max_a': i_max,
+        'auslastung_prozent': round(auslastung, 1),
+        'parallele_systeme': parallele_systeme,
+        's_mva': round(s_mva, 4),
+        'bewertung': bewertung,
+        'text': text,
+        'hinweis_verlegeart': 'Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C).',
+    }
+
+
+# =============================================================================
+# TRAFO-AUSLASTUNG (S-basiert)
+# =============================================================================
+
+def berechne_trafo(s_mva, trafo_s_mva, bestand_auslastung_prozent=0):
+    """Trafo-Auslastung auf S-Basis mit Bestandsberücksichtigung"""
+    bestand_s = trafo_s_mva * (bestand_auslastung_prozent / 100.0)
+    gesamt_s = bestand_s + s_mva
+    auslastung = (gesamt_s / trafo_s_mva) * 100.0
+
+    if auslastung <= 60:
+        bewertung, text = 'GRUEN', 'Trafo unkritisch. Genuegend Reserve.'
+    elif auslastung <= 80:
+        bewertung, text = 'GELB', 'Trafo akzeptabel. Reserve eingeschraenkt.'
+    elif auslastung <= 100:
+        bewertung, text = 'ORANGE', 'Trafo grenzwertig.'
+    else:
+        bewertung, text = 'ROT', 'Trafo ueberlastet!'
+
+    return {
+        'trafo_s_mva': round(trafo_s_mva, 2),
+        'anlage_s_mva': round(s_mva, 4),
+        'bestand_s_mva': round(bestand_s, 4),
+        'gesamt_s_mva': round(gesamt_s, 4),
+        'auslastung_prozent': round(auslastung, 1),
+        'bewertung': bewertung,
+        'text': text,
+    }
+
+
+# =============================================================================
+# SPANNUNGSAENDERUNG (signiert, Richtung Anhebung/Absenkung)
+# =============================================================================
+
+def berechne_spannung(p_mw, q_mvar, u_kv, r_ges, x_ges, anschlussart):
+    """
+    Signierte Spannungsänderung: Δu ≈ (R*P + X*Q) / U²
+    Einspeisung → Spannungsanhebung (positiv)
+    Entnahme → Spannungsabsenkung (negativ)
+    """
+    u_v = u_kv * 1000.0
+    p_w = p_mw * 1e6
+    q_var = q_mvar * 1e6
+
+    # Vorzeichen: Einspeisung hebt Spannung, Entnahme senkt
+    if anschlussart == 'Einspeisung':
+        vorzeichen = 1.0
+        richtung = 'Anhebung'
+    elif anschlussart == 'Entnahme':
+        vorzeichen = -1.0
+        richtung = 'Absenkung'
+    else:  # Speicher
+        vorzeichen = 1.0  # Worst Case: Einspeisung
+        richtung = 'Anhebung (Worst Case Einspeisung)'
+
+    delta_u_v = vorzeichen * math.sqrt(3) * (r_ges * p_w + x_ges * q_var) / (math.sqrt(3) * u_v)
+    # Vereinfachte Formel: delta_u ≈ (R*P + X*Q) / U²
+    delta_u_v_approx = vorzeichen * (r_ges * p_w + x_ges * q_var) / u_v
+    delta_u_proz = (abs(delta_u_v_approx) / u_v) * 100.0
+
+    ebene = bestimme_spannungsebene(u_kv)
+
+    # Ampellogik nach Netzplaner-Vorgabe
+    if delta_u_proz <= 2.0:
+        bewertung, text = 'GRUEN', f'Spannungs{richtung.lower()} unkritisch.'
+    elif delta_u_proz <= 3.0:
+        bewertung, text = 'GELB', f'Spannungs{richtung.lower()} akzeptabel, Reserve eingeschraenkt.'
+    elif delta_u_proz <= 5.0:
+        bewertung, text = 'ORANGE', f'Spannungs{richtung.lower()} grenzwertig.'
+    else:
+        bewertung, text = 'ROT', f'Spannungs{richtung.lower()} ueberschreitet zulaessigen Bereich!'
+
+    return {
+        'delta_u_prozent': round(delta_u_proz, 3),
+        'delta_u_v': round(abs(delta_u_v_approx), 1),
+        'richtung': richtung,
+        'vorzeichen': 'positiv' if vorzeichen > 0 else 'negativ',
+        'spannungsebene': ebene,
+        'r_ges_ohm': round(r_ges, 5),
+        'x_ges_ohm': round(x_ges, 5),
+        'bewertung': bewertung,
+        'text': text,
+    }
+
+
+# =============================================================================
+# KURZSCHLUSS-SCREENING
+# =============================================================================
+
+def berechne_kurzschluss(u_kv, z_ges, s_mva, sk_mva):
+    """
+    Kurzschluss-Screening: Ik'', Sk/Sn, Netzrückwirkungs-Screening
+    """
+    u_v = u_kv * 1000.0
+    c = 1.1  # Spannungsfaktor nach IEC 60909
+
+    # Ik'' = c * U / (sqrt(3) * |Z_ges|)
+    ik_max = (c * u_v) / (math.sqrt(3) * z_ges) if z_ges > 0 else 0
+    ik_min = (0.95 * u_v) / (math.sqrt(3) * z_ges) if z_ges > 0 else 0  # c_min ≈ 0.95
+
+    # Sk/Sn Verhältnis
+    sk_sn = sk_mva / s_mva if s_mva > 0 else 999
+
+    # Netzrückwirkungs-Screening: S_anlage/S_k
+    rueckwirkung_ratio = s_mva / sk_mva if sk_mva > 0 else 999
+
+    # Sk/Sn Bewertung
+    if sk_sn > 20:
+        sk_bewertung = 'GRUEN'
+        sk_text = 'Kurzschlussniveau ausreichend.'
+    elif sk_sn > 10:
+        sk_bewertung = 'GELB'
+        sk_text = 'Kurzschlussniveau: vertiefte Pruefung empfohlen.'
+    else:
+        sk_bewertung = 'ROT'
+        sk_text = 'Kurzschlussniveau kritisch. Anschluss nur nach Detailpruefung.'
+
+    # Netzrückwirkung
+    if rueckwirkung_ratio <= 0.02:
+        rw_bewertung = 'GRUEN'
+        rw_text = 'Netzrueckwirkungen unkritisch.'
+    elif rueckwirkung_ratio <= 0.05:
+        rw_bewertung = 'GELB'
+        rw_text = 'Netzrueckwirkungen: Hinweis beachten.'
+    elif rueckwirkung_ratio <= 0.10:
+        rw_bewertung = 'ORANGE'
+        rw_text = 'Netzrueckwirkungsstudie empfohlen.'
+    else:
+        rw_bewertung = 'ROT'
+        rw_text = 'Erhebliche Netzrueckwirkungen. Detailstudie zwingend.'
+
+    # Gesamt: schlechtester Wert
+    bewertungen = [sk_bewertung, rw_bewertung]
+    if 'ROT' in bewertungen:
+        gesamt = 'ROT'
+    elif 'ORANGE' in bewertungen:
+        gesamt = 'ORANGE'
+    elif 'GELB' in bewertungen:
+        gesamt = 'GELB'
+    else:
+        gesamt = 'GRUEN'
+
+    return {
+        'ik_max_ka': round(ik_max / 1000, 2),
+        'ik_min_ka': round(ik_min / 1000, 2),
+        'sk_mva': round(sk_mva, 1),
+        'sk_sn_ratio': round(sk_sn, 1),
+        'sk_bewertung': sk_bewertung,
+        'sk_text': sk_text,
+        'rueckwirkung_ratio': round(rueckwirkung_ratio, 4),
+        'rw_bewertung': rw_bewertung,
+        'rw_text': rw_text,
+        'bewertung': gesamt,
+        'text': sk_text + ' ' + rw_text,
+        'schutzpruefung_noetig': sk_sn < 20 or rueckwirkung_ratio > 0.05,
+    }
+
+
+# =============================================================================
+# N-1 PRE-SCREEN (umbenannt, korrekte Terminologie)
+# =============================================================================
+
+def berechne_n1_prescreen(thermisch, trafo, topologie, parallele, redundanz):
+    """
+    N-1 Pre-Screen — KEINE echte N-1 Prüfung.
+    Topologische N-1-Prüfung nur mit vollständigem Netzmodell möglich.
+    """
+    # Topologie-Bewertung
+    if topologie == 'stich' or topologie == 'radial':
+        topo_n1 = False
+        topo_text = 'Radial/Stich: keine echte N-1 moeglich.'
+    elif topologie == 'ring_ohne_reserve':
+        topo_n1 = False
+        topo_text = 'Ring ohne Umschaltreserve: N-1 bedingt.'
+    elif topologie == 'ring_mit_reserve':
+        topo_n1 = True
+        topo_text = 'Ring mit Umschaltreserve: N-1 plausibel.'
+    elif topologie == 'doppeleinspeisung':
+        topo_n1 = True
+        topo_text = 'Doppeleinspeisung: gute N-1 Voraussetzung.'
+    else:
+        topo_n1 = False
+        topo_text = 'Topologie unbekannt: N-1 nicht bewertbar.'
+
+    # Leitungs-N-1
+    if parallele >= 2:
+        n1_auslastung = thermisch['auslastung_prozent'] * parallele / (parallele - 1)
+        leitung_n1 = n1_auslastung <= 100
+    elif redundanz:
+        n1_auslastung = thermisch['auslastung_prozent']
+        leitung_n1 = n1_auslastung <= 100
+    else:
+        n1_auslastung = thermisch['auslastung_prozent']
+        leitung_n1 = False
+
+    # Trafo-N-1 (wenn 2+ Trafos)
+    trafo_n1 = trafo['auslastung_prozent'] <= 100  # Vereinfachung
+
+    n1_sicher = topo_n1 and leitung_n1
+    if n1_sicher:
+        if n1_auslastung <= 80:
+            bewertung = 'GRUEN'
+            text = 'N-1 Pre-Screen: plausibel mit Reserve.'
+        else:
+            bewertung = 'GELB'
+            text = 'N-1 Pre-Screen: plausibel, eingeschraenkte Reserve.'
+    else:
+        if topo_n1 and not leitung_n1:
+            bewertung = 'ROT'
+            text = 'N-1 Pre-Screen: Leitungsueberlastung im Stoerungsfall.'
+        elif not topo_n1:
+            bewertung = 'ROT'
+            text = f'N-1 Pre-Screen: {topo_text}'
+        else:
+            bewertung = 'ROT'
+            text = 'N-1 Pre-Screen: nicht erfuellt.'
+
+    return {
+        'n1_sicher': n1_sicher,
+        'n1_auslastung_prozent': round(n1_auslastung, 1),
+        'leitung_n1': leitung_n1,
+        'trafo_n1': trafo_n1,
+        'topologie': topologie,
+        'topologie_n1': topo_n1,
+        'topologie_text': topo_text,
+        'parallele_systeme': parallele,
+        'redundanz': redundanz,
+        'bewertung': bewertung,
+        'text': text,
+        'hinweis': 'Dies ist ein Pre-Screen. Topologische N-1-Pruefung erfordert vollstaendiges Netzmodell.',
+    }
+
+
+# =============================================================================
+# SZENARIOANALYSE
+# =============================================================================
+
+def berechne_szenarien(p_mw, q_mvar, s_mva, u_kv, r_ges, x_ges, leitungstyp,
+                       parallele_systeme, anschlussart, sk_mva, z_ges,
+                       trafo_s_mva, bestand_trafo_proz):
+    """4 Pflichtszenarien gemäss Netzplaner-Vorgabe"""
+    szenarien = []
+
+    def run_szenario(name, p_fakt, q_fakt, beschreibung):
+        p = p_mw * p_fakt
+        q = q_mvar * q_fakt
+        s = math.sqrt(p**2 + q**2)
+        th = berechne_thermisch(s, u_kv, leitungstyp, parallele_systeme)
+        sp = berechne_spannung(p, q, u_kv, r_ges, x_ges, anschlussart)
+        tr = berechne_trafo(s, trafo_s_mva, bestand_trafo_proz)
+        return {
+            'name': name,
+            'beschreibung': beschreibung,
+            'p_mw': round(p, 4),
+            'q_mvar': round(q, 4),
+            's_mva': round(s, 4),
+            'thermisch': th,
+            'spannung': sp,
+            'trafo': tr,
+        }
+
+    # 1. Maximale Einspeisung / minimale Last
+    szenarien.append(run_szenario(
+        'Max. Einspeisung',
+        1.0, 1.0,
+        'Volle Leistung, minimale Netzlast — kritischster Fall fuer Spannungsanhebung.'
+    ))
+
+    # 2. Typischer Betrieb (70%)
+    szenarien.append(run_szenario(
+        'Typischer Betrieb',
+        0.7, 0.7,
+        'Typischer Betriebspunkt bei 70% Nennleistung.'
+    ))
+
+    # 3. Reduzierter Betrieb (40%)
+    szenarien.append(run_szenario(
+        'Teillast',
+        0.4, 0.4,
+        'Teillastbetrieb bei 40% — fuer Normalbetriebsbewertung.'
+    ))
+
+    # 4. N-1 Reservebetrachtung (100% auf n-1 Systeme)
+    if parallele_systeme >= 2:
+        p_n1 = p_mw
+        q_n1 = q_mvar
+        s_n1 = s_mva
+        th_n1 = berechne_thermisch(s_n1, u_kv, leitungstyp, parallele_systeme - 1)
+        sp_n1 = berechne_spannung(p_n1, q_n1, u_kv, r_ges * parallele_systeme / (parallele_systeme - 1),
+                                   x_ges * parallele_systeme / (parallele_systeme - 1), anschlussart)
+        tr_n1 = berechne_trafo(s_n1, trafo_s_mva, bestand_trafo_proz)
+        szenarien.append({
+            'name': 'N-1 Stoerungsfall',
+            'beschreibung': f'Volle Leistung auf {parallele_systeme - 1} von {parallele_systeme} Systemen.',
+            'p_mw': round(p_n1, 4),
+            'q_mvar': round(q_n1, 4),
+            's_mva': round(s_n1, 4),
+            'thermisch': th_n1,
+            'spannung': sp_n1,
+            'trafo': tr_n1,
+        })
+    else:
+        szenarien.append(run_szenario(
+            'N-1 Stoerungsfall',
+            1.0, 1.0,
+            'Kein paralleles System: N-1 = Volllast auf einziger Leitung.'
+        ))
+
+    return szenarien
+
+
+# =============================================================================
+# TEIL-SCORES (gewichtet)
+# =============================================================================
+
+def berechne_scores(thermisch, spannung, kurzschluss, n1, datenqualitaet, trafo):
+    """5 Teilscores + gewichteter Gesamtscore"""
+
+    def bew_to_score(bew):
+        return {'GRUEN': 95, 'GELB': 65, 'ORANGE': 35, 'ROT': 10}.get(bew, 50)
+
+    s_kap = min(bew_to_score(thermisch['bewertung']), bew_to_score(trafo['bewertung']))
+    s_spg = bew_to_score(spannung['bewertung'])
+    s_ks = bew_to_score(kurzschluss['bewertung'])
+    s_n1 = bew_to_score(n1['bewertung'])
+    s_dq = datenqualitaet['score']
+
+    gesamt = round(0.30 * s_kap + 0.25 * s_spg + 0.20 * s_ks + 0.15 * s_n1 + 0.10 * s_dq)
+
+    # Harte Grenze: ROT ueberschreibt Score
+    harte_verstoesse = []
+    if thermisch['auslastung_prozent'] > 100:
+        harte_verstoesse.append('Leitungsueberlastung > 100%')
+    if trafo['auslastung_prozent'] > 100:
+        harte_verstoesse.append('Trafoueberlastung > 100%')
+    if spannung['delta_u_prozent'] > 5.0:
+        harte_verstoesse.append('Spannungsaenderung > 5%')
+
+    if harte_verstoesse:
+        gesamt = min(gesamt, 25)
+
+    return {
+        'kapazitaet': s_kap,
+        'spannung': s_spg,
+        'kurzschluss': s_ks,
+        'versorgungssicherheit': s_n1,
+        'datenqualitaet': s_dq,
+        'gesamt': gesamt,
+        'harte_verstoesse': harte_verstoesse,
+    }
+
+
+# =============================================================================
+# KOSTEN-MODUL
+# =============================================================================
+
+def berechne_kosten(eingabe, spannungsebene, entfernung_km, parallele_systeme):
+    ref = REFERENZKOSTEN[spannungsebene]
+    entfernung_m = entfernung_km * 1000
+
+    tiefbau_m = _float_or(eingabe.get('kosten_tiefbau_eur_m'), ref['tiefbau_eur_m'])
+    kabel_m = _float_or(eingabe.get('kosten_kabel_eur_m'), ref['kabel_eur_m'])
+    trafo = _float_or(eingabe.get('kosten_trafostation_eur'), ref['trafostation_eur'])
+    schaltanlage = _float_or(eingabe.get('kosten_schaltanlage_eur'), ref['schaltanlage_eur'])
+    genehmigung = _float_or(eingabe.get('kosten_genehmigung_eur'), ref['genehmigung_eur'])
+    pacht_pa = _float_or(eingabe.get('kosten_pacht_eur_a'), 0)
+    bkz = _float_or(eingabe.get('kosten_bkz_eur'), 0)
+    netzentgelt_pa = _float_or(eingabe.get('kosten_netzentgelt_eur_a'), 0)
+
+    kosten_trasse = (tiefbau_m + kabel_m) * entfernung_m * parallele_systeme
+    kosten_station = trafo + schaltanlage
+    kosten_genehm = genehmigung
+
+    zwischensumme = kosten_trasse + kosten_station + kosten_genehm
+    planung_prozent = _float_or(eingabe.get('kosten_planung_prozent'), ref['planung_prozent'])
+    kosten_planung = zwischensumme * (planung_prozent / 100)
+
+    investition_gesamt = zwischensumme + kosten_planung + bkz
+    betriebskosten_pa = pacht_pa + netzentgelt_pa
+
+    eigene_felder = ['kosten_tiefbau_eur_m', 'kosten_kabel_eur_m', 'kosten_trafostation_eur',
+                     'kosten_schaltanlage_eur', 'kosten_genehmigung_eur']
+    eigene_count = sum(1 for f in eigene_felder if _is_valid_number(eingabe.get(f)))
+    konfidenz = 40 + (eigene_count / len(eigene_felder)) * 40
+
+    return {
+        'kosten_trasse_eur': round(kosten_trasse),
+        'kosten_station_eur': round(kosten_station),
+        'kosten_genehmigung_eur': round(kosten_genehm),
+        'kosten_planung_eur': round(kosten_planung),
+        'kosten_bkz_eur': round(bkz),
+        'investition_gesamt_eur': round(investition_gesamt),
+        'betriebskosten_pa_eur': round(betriebskosten_pa),
+        'konfidenz_prozent': round(konfidenz),
+        'quelle': 'Eigene + Referenz' if eigene_count > 0 else 'Referenzwerte',
+    }
+
+
+# =============================================================================
+# WIRTSCHAFTLICHKEIT
+# =============================================================================
+
+def berechne_wirtschaftlichkeit(eingabe, kosten, p_mw):
+    verguetung_ct = _float_or_none(eingabe.get('wirt_verguetung_ct_kwh'))
+    volllaststunden = _float_or_none(eingabe.get('wirt_volllaststunden'))
+    eigenverbrauch_pct = _float_or(eingabe.get('wirt_eigenverbrauch_prozent'), 0)
+    wartung_pa = _float_or(eingabe.get('wirt_wartung_eur_a'), 0)
+
+    if verguetung_ct is None or volllaststunden is None:
+        return None
+
+    p_kw = p_mw * 1000
+    jahresertrag_kwh = p_kw * volllaststunden
+    einspeisung_kwh = jahresertrag_kwh * (1 - eigenverbrauch_pct / 100)
+    einnahmen_pa = einspeisung_kwh * (verguetung_ct / 100)
+
+    betriebskosten_pa = kosten['betriebskosten_pa_eur'] + wartung_pa
+    cashflow_pa = einnahmen_pa - betriebskosten_pa
+    investition = kosten['investition_gesamt_eur']
+
+    amortisation_jahre = investition / cashflow_pa if cashflow_pa > 0 else None
+    laufzeit = 20
+    gewinn_20a = (cashflow_pa * laufzeit) - investition
+    roi_prozent = (gewinn_20a / investition) * 100 if investition > 0 else 0
+
+    return {
+        'jahresertrag_kwh': round(jahresertrag_kwh),
+        'einnahmen_pa_eur': round(einnahmen_pa),
+        'betriebskosten_pa_eur': round(betriebskosten_pa),
+        'cashflow_pa_eur': round(cashflow_pa),
+        'amortisation_jahre': round(amortisation_jahre, 1) if amortisation_jahre else None,
+        'roi_20a_prozent': round(roi_prozent, 1),
+        'bewertung': 'GRUEN' if amortisation_jahre and amortisation_jahre < 12 else
+                     'GELB' if amortisation_jahre and amortisation_jahre < 18 else 'ROT',
+    }
+
+
+# =============================================================================
+# NB-SCHWELLENWERTE
+# =============================================================================
+
+def pruefe_nb_schwellenwerte(eingabe, thermisch, spannung, kurzschluss):
+    ergebnisse = []
+
+    max_auslastung = _float_or_none(eingabe.get('nb_max_auslastung_prozent'))
+    if max_auslastung is not None:
+        ok = thermisch['auslastung_prozent'] <= max_auslastung
+        ergebnisse.append({
+            'kriterium': 'Max. Auslastung',
+            'grenzwert': f'{max_auslastung}%',
+            'istwert': f'{thermisch["auslastung_prozent"]}%',
+            'erfuellt': ok,
+        })
+
+    max_sf = _float_or_none(eingabe.get('nb_max_spannungsfall_prozent'))
+    if max_sf is not None:
+        ok = spannung['delta_u_prozent'] <= max_sf
+        ergebnisse.append({
+            'kriterium': 'Max. Spannungsaenderung',
+            'grenzwert': f'{max_sf}%',
+            'istwert': f'{spannung["delta_u_prozent"]}%',
+            'erfuellt': ok,
+        })
+
+    min_skv = _float_or_none(eingabe.get('nb_min_kurzschluss_ratio'))
+    if min_skv is not None:
+        ok = kurzschluss['sk_sn_ratio'] >= min_skv
+        ergebnisse.append({
+            'kriterium': 'Min. Kurzschlussleistungsverhaeltnis',
+            'grenzwert': f'{min_skv}',
+            'istwert': f'{kurzschluss["sk_sn_ratio"]}',
+            'erfuellt': ok,
+        })
+
+    flags = []
+    if eingabe.get('nb_netzdienlichkeit_bonus'):
+        flags.append('Netzdienlichkeits-Bonus aktiv')
+    if eingabe.get('nb_speicher_prio'):
+        flags.append('Speicher-Priorisierung aktiv')
+    if eingabe.get('nb_eigenkapital_nachweis'):
+        flags.append('Eigenkapitalnachweis erforderlich')
+
+    alle_erfuellt = all(e['erfuellt'] for e in ergebnisse if e['erfuellt'] is not None)
+
+    return {
+        'pruefungen': ergebnisse,
+        'flags': flags,
+        'alle_erfuellt': alle_erfuellt,
+        'bewertung': 'GRUEN' if alle_erfuellt and ergebnisse else
+                     'GELB' if not ergebnisse else
+                     'ROT' if not alle_erfuellt else 'GELB',
+    }
+
+
+# =============================================================================
+# EMPFEHLUNGEN (erweitert)
+# =============================================================================
+
+def erzeuge_empfehlungen(thermisch, spannung, kurzschluss, n1, trafo, nb_check, dq, pqs, eingabe):
+    empfehlungen = []
+
+    # Thermisch
+    if thermisch['bewertung'] in ('ORANGE', 'ROT'):
+        empfehlungen.append('Leitung hoeher dimensionieren oder zusaetzliches paralleles System einplanen.')
+    if thermisch['bewertung'] == 'ROT':
+        empfehlungen.append('Naechsthoehere Spannungsebene pruefen.')
+
+    # Trafo
+    if trafo['bewertung'] in ('ORANGE', 'ROT'):
+        empfehlungen.append('Trafo hoeher dimensionieren oder 2. Trafo einplanen.')
+
+    # Spannung
+    if spannung['bewertung'] == 'ROT':
+        empfehlungen.append('Anschlusspunkt naeher am UW waehlen oder Spannungsregelung vorsehen.')
+    if spannung['bewertung'] in ('GELB', 'ORANGE', 'ROT'):
+        empfehlungen.append('Blindleistungskompensation pruefen (cos phi optimieren).')
+        if spannung['richtung'] == 'Anhebung':
+            empfehlungen.append('Anschluss nur mit aktivierter Blindleistungsregelung plausibel.')
+
+    # Kurzschluss
+    if kurzschluss['schutzpruefung_noetig']:
+        empfehlungen.append('Vertiefte Schutzpruefung erforderlich.')
+    if kurzschluss['rw_bewertung'] in ('ORANGE', 'ROT'):
+        empfehlungen.append('Netzrueckwirkungsstudie (Flicker/THD) beauftragen.')
+
+    # N-1
+    if not n1['n1_sicher']:
+        empfehlungen.append('Redundanten Anschluss einplanen fuer N-1 Sicherheit.')
+    if n1['bewertung'] == 'ROT' and n1.get('redundanz'):
+        empfehlungen.append('Auch mit Redundanz kritisch: Netzverstaerkung erforderlich.')
+
+    # NB-Check
+    if nb_check and not nb_check['alle_erfuellt']:
+        for p in nb_check['pruefungen']:
+            if p['erfuellt'] is False:
+                empfehlungen.append(f'NB-Kriterium nicht erfuellt: {p["kriterium"]} '
+                                    f'(Grenzwert {p["grenzwert"]}, Ist {p["istwert"]})')
+
+    # Datenqualität
+    if dq['klasse'] in ('C', 'D'):
+        empfehlungen.append(f'Datenqualitaet {dq["klasse"]}: Vor Antragstellung reale Netzdaten beim VNB anfordern.')
+
+    if not empfehlungen:
+        empfehlungen.append('Anschluss technisch plausibel. Standardverfahren beim Netzbetreiber einleiten.')
+
+    return empfehlungen
+
+
+# =============================================================================
+# FAZIT / ENTSCHEIDUNGSLOGIK (3 Ebenen)
+# =============================================================================
+
+def erzeuge_fazit(scores, harte_verstoesse):
+    """
+    3 Entscheidungsebenen:
+    A = Anschluss grundsätzlich plausibel
+    B = Anschluss bedingt plausibel
+    C = Anschluss kritisch / nicht plausibel
+    """
+    if harte_verstoesse:
+        return {
+            'entscheidung': 'C',
+            'text': 'KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.',
+            'detail': 'Harte Verstoesse: ' + '; '.join(harte_verstoesse),
+            'farbe': 'ROT',
+        }
+
+    g = scores['gesamt']
+    if g >= 70:
+        return {
+            'entscheidung': 'A',
+            'text': 'PLAUSIBEL: Netzanschluss grundsaetzlich realisierbar.',
+            'detail': f'Gesamtscore {g}/100. Standardverfahren beim VNB einleiten.',
+            'farbe': 'GRUEN',
+        }
+    elif g >= 40:
+        return {
+            'entscheidung': 'B',
+            'text': 'BEDINGT PLAUSIBEL: Netzanschluss mit Massnahmen moeglich.',
+            'detail': f'Gesamtscore {g}/100. Massnahmen und Detailpruefung erforderlich.',
+            'farbe': 'GELB',
+        }
+    else:
+        return {
+            'entscheidung': 'C',
+            'text': 'KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.',
+            'detail': f'Gesamtscore {g}/100. Erhebliche Anpassungen oder alternatives Konzept noetig.',
+            'farbe': 'ROT',
+        }
+
+
+# =============================================================================
+# HAUPTFUNKTION
+# =============================================================================
+
+def berechne_netzanschluss(eingabe):
+    # Validierung
+    fehler, warnungen = validiere_eingabe(eingabe)
+    if fehler:
+        return {'status': 'FEHLER', 'fehler': fehler, 'warnungen': warnungen}
+
+    # Grunddaten
+    u_kv = float(eingabe['nennspannung'])
+    p_mw = float(eingabe['leistung_mw'])
+    leitungstyp = eingabe['leitungstyp']
+    entfernung_km = float(eingabe['entfernung_km'])
+    cos_phi = float(eingabe.get('cos_phi', 0.95))
+    redundanz = eingabe.get('redundanz', False)
+    parallele_systeme = int(eingabe.get('parallele_systeme', 1))
+    anschlussart = eingabe['anschlussart']
+    topologie = eingabe.get('topologie', 'radial')
+    temperatur_c = _float_or(eingabe.get('temperatur_c'), 20)
+
+    spannungsebene = bestimme_spannungsebene(u_kv)
+
+    # P-Q-S Modell
+    pqs = berechne_pqs(p_mw, cos_phi)
+
+    # Impedanzmodell
+    sk_mva = _float_or(eingabe.get('sk_mva'), SK_DEFAULT[spannungsebene])
+    rx_ratio = _float_or(eingabe.get('rx_ratio'), RX_RATIO_DEFAULT[spannungsebene])
+    trafo_s_mva = _float_or(eingabe.get('trafo_s_mva'), TRAFO_DEFAULTS[spannungsebene]['s_mva'])
+    trafo_uk = _float_or(eingabe.get('trafo_uk_prozent'), TRAFO_DEFAULTS[spannungsebene]['uk_prozent'])
+    bestand_trafo_proz = _float_or(eingabe.get('bestand_trafo_auslastung'), 0)
+
+    r_q, x_q = berechne_quellenimpedanz(u_kv, sk_mva, rx_ratio)
+    r_t, x_t = berechne_trafoimpedanz(u_kv, trafo_s_mva, trafo_uk)
+    r_l, x_l = berechne_leitungsimpedanz(leitungstyp, entfernung_km, parallele_systeme, temperatur_c)
+    r_ges, x_ges, z_ges = berechne_gesamtimpedanz(r_q, x_q, r_t, x_t, r_l, x_l)
+
+    # Berechnungen
+    thermisch = berechne_thermisch(pqs['s_mva'], u_kv, leitungstyp, parallele_systeme)
+    trafo = berechne_trafo(pqs['s_mva'], trafo_s_mva, bestand_trafo_proz)
+    spannung = berechne_spannung(pqs['p_mw'], pqs['q_mvar'], u_kv, r_ges, x_ges, anschlussart)
+    kurzschluss = berechne_kurzschluss(u_kv, z_ges, pqs['s_mva'], sk_mva)
+    n1 = berechne_n1_prescreen(thermisch, trafo, topologie, parallele_systeme, redundanz)
+    datenqualitaet = berechne_datenqualitaet(eingabe)
+
+    # Szenarien
+    szenarien = berechne_szenarien(
+        pqs['p_mw'], pqs['q_mvar'], pqs['s_mva'], u_kv,
+        r_ges, x_ges, leitungstyp, parallele_systeme,
+        anschlussart, sk_mva, z_ges, trafo_s_mva, bestand_trafo_proz
+    )
+
+    # Scores
+    scores = berechne_scores(thermisch, spannung, kurzschluss, n1, datenqualitaet, trafo)
+    fazit = erzeuge_fazit(scores, scores['harte_verstoesse'])
+
+    # Kosten & Wirtschaftlichkeit
+    kosten = berechne_kosten(eingabe, spannungsebene, entfernung_km, parallele_systeme)
+    wirtschaftlichkeit = berechne_wirtschaftlichkeit(eingabe, kosten, p_mw)
+
+    # NB-Check
+    nb_check = pruefe_nb_schwellenwerte(eingabe, thermisch, spannung, kurzschluss)
+
+    # Empfehlungen
+    empfehlungen = erzeuge_empfehlungen(thermisch, spannung, kurzschluss, n1, trafo,
+                                         nb_check, datenqualitaet, pqs, eingabe)
+
+    return {
+        'status': 'OK',
+        'eingabe': eingabe,
+        'warnungen': warnungen,
+        'pqs': pqs,
+        'impedanz': {
+            'r_q': round(r_q, 5), 'x_q': round(x_q, 5),
+            'r_t': round(r_t, 5), 'x_t': round(x_t, 5),
+            'r_l': round(r_l, 5), 'x_l': round(x_l, 5),
+            'r_ges': round(r_ges, 5), 'x_ges': round(x_ges, 5),
+            'z_ges': round(z_ges, 5),
+        },
+        'thermisch': thermisch,
+        'trafo': trafo,
+        'spannung': spannung,
+        'kurzschluss': kurzschluss,
+        'n1': n1,
+        'szenarien': szenarien,
+        'scores': scores,
+        'fazit': fazit,
+        'kosten': kosten,
+        'wirtschaftlichkeit': wirtschaftlichkeit,
+        'nb_check': nb_check,
+        'datenqualitaet': datenqualitaet,
+        'empfehlungen': empfehlungen,
+    }
+
+===== C:\Users\andre\gridcheck\backend\engine\berechnung_backup_v1.py =====
+import math
+
+LEITUNGSDATEN = {
+    'NAYY150': (270, 0.206, 0.080),
+    'NAYY185': (310, 0.164, 0.080),
+    'NAY2Y150': (270, 0.206, 0.080),
+    'NA2XS2Y110': (355, 0.164, 0.113),
+    'NA2XS2Y150': (410, 0.124, 0.110),
+    'NA2XS2Y185': (455, 0.099, 0.108),
+    'NA2XS2Y240': (530, 0.077, 0.105),
+    'AL240': (645, 0.120, 0.390),
+    'AL_STAHL240': (645, 0.120, 0.390),
+    'ACSR240': (645, 0.120, 0.390),
+}
+
+GRENZWERTE_SPANNUNG = {
+    'NS': 3.0,
+    'MS': 2.0,
+    'HS': 1.0,
+}
+
+
+def bestimme_spannungsebene(u_kv):
+    if u_kv >= 60:
+        return 'HS'
+    elif u_kv >= 1:
+        return 'MS'
+    else:
+        return 'NS'
+
+
+def validiere_eingabe(eingabe):
+    fehler = []
+    pflichtfelder = ['nennspannung', 'leistung_mw', 'leitungstyp', 'entfernung_km', 'anschlussart']
+    for feld in pflichtfelder:
+        if feld not in eingabe:
+            fehler.append(f'Pflichtfeld fehlt: {feld}')
+
+    if not fehler:
+        try:
+            u = float(eingabe['nennspannung'])
+            if u <= 0 or u > 380:
+                fehler.append(f'Nennspannung unrealistisch: {u} kV')
+        except (ValueError, TypeError):
+            fehler.append('Nennspannung ist keine gueltige Zahl')
+
+        try:
+            p = float(eingabe['leistung_mw'])
+            if p <= 0 or p > 2000:
+                fehler.append(f'Leistung unrealistisch: {p} MW')
+        except (ValueError, TypeError):
+            fehler.append('Leistung ist keine gueltige Zahl')
+
+        try:
+            d = float(eingabe['entfernung_km'])
+            if d <= 0 or d > 500:
+                fehler.append(f'Entfernung unrealistisch: {d} km')
+        except (ValueError, TypeError):
+            fehler.append('Entfernung ist keine gueltige Zahl')
+
+        lt = eingabe.get('leitungstyp', '')
+        if lt not in LEITUNGSDATEN:
+            fehler.append(f'Unbekannter Leitungstyp: {lt}. Verfuegbar: {", ".join(LEITUNGSDATEN.keys())}')
+
+        aa = eingabe.get('anschlussart', '')
+        if aa not in ('Einspeisung', 'Entnahme', 'Speicher'):
+            fehler.append(f'Anschlussart ungueltig: {aa}. Erlaubt: Einspeisung, Entnahme, Speicher')
+
+        try:
+            ps = int(eingabe.get('parallele_systeme', 1))
+            if ps < 1 or ps > 6:
+                fehler.append(f'Parallele Systeme unrealistisch: {ps}. Erlaubt: 1-6')
+        except (ValueError, TypeError):
+            fehler.append('Parallele Systeme ist keine gueltige Zahl')
+
+    return fehler
+
+
+def berechne_thermisch(u_kv, p_mw, leitungstyp, cos_phi=0.95, parallele_systeme=1):
+    u_v = u_kv * 1000.0
+    p_w = p_mw * 1e6
+    i_max, r_km, x_km = LEITUNGSDATEN[leitungstyp]
+
+    # Gesamtstrom auf parallele Systeme aufteilen
+    i_gesamt = p_w / (math.sqrt(3) * u_v * cos_phi)
+    i_pro_system = i_gesamt / parallele_systeme
+    auslastung = (i_pro_system / i_max) * 100.0
+
+    if auslastung <= 60:
+        bewertung = 'GRUEN'
+        text = 'Thermisch unkritisch. Genuegend Reserve vorhanden.'
+    elif auslastung <= 80:
+        bewertung = 'GELB'
+        text = 'Thermisch akzeptabel. Reserve eingeschraenkt.'
+    elif auslastung <= 100:
+        bewertung = 'ORANGE'
+        text = 'Thermisch grenzwertig. Kaum Reserve fuer N-1.'
+    else:
+        bewertung = 'ROT'
+        text = 'Thermische Ueberlastung! Leitung nicht ausreichend dimensioniert.'
+
+    return {
+        'i_betrieb_gesamt_a': round(i_gesamt, 1),
+        'i_pro_system_a': round(i_pro_system, 1),
+        'i_max_a': i_max,
+        'auslastung_prozent': round(auslastung, 1),
+        'parallele_systeme': parallele_systeme,
+        'bewertung': bewertung,
+        'text': text,
+    }
+
+
+def berechne_spannung(u_kv, p_mw, leitungstyp, entfernung_km, cos_phi=0.95, parallele_systeme=1):
+    u_v = u_kv * 1000.0
+    p_w = p_mw * 1e6
+    i_max, r_km, x_km = LEITUNGSDATEN[leitungstyp]
+
+    # Bei parallelen Systemen: Impedanz reduziert sich (Parallelschaltung)
+    r_gesamt = (r_km * entfernung_km) / parallele_systeme
+    x_gesamt = (x_km * entfernung_km) / parallele_systeme
+
+    i_gesamt = p_w / (math.sqrt(3) * u_v * cos_phi)
+    sin_phi = math.sqrt(1 - cos_phi ** 2)
+
+    delta_u_v = math.sqrt(3) * i_gesamt * (r_gesamt * cos_phi + x_gesamt * sin_phi)
+    delta_u_proz = (delta_u_v / u_v) * 100.0
+
+    ebene = bestimme_spannungsebene(u_kv)
+    grenzwert = GRENZWERTE_SPANNUNG[ebene]
+
+    if delta_u_proz <= grenzwert * 0.6:
+        bewertung = 'GRUEN'
+        text = 'Spannungsfall unkritisch.'
+    elif delta_u_proz <= grenzwert * 0.85:
+        bewertung = 'GELB'
+        text = 'Spannungsfall akzeptabel, aber eingeschraenkte Reserve.'
+    elif delta_u_proz <= grenzwert:
+        bewertung = 'ORANGE'
+        text = 'Spannungsfall grenzwertig. Grenzwert fast erreicht.'
+    else:
+        bewertung = 'ROT'
+        text = f'Spannungsfall ueberschreitet Grenzwert ({grenzwert}%)!'
+
+    return {
+        'delta_u_prozent': round(delta_u_proz, 2),
+        'delta_u_v': round(delta_u_v, 1),
+        'grenzwert_prozent': grenzwert,
+        'spannungsebene': ebene,
+        'parallele_systeme': parallele_systeme,
+        'bewertung': bewertung,
+        'text': text,
+    }
+
+
+def berechne_n1(thermisch, spannung, redundanz=False):
+    parallele = thermisch['parallele_systeme']
+
+    if parallele >= 2:
+        # N-1: ein System faellt aus, Rest traegt die Last
+        n1_auslastung = thermisch['auslastung_prozent'] * parallele / (parallele - 1)
+        n1_sicher = n1_auslastung <= 100
+        n1_redundanz = True
+    elif redundanz:
+        # Redundanz-Flag aber nur 1 System = 2. System als Reserve
+        n1_auslastung = thermisch['auslastung_prozent']
+        n1_sicher = n1_auslastung <= 100
+        n1_redundanz = True
+    else:
+        n1_auslastung = thermisch['auslastung_prozent']
+        n1_sicher = False
+        n1_redundanz = False
+
+    if n1_sicher:
+        if n1_auslastung <= 80:
+            bewertung = 'GRUEN'
+            text = 'N-1 sicher mit ausreichend Reserve.'
+        else:
+            bewertung = 'GELB'
+            text = 'N-1 sicher, aber eingeschraenkte Reserve.'
+    else:
+        if n1_redundanz:
+            bewertung = 'ROT'
+            text = 'Trotz Redundanz: N-1 fuehrt zu Ueberlastung!'
+        else:
+            bewertung = 'ROT'
+            text = 'Kein redundanter Pfad. N-1 nicht erfuellt.'
+
+    return {
+        'n1_sicher': n1_sicher,
+        'n1_auslastung_prozent': round(n1_auslastung, 1),
+        'redundanz': n1_redundanz,
+        'parallele_systeme': parallele,
+        'bewertung': bewertung,
+        'text': text,
+    }
+
+
+def erzeuge_empfehlungen(thermisch, spannung, n1):
+    empfehlungen = []
+
+    if thermisch['bewertung'] in ('ORANGE', 'ROT'):
+        empfehlungen.append('Leitung hoeher dimensionieren oder zusaetzliches paralleles System einplanen.')
+    if thermisch['bewertung'] == 'ROT':
+        empfehlungen.append('Naechsthoehere Spannungsebene pruefen.')
+
+    if spannung['bewertung'] == 'ROT':
+        empfehlungen.append('Anschlusspunkt naeher am Umspannwerk waehlen oder Spannungsregelung vorsehen.')
+    if spannung['bewertung'] in ('GELB', 'ROT'):
+        empfehlungen.append('Blindleistungskompensation pruefen (cos phi optimieren).')
+
+    if not n1['n1_sicher']:
+        empfehlungen.append('Redundanten Anschluss (zweiter Einspeisestrang) einplanen fuer N-1 Sicherheit.')
+    if n1['bewertung'] == 'ROT' and n1['redundanz']:
+        empfehlungen.append('Auch mit Redundanz kritisch: Netzverstaerkung erforderlich.')
+
+    if not empfehlungen:
+        empfehlungen.append('Anschluss technisch machbar. Standardverfahren beim Netzbetreiber einleiten.')
+
+    return empfehlungen
+
+
+def erzeuge_fazit(thermisch, spannung, n1):
+    bewertungen = [thermisch['bewertung'], spannung['bewertung'], n1['bewertung']]
+
+    if 'ROT' in bewertungen:
+        return 'KRITISCH: Netzanschluss in dieser Konfiguration nicht realisierbar. Anpassungen zwingend erforderlich.'
+    elif 'ORANGE' in bewertungen:
+        return 'EINGESCHRAENKT: Netzanschluss moeglich, aber Detailpruefung und Massnahmen erforderlich.'
+    elif 'GELB' in bewertungen:
+        return 'MACHBAR MIT AUFLAGEN: Netzanschluss realisierbar, einzelne Punkte beachten.'
+    else:
+        return 'MACHBAR: Netzanschluss technisch problemlos realisierbar.'
+
+
+def berechne_netzanschluss(eingabe):
+    fehler = validiere_eingabe(eingabe)
+    if fehler:
+        return {'status': 'FEHLER', 'fehler': fehler}
+
+    u_kv = float(eingabe['nennspannung'])
+    p_mw = float(eingabe['leistung_mw'])
+    leitungstyp = eingabe['leitungstyp']
+    entfernung_km = float(eingabe['entfernung_km'])
+    cos_phi = float(eingabe.get('cos_phi', 0.95))
+    redundanz = eingabe.get('redundanz', False)
+    parallele_systeme = int(eingabe.get('parallele_systeme', 1))
+
+    thermisch = berechne_thermisch(u_kv, p_mw, leitungstyp, cos_phi, parallele_systeme)
+    spannung = berechne_spannung(u_kv, p_mw, leitungstyp, entfernung_km, cos_phi, parallele_systeme)
+    n1 = berechne_n1(thermisch, spannung, redundanz)
+    empfehlungen = erzeuge_empfehlungen(thermisch, spannung, n1)
+    fazit = erzeuge_fazit(thermisch, spannung, n1)
+
+    return {
+        'status': 'OK',
+        'eingabe': eingabe,
+        'thermisch': thermisch,
+        'spannung': spannung,
+        'n1': n1,
+        'empfehlungen': empfehlungen,
+        'fazit': fazit,
+    }
+
+===== C:\Users\andre\gridcheck\backend\engine\ki_modul.py =====
+import json
+import os
+import math
+
+KI_DATEN_PFAD = 'daten/ki_lerndaten.json'
+
+def lade_lerndaten():
+    if not os.path.exists(KI_DATEN_PFAD):
+        return []
+    try:
+        with open(KI_DATEN_PFAD, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return []
+
+def speichere_lerndaten(daten):
+    os.makedirs('daten', exist_ok=True)
+    with open(KI_DATEN_PFAD, 'w', encoding='utf-8') as f:
+        json.dump(daten, f, indent=2, ensure_ascii=False)
+
+def berechne_aehnlichkeit(a, b):
+    try:
+        felder = ['nennspannung', 'leistung_mw', 'entfernung_km']
+        summe = 0.0
+        for feld in felder:
+            va = float(a.get(feld, 0))
+            vb = float(b.get(feld, 0))
+            maxval = max(abs(va), abs(vb), 1.0)
+            diff = (va - vb) / maxval
+            summe += diff ** 2
+        if a.get('leitungstyp') != b.get('leitungstyp'):
+            summe += 1.0
+        if a.get('anschlussart') != b.get('anschlussart'):
+            summe += 0.5
+        distanz = math.sqrt(summe)
+        aehnlichkeit = max(0.0, 1.0 - distanz / 3.0)
+        return round(aehnlichkeit, 4)
+    except Exception:
+        return 0.0
+
+def finde_aehnliche(eingabe, lerndaten, top_n=5):
+    scored = []
+    for eintrag in lerndaten:
+        score = berechne_aehnlichkeit(eingabe, eintrag.get('eingabe', {}))
+        if score > 0.3:
+            scored.append({'score': score, 'eintrag': eintrag})
+    scored.sort(key=lambda x: x['score'], reverse=True)
+    return scored[:top_n]
+
+def berechne_konfidenz(aehnliche):
+    if not aehnliche:
+        return 0.3
+    n = len(aehnliche)
+    avg_score = sum(a['score'] for a in aehnliche) / n
+    konfidenz = min(0.3 + (n * 0.1) + (avg_score * 0.2), 0.98)
+    return round(konfidenz, 3)
+
+def erzeuge_ki_hinweise(ergebnis, aehnliche):
+    hinweise = []
+    if not aehnliche:
+        hinweise.append('Keine vergleichbaren Faelle in der Datenbank. Ergebnis basiert rein auf Berechnung.')
+        return hinweise
+
+    hinweise.append(f'{len(aehnliche)} aehnliche Faelle gefunden.')
+
+    aktuelles_fazit = ergebnis.get('fazit', '')
+    abweichungen = 0
+    for a in aehnliche:
+        altes_fazit = a['eintrag'].get('fazit', '')
+        if altes_fazit and aktuelles_fazit:
+            # Vergleiche Kernaussage (erstes Wort: MACHBAR/KRITISCH/EINGESCHRAENKT)
+            if aktuelles_fazit.split(':')[0] != altes_fazit.split(':')[0]:
+                abweichungen += 1
+
+    if abweichungen > 0:
+        hinweise.append(f'ACHTUNG: {abweichungen} von {len(aehnliche)} aehnlichen Faellen hatten ein abweichendes Ergebnis. Manuelle Pruefung empfohlen.')
+    else:
+        hinweise.append('Ergebnis konsistent mit aehnlichen Faellen. Hohe Validitaet.')
+
+    # Bester Match Info
+    bester = aehnliche[0]
+    hinweise.append(f'Bester Match: Aehnlichkeit {round(bester["score"]*100,1)}%')
+
+    return hinweise
+
+def ki_bewertung(ergebnis):
+    lerndaten = lade_lerndaten()
+    eingabe = ergebnis.get('eingabe', {})
+
+    aehnliche = finde_aehnliche(eingabe, lerndaten)
+    konfidenz = berechne_konfidenz(aehnliche)
+    hinweise = erzeuge_ki_hinweise(ergebnis, aehnliche)
+
+    ergebnis['ki'] = {
+        'konfidenz': konfidenz,
+        'konfidenz_prozent': round(konfidenz * 100, 1),
+        'aehnliche_faelle': len(aehnliche),
+        'hinweise': hinweise,
+    }
+
+    lernfall = {
+        'eingabe': eingabe,
+        'thermisch': ergebnis.get('thermisch', {}),
+        'spannung': ergebnis.get('spannung', {}),
+        'n1': ergebnis.get('n1', {}),
+        'fazit': ergebnis.get('fazit', ''),
+    }
+    lerndaten.append(lernfall)
+    speichere_lerndaten(lerndaten)
+
+    return ergebnis
+
+===== C:\Users\andre\gridcheck\backend\engine\pdf_report.py =====
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import mm
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from datetime import datetime
+import os
+import hashlib
+import json
+
+def erstelle_pdf(daten, dateiname=None):
+    """Erstellt revisionssicheren PDF-Report aus Analysedaten"""
+    
+    if not dateiname:
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        rev_id = daten.get('revision_id', 'unbekannt')
+        dateiname = f'daten/reports/GridCheck_Report_{rev_id}_{ts}.pdf'
+    
+    os.makedirs(os.path.dirname(dateiname), exist_ok=True)
+    
+    doc = SimpleDocTemplate(dateiname, pagesize=A4,
+                           topMargin=20*mm, bottomMargin=20*mm,
+                           leftMargin=15*mm, rightMargin=15*mm)
+    
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='TitelGC', fontSize=18, spaceAfter=6,
+                              textColor=colors.HexColor('#00b4d8'), fontName='Helvetica-Bold'))
+    styles.add(ParagraphStyle(name='SubGC', fontSize=10, spaceAfter=12,
+                              textColor=colors.HexColor('#667788')))
+    styles.add(ParagraphStyle(name='SektionGC', fontSize=13, spaceAfter=6, spaceBefore=14,
+                              textColor=colors.HexColor('#00b4d8'), fontName='Helvetica-Bold',
+                              borderWidth=1, borderColor=colors.HexColor('#1e3a5f'), borderPadding=4))
+    styles.add(ParagraphStyle(name='FazitGC', fontSize=12, fontName='Helvetica-Bold',
+                              spaceAfter=10, spaceBefore=6, alignment=1))
+    styles.add(ParagraphStyle(name='EmpfehlungGC', fontSize=9, spaceAfter=4,
+                              leftIndent=10, bulletIndent=0))
+    
+    elemente = []
+    
+    # Header
+    elemente.append(Paragraph('GridCheck Pro - Analysereport', styles['TitelGC']))
+    elemente.append(Paragraph(
+        f'Erstellt: {datetime.now().strftime("%d.%m.%Y %H:%M:%S")} | '
+        f'Revision: {daten.get("revision_id", "n/a")}',
+        styles['SubGC']))
+    elemente.append(Spacer(1, 4*mm))
+    
+    # Fazit
+    fazit = daten.get('fazit', '')
+    if 'MACHBAR' in fazit:
+        fazit_farbe = colors.HexColor('#064e3b')
+    elif 'AUFLAGEN' in fazit:
+        fazit_farbe = colors.HexColor('#713f12')
+    else:
+        fazit_farbe = colors.HexColor('#7f1d1d')
+    
+    fazit_stil = ParagraphStyle('FazitDyn', parent=styles['FazitGC'], textColor=fazit_farbe)
+    elemente.append(Paragraph(f'FAZIT: {fazit}', fazit_stil))
+    elemente.append(Spacer(1, 4*mm))
+    
+    # Eingabedaten
+    e = daten.get('eingabe', {})
+    elemente.append(Paragraph('Anschlussparameter', styles['SektionGC']))
+    tab_eingabe = [
+        ['Parameter', 'Wert'],
+        ['Spannungsebene', str(e.get('spannungsebene', ''))],
+        ['Nennspannung', f"{e.get('nennspannung', '')} kV"],
+        ['Leistung', f"{e.get('leistung_mw', '')} MW"],
+        ['cos phi', str(e.get('cos_phi', ''))],
+        ['Anschlussart', str(e.get('anschlussart', ''))],
+        ['Entfernung', f"{e.get('entfernung_km', '')} km"],
+        ['Leitungstyp', str(e.get('leitungstyp', ''))],
+        ['Parallele Systeme', str(e.get('parallele_systeme', ''))],
+    ]
+    elemente.append(_tabelle(tab_eingabe))
+    
+    # Thermische Analyse
+    th = daten.get('thermisch', {})
+    elemente.append(Paragraph('Thermische Analyse', styles['SektionGC']))
+    tab_th = [
+        ['Parameter', 'Wert'],
+        ['Betriebsstrom', f"{th.get('i_pro_system_a', '')} A"],
+        ['Grenzstrom', f"{th.get('i_max_a', '')} A"],
+        ['Auslastung', f"{th.get('auslastung_prozent', '')} %"],
+        ['Status', str(th.get('bewertung', ''))],
+    ]
+    elemente.append(_tabelle(tab_th))
+    
+    # Spannungsanalyse
+    sp = daten.get('spannung', {})
+    elemente.append(Paragraph('Spannungsanalyse', styles['SektionGC']))
+    tab_sp = [
+        ['Parameter', 'Wert'],
+        ['Delta U', f"{sp.get('delta_u_prozent', '')} %"],
+        ['Grenzwert', f"{sp.get('grenzwert_prozent', '')} %"],
+        ['Status', str(sp.get('bewertung', ''))],
+    ]
+    elemente.append(_tabelle(tab_sp))
+    
+    # N-1 Analyse
+    n1 = daten.get('n1', {})
+    elemente.append(Paragraph('N-1 Sicherheit', styles['SektionGC']))
+    tab_n1 = [
+        ['Parameter', 'Wert'],
+        ['N-1 sicher', 'JA' if n1.get('n1_sicher') else 'NEIN'],
+        ['Auslastung bei N-1', f"{n1.get('n1_auslastung_prozent', '')} %"],
+        ['Bewertung', str(n1.get('bewertung', ''))],
+    ]
+    elemente.append(_tabelle(tab_n1))
+    
+    # KI-Bewertung
+    ki = daten.get('ki_bewertung', {})
+    if ki:
+        elemente.append(Paragraph('KI-Bewertung', styles['SektionGC']))
+        tab_ki = [
+            ['Parameter', 'Wert'],
+            ['Konfidenz', f"{ki.get('konfidenz', '')} %"],
+            ['Einschaetzung', str(ki.get('einschaetzung', ''))],
+        ]
+        elemente.append(_tabelle(tab_ki))
+    
+    # Empfehlungen
+    empf = daten.get('empfehlungen', [])
+    if empf:
+        elemente.append(Paragraph('Empfehlungen', styles['SektionGC']))
+        for em in empf:
+            elemente.append(Paragraph(f'\u2022 {em}', styles['EmpfehlungGC']))
+    
+    elemente.append(Spacer(1, 10*mm))
+    
+    # Revisions-Hash
+    hash_input = json.dumps(daten, sort_keys=True, default=str)
+    rev_hash = hashlib.sha256(hash_input.encode()).hexdigest()[:16]
+    elemente.append(Paragraph(
+        f'Revisions-Hash: {rev_hash} | Dokument maschinell erstellt - GridCheck Pro v1.0',
+        styles['SubGC']))
+    
+    doc.build(elemente)
+    return dateiname, rev_hash
+
+
+def _tabelle(daten_liste):
+    """Erstellt formatierte Tabelle"""
+    t = Table(daten_liste, colWidths=[70*mm, 90*mm])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0d1b2a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#00b4d8')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#0a0f1e')),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#e0e0e0')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#1e3a5f')),
+        ('PADDING', (0, 0), (-1, -1), 6),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#0a0f1e'), colors.HexColor('#111827')]),
+    ]))
+    return t
+
+===== C:\Users\andre\gridcheck\backend\engine\revision.py =====
+import json
+import os
+import hashlib
+import uuid
+from datetime import datetime, timezone
+
+REVISIONS_PFAD = 'daten/revisionen.json'
+
+def lade_revisionen():
+    if not os.path.exists(REVISIONS_PFAD):
+        return []
+    with open(REVISIONS_PFAD, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def speichere_revisionen(revisionen):
+    os.makedirs('daten', exist_ok=True)
+    with open(REVISIONS_PFAD, 'w', encoding='utf-8') as f:
+        json.dump(revisionen, f, indent=2, ensure_ascii=False)
+
+def erzeuge_hash(daten):
+    raw = json.dumps(daten, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(raw.encode('utf-8')).hexdigest()
+
+def erzeuge_vorgaenger_hash(revisionen):
+    if not revisionen:
+        return 'GENESIS'
+    letzter = revisionen[-1]
+    return letzter.get('hash', 'UNBEKANNT')
+
+def speichere_revision(ergebnis):
+    revisionen = lade_revisionen()
+    revision_id = str(uuid.uuid4())
+    zeitstempel = datetime.now(timezone.utc).isoformat()
+    vorgaenger_hash = erzeuge_vorgaenger_hash(revisionen)
+
+    revision = {
+        'id': revision_id,
+        'zeitstempel': zeitstempel,
+        'vorgaenger_hash': vorgaenger_hash,
+        'eingabe': ergebnis.get('eingabe', {}),
+        'thermisch': ergebnis.get('thermisch', {}),
+        'spannung': ergebnis.get('spannung', {}),
+        'n1': ergebnis.get('n1', {}),
+        'ki': ergebnis.get('ki', {}),
+        'fazit': ergebnis.get('fazit', ''),
+        'empfehlungen': ergebnis.get('empfehlungen', []),
+    }
+
+    revision['hash'] = erzeuge_hash(revision)
+
+    revisionen.append(revision)
+    speichere_revisionen(revisionen)
+
+    ergebnis['revision'] = {
+        'id': revision_id,
+        'zeitstempel': zeitstempel,
+        'hash': revision['hash'],
+        'vorgaenger_hash': vorgaenger_hash,
+        'revisionsnummer': len(revisionen),
+    }
+
+    return ergebnis
+
+def pruefe_integritaet():
+    revisionen = lade_revisionen()
+    if not revisionen:
+        return {'intakt': True, 'anzahl': 0, 'fehler': []}
+
+    fehler = []
+    for i, rev in enumerate(revisionen):
+        gespeicherter_hash = rev.get('hash', '')
+        rev_ohne_hash = {k: v for k, v in rev.items() if k != 'hash'}
+        berechneter_hash = erzeuge_hash(rev_ohne_hash)
+
+        if gespeicherter_hash != berechneter_hash:
+            fehler.append({
+                'index': i,
+                'id': rev.get('id', ''),
+                'fehler': 'Hash stimmt nicht ueberein'
+            })
+
+        if i == 0:
+            if rev.get('vorgaenger_hash') != 'GENESIS':
+                fehler.append({
+                    'index': i,
+                    'id': rev.get('id', ''),
+                    'fehler': 'Erster Eintrag hat keinen GENESIS-Vorgaenger'
+                })
+        else:
+            erwarteter_vorgaenger = revisionen[i-1].get('hash', '')
+            if rev.get('vorgaenger_hash') != erwarteter_vorgaenger:
+                fehler.append({
+                    'index': i,
+                    'id': rev.get('id', ''),
+                    'fehler': 'Verkettung unterbrochen'
+                })
+
+    return {
+        'intakt': len(fehler) == 0,
+        'anzahl': len(revisionen),
+        'fehler': fehler,
+    }
+
+===== C:\Users\andre\gridcheck\backend\engine\__init__.py =====
+
+
+===== C:\Users\andre\gridcheck\backend\simulation\optimization.py =====
+import pandapower as pp
+import numpy as np
+
+def optimize_voltage(net, target_vm=1.0):
+    results = []
+    for idx in net.ext_grid.index:
+        original = net.ext_grid.at[idx, 'vm_pu']
+        best_vm = original
+        best_dev = float('inf')
+        for vm in np.arange(0.95, 1.06, 0.01):
+            net.ext_grid.at[idx, 'vm_pu'] = vm
+            try:
+                pp.runpp(net)
+                dev = net.res_bus.vm_pu.std()
+                if dev < best_dev:
+                    best_dev = dev
+                    best_vm = vm
+            except:
+                pass
+        net.ext_grid.at[idx, 'vm_pu'] = best_vm
+        results.append({'grid': idx, 'optimal_vm': best_vm})
+    return results
+
+===== C:\Users\andre\gridcheck\backend\simulation\power_flow.py =====
+import pandapower as pp
+import numpy as np
+
+def run_power_flow(net):
+    try:
+        pp.runpp(net, algorithm='nr', max_iteration=100)
+        return {
+            'success': True,
+            'bus_results': net.res_bus.to_dict(),
+            'line_results': net.res_line.to_dict()
+        }
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+def create_sample_network():
+    net = pp.create_empty_network()
+    bus1 = pp.create_bus(net, vn_kv=110, name='HV Bus')
+    bus2 = pp.create_bus(net, vn_kv=20, name='MV Bus')
+    bus3 = pp.create_bus(net, vn_kv=20, name='MV Bus 2')
+    pp.create_ext_grid(net, bus=bus1, vm_pu=1.02)
+    pp.create_transformer(net, hv_bus=bus1, lv_bus=bus2, std_type='25 MVA 110/20 kV')
+    pp.create_line(net, from_bus=bus2, to_bus=bus3, length_km=5, std_type='NAYY 4x50 SE')
+    pp.create_load(net, bus=bus3, p_mw=2.0, q_mvar=0.5, name='Last 1')
+    pp.create_sgen(net, bus=bus3, p_mw=0.5, name='Solar 1')
+    return net
+
+def get_results_summary(net):
+    return {
+        'n_buses': len(net.bus),
+        'n_lines': len(net.line),
+        'min_voltage': net.res_bus.vm_pu.min(),
+        'max_loading': net.res_line.loading_percent.max()
+    }
+
+===== C:\Users\andre\gridcheck\backend\simulation\__init__.py =====
+
+
+===== C:\Users\andre\gridcheck\backend\utils\grid_helpers.py =====
+import numpy as np
+
+def calculate_line_loading(power_flow, max_capacity):
+    return (abs(power_flow) / max_capacity) * 100
+
+def calculate_voltage_deviation(voltage, nominal=1.0):
+    return ((voltage - nominal) / nominal) * 100
+
+def check_thermal_limits(loading_percent, warning=80, critical=100):
+    if loading_percent >= critical:
+        return 'critical'
+    elif loading_percent >= warning:
+        return 'warning'
+    return 'normal'
+
+===== C:\Users\andre\gridcheck\backend\utils\validators.py =====
+def validate_network(net):
+    errors = []
+    if len(net.bus) == 0:
+        errors.append('Keine Busse definiert')
+    if len(net.line) == 0 and len(net.trafo) == 0:
+        errors.append('Keine Leitungen oder Trafos')
+    if len(net.ext_grid) == 0:
+        errors.append('Kein externes Netz definiert')
+    return {'valid': len(errors) == 0, 'errors': errors}
+
+===== C:\Users\andre\gridcheck\backend\utils\__init__.py =====
+
+
+===== C:\Users\andre\gridcheck\backend\visualization\plots.py =====
+import plotly.graph_objects as go
+import plotly.express as px
+import pandas as pd
+
+def plot_voltage_profile(net):
+    if net.res_bus.empty:
+        return None
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=[f'Bus {i}' for i in net.res_bus.index],
+        y=net.res_bus.vm_pu.values,
+        marker_color=['green' if 0.95 <= v <= 1.05 else 'red' for v in net.res_bus.vm_pu.values]
+    ))
+    fig.add_hline(y=1.05, line_dash='dash', line_color='red')
+    fig.add_hline(y=0.95, line_dash='dash', line_color='red')
+    fig.update_layout(title='Spannungsprofil', xaxis_title='Bus', yaxis_title='Spannung (p.u.)')
+    return fig
+
+def plot_loading(net):
+    if net.res_line.empty:
+        return None
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=[f'Leitung {i}' for i in net.res_line.index],
+        y=net.res_line.loading_percent.values,
+        marker_color=['green' if l < 80 else 'orange' if l < 100 else 'red' for l in net.res_line.loading_percent.values]
+    ))
+    fig.add_hline(y=100, line_dash='dash', line_color='red')
+    fig.update_layout(title='Leitungsauslastung', xaxis_title='Leitung', yaxis_title='Auslastung (%)')
+    return fig
+
+===== C:\Users\andre\gridcheck\backend\visualization\__init__.py =====
+
+
+===== C:\Users\andre\gridcheck\backend\app.py =====
+from flask import Flask, request, jsonify, send_from_directory, send_file
+from engine.berechnung import berechne_netzanschluss
+from engine.ki_modul import ki_bewertung
+from engine.revision import speichere_revision
+from engine.pdf_report import erstelle_pdf
+import os
+import json
+
+app = Flask(__name__, static_folder='frontend', static_url_path='')
+
+@app.route('/')
+def index():
+    return send_from_directory('frontend', 'index.html')
+
+@app.route('/api/check', methods=['POST'])
+def check():
+    try:
+        daten = request.get_json()
+        pflicht = ['nennspannung', 'leistung_mw', 'anschlussart', 'entfernung_km', 'leitungstyp']
+        for feld in pflicht:
+            if feld not in daten or daten[feld] is None:
+                return jsonify({'error': 'Pflichtfeld fehlt: ' + feld}), 400
+
+        ergebnis = berechne_netzanschluss(daten)
+        ergebnis = ki_bewertung(ergebnis)
+        ergebnis = speichere_revision(ergebnis)
+        return jsonify(ergebnis)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/pdf', methods=['POST'])
+def pdf_export():
+    try:
+        daten = request.get_json()
+        if not daten:
+            return jsonify({'error': 'Keine Daten'}), 400
+        
+        pfad, rev_hash = erstelle_pdf(daten)
+        return send_file(pfad, as_attachment=True, 
+                        download_name=os.path.basename(pfad),
+                        mimetype='application/pdf')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/revisionen', methods=['GET'])
+def revisionen():
+    import json
+    pfad = 'daten/revisionen.json'
+    if not os.path.exists(pfad):
+        return jsonify([])
+    with open(pfad, 'r', encoding='utf-8') as f:
+        return jsonify(json.load(f))
+
+if __name__ == '__main__':
+    os.makedirs('daten', exist_ok=True)
+    os.makedirs('daten/reports', exist_ok=True)
+    app.run(debug=True, port=5000)
+
+===== C:\Users\andre\gridcheck\backend\__init__.py =====
+
