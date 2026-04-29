@@ -1,0 +1,17 @@
+{
+  "gridOk": "Netzkapazität ausreichend",
+  "gridInsufficient": "Netzkapazität nicht ausreichend",
+  "riskCapacityDeficit": "Leistungsdefizit im Netz",
+  "n1Ok": "N-1 Kriterium eingehalten",
+  "n1Failed": "N-1 Kriterium nicht eingehalten",
+  "riskN1": "Keine Versorgungssicherheit (N-1)",
+  "recN1": "Zweiten Einspeisepunkt oder Ringstruktur prüfen",
+  "stabilityOk": "Netzstabilität ausreichend",
+  "stabilityCritical": "Netzstabilität kritisch",
+  "riskShortCircuit": "Geringe Kurzschlussleistung",
+  "riskDistance": "Große Entfernung zum Netzanschlusspunkt (Kostenrisiko)",
+  "recDistance": "Leitungsauslegung und Spannungsebene prüfen",
+  "summaryFeasibleNoN1": "Anschluss technisch möglich, aber ohne N-1 Sicherheit",
+  "summaryFeasible": "Anschluss technisch möglich",
+  "summaryNotFeasible": "Anschluss aktuell nicht möglich"
+}

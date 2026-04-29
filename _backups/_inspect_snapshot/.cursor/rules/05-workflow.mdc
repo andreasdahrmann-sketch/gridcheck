@@ -1,0 +1,38 @@
+---
+description: Arbeitsweise, Revisionssicherheit, KI-Verhalten
+alwaysApply: true
+---
+
+# Workflow-Regeln
+
+## Arbeitsweise (für KI-Assistenten und Entwickler)
+1. **Lesen vor Schreiben** – bevor Code geändert wird, betroffene Dateien + Abhängigkeiten prüfen.
+2. **Schritt für Schritt** – große Änderungen in kleine, testbare Schritte zerlegen.
+3. **Jedes Zwischenziel testen** – bevor weitergebaut wird.
+4. **Nach Meilensteinen: Backup / Git-Tag.**
+5. **Im Zweifel fragen, nicht raten.** Keine Halluzinationen, keine erfundenen APIs/Pakete.
+6. **Konsistenz** – gleiche Aufgabe → gleiches Tool/Muster. Abweichung begründen.
+
+## Revisionssicherheit (projektweit)
+- Jede Berechnung wird vollständig gespeichert: Input, Output, App-Version, Norm-Version, User, Timestamp.
+- Historische Berechnungen sind **append-only**. Änderungen erzeugen eine neue Version.
+- Exporte (PDF-Report) enthalten: Projekt-ID, Berechnungs-ID, Hash, Norm-Version, App-Version.
+- Löschung nur durch Soft-Delete (`deleted_at`), Daten bleiben für Audit erhalten.
+
+## Git
+- Branches: `main` (deployable), `feature/<kurz>`, `fix/<kurz>`.
+- Commits: Konventionell (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`).
+- Keine Commits direkt auf `main` in Produktivphase.
+
+## Qualitätssicherung vor Code-Ausgabe (KI)
+Vor jedem Code-Vorschlag prüfen:
+- [ ] Konflikt mit bestehendem Code?
+- [ ] Typen/Schemas konsistent (Backend Pydantic ↔ Frontend Zod)?
+- [ ] Fehlerfälle behandelt?
+- [ ] Security-Implikationen (Input-Validation, Auth, Secrets)?
+- [ ] Test vorhanden oder ergänzbar?
+
+## Proaktive Hinweise (erwünscht)
+- Optimierungspotenzial benennen (Performance, UX, Security), auch wenn nicht gefragt.
+- Technische Schulden markieren (`# TODO(tech-debt): ...`).
+- Bei Unklarheit in Anforderungen: nachfragen, bevor gecodet wird.

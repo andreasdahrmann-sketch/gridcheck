@@ -1,0 +1,34 @@
+---
+description: Fachregeln Elektrotechnik / Netzanschluss
+alwaysApply: true
+---
+
+# Elektrotechnik-Regeln
+
+## Normgrundlage (Deutschland)
+- **VDE-AR-N 4105** – Niederspannung (≤ 1 kV), Erzeugungsanlagen
+- **VDE-AR-N 4110** – Mittelspannung (> 1 kV bis 35 kV)
+- **VDE-AR-N 4120** – Hochspannung (> 35 kV bis 110 kV)
+- **VDE-AR-N 4100** – Netzanschluss Niederspannung (Verbraucher)
+- **TAB** des jeweiligen Netzbetreibers (kann strenger sein – konservativ!)
+
+Jede Berechnung speichert die **verwendete Normversion** (z. B. "VDE-AR-N 4110:2018-11 inkl. Änderung A1:2023-03").
+
+## Spannungsebenen-Logik
+- NS (LV): ≤ 1 kV → VDE 4105 / 4100
+- MS (MV): > 1 kV bis 35 kV → VDE 4110
+- HS (HV): > 35 kV → VDE 4120
+
+## N-1-Analyse
+- **Pflicht** für MS- und HS-Anschlüsse (ab VDE 4110).
+- Für NS nur, wenn Netzbetreiber es verlangt oder Anlage systemrelevant ist.
+- Bei N-1 werden nacheinander alle relevanten Betriebsmittel (Trafo, Leitung) ausgefallen simuliert; Grenzwerte (Spannung, Strom, Kurzschlussleistung) müssen auch dann eingehalten sein.
+
+## Grenzwerte & Konservativität
+- Spannungsänderung dU: NS 3%, MS 2% (Richtwerte, TAB kann abweichen).
+- Flicker, Oberschwingungen: nach IEC 61000-3-x bzw. DACHCZ.
+- Kurzschlussleistung Sk'' am Verknüpfungspunkt: **immer** aus Netzbetreiber-Auskunft, nicht schätzen. Fehlt sie → Rechnung mit Vermerk "vorläufig, Sk'' ausstehend".
+
+## Reproduzierbarkeit
+- Jede Berechnung: Input-JSON + Ergebnis-JSON + Norm-Version + Engine-Version in DB.
+- Keine stochastischen Defaults. Alle Annahmen explizit im Ergebnis.

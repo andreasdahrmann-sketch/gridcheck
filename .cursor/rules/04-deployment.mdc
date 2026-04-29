@@ -1,0 +1,53 @@
+---
+description: Deployment (Railway, PostgreSQL, ENV)
+alwaysApply: false
+---
+
+# Deployment-Regeln
+
+## Railway
+- Backend + PostgreSQL als separate Services im selben Projekt.
+- `Procfile` oder `railway.toml` für Start-Command.
+- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Healthcheck-Endpoint: `GET /health` → `{"status":"ok","version":"..."}`
+
+## ENV-Variablen (Pflicht)
+
+### Backend (Railway)
+| Variable              | Zweck                                     | Beispiel / Hinweis                |
+|-----------------------|-------------------------------------------|-----------------------------------|
+| `APP_ENV`             | Umgebung                                  | `dev` \| `staging` \| `prod`      |
+| `APP_VERSION`         | Aus Git-Tag gesetzt, für Audit-Log        | `v1.2.3`                          |
+| `DATABASE_URL`        | Postgres-Verbindung                       | von Railway injiziert             |
+| `JWT_SECRET`          | Signatur Access-Token                     | min. 32 Zeichen, zufällig         |
+| `JWT_REFRESH_SECRET`  | Signatur Refresh-Token                    | eigener Wert, ≠ `JWT_SECRET`      |
+| `JWT_ACCESS_TTL_MIN`  | Lebensdauer Access-Token                  | `15`                              |
+| `JWT_REFRESH_TTL_DAYS`| Lebensdauer Refresh-Token                 | `14`                              |
+| `CORS_ORIGINS`        | Komma-getrennte Liste erlaubter Origins   | `https://app.gridcheck.de`        |
+| `LOG_LEVEL`           | Logging-Schwelle                          | `INFO` (prod), `DEBUG` (dev)      |
+| `NORM_VERSION`        | Aktuell genutzte Normensammlung           | `VDE-AR-N-4105:2018-11 + ...`     |
+| `SENTRY_DSN`          | Error-Tracking (optional, empfohlen)      | von Sentry                        |
+
+### Frontend (Vercel/Railway)
+| Variable         | Zweck                                  | Beispiel                          |
+|------------------|----------------------------------------|-----------------------------------|
+| `VITE_API_URL`   | Basis-URL Backend                      | `https://api.gridcheck.de`        |
+| `VITE_APP_ENV`   | Umgebung für UI-Hinweise               | `prod`                            |
+| `VITE_SENTRY_DSN`| Frontend-Error-Tracking (optional)     | von Sentry                        |
+
+### Regeln
+- **Keine** Defaults für Secrets im Code. Fehlt eine Pflicht-Variable → App startet nicht (fail-fast).
+- Secrets werden **nie** geloggt. Auch nicht teilweise.
+- Rotation: `JWT_SECRET` und `JWT_REFRESH_SECRET` mindestens jährlich, bei Verdacht sofort.
+- Lokale Entwicklung: `.env.local` (gitignored). Template `.env.example` wird gepflegt und committed.
+- In CI/CD werden Secrets ausschließlich über die Plattform (Railway/Vercel Variables) injiziert.
+
+## PostgreSQL
+- Version: 15+.
+- Backups: täglich automatisch (Railway), zusätzlich wöchentliches Offsite-Backup.
+- Migrations: Alembic, **vor** Deploy via CI ausführen. Kein Auto-Migrate beim App-Start in Prod.
+- Connection Pool: `pool_size=5, max_overflow=10` als Startwert.
+
+## CI/CD
+- Bei jedem Push auf `main`: Lint + Tests + Migrations-Check. Nur bei grün → Deploy.
+- Tags für Releases: `v1.2.3` → landet in `APP_VERSION`.

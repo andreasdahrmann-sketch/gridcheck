@@ -1,0 +1,118 @@
+// engine/mappers/business-to-technical.js
+// Mapped Business-Input (projectName, connectionLevel, capacities, ...)
+// auf technischen Input fuer decision-engine (demand_kW, trafo_capacity_kVA, line_capacity_kW, voltage_kV).
+//
+// Version: 1.0.0
+// Annahmen:
+//   - connectionLevel 'MV' => 20 kV (DE-Standard Mittelspannung)
+//   - connectionLevel 'LV' => 0.4 kV (Niederspannung)
+//   - connectionLevel 'HV' => 110 kV (Hochspannung)
+//   - Wenn technische Felder (demand_kW, trafo_capacity_kVA, line_capacity_kW) im Input
+//     vorhanden sind, werden sie uebernommen. Sonst werden sie aus Business-Feldern abgeleitet.
+//   - requestedCapacityKw -> demand_kW
+//   - estimatedAvailableCapacityKw -> line_capacity_kW (Naeherung: verfuegbare Netzkapazitaet)
+//   - trafo_capacity_kVA: Default = estimatedAvailableCapacityKw * 1.25 (cos phi 0.8 Annahme),
+//     falls nicht explizit gesetzt. Konservativ.
+
+const MAPPER_VERSION = '1.0.0';
+
+const VOLTAGE_MAP_KV = {
+  LV: 0.4,
+  MV: 20,
+  HV: 110
+};
+
+const SUPPORTED_LEVELS = ['LV', 'MV', 'HV'];
+
+function mapBusinessToTechnical(input) {
+  // 1. ConnectionLevel pruefen
+  if (!input || typeof input !== 'object') {
+    return {
+      ok: false,
+      error: {
+        id: 'MAP_000',
+        message: 'Mapper-Input ist leer oder kein Objekt.'
+      },
+      mapperVersion: MAPPER_VERSION
+    };
+  }
+
+  const level = input.connectionLevel;
+
+  if (!SUPPORTED_LEVELS.includes(level)) {
+    return {
+      ok: false,
+      error: {
+        id: 'MAP_001',
+        message: `Mapper unterstuetzt nur connectionLevel ${SUPPORTED_LEVELS.join(', ')}. Erhalten: '${level}'`
+      },
+      mapperVersion: MAPPER_VERSION
+    };
+  }
+
+  // 2. Spannung ableiten
+  const voltage_kV = VOLTAGE_MAP_KV[level];
+
+  // 3. Technische Werte ableiten (explizite Felder haben Vorrang)
+  const demand_kW =
+    typeof input.demand_kW === 'number'
+      ? input.demand_kW
+      : input.requestedCapacityKw;
+
+  const line_capacity_kW =
+    typeof input.line_capacity_kW === 'number'
+      ? input.line_capacity_kW
+      : input.estimatedAvailableCapacityKw;
+
+  const trafo_capacity_kVA =
+    typeof input.trafo_capacity_kVA === 'number'
+      ? input.trafo_capacity_kVA
+      : Math.round((input.estimatedAvailableCapacityKw || 0) * 1.25);
+
+  // 4. Plausibilitaetscheck
+  if (typeof demand_kW !== 'number' || demand_kW <= 0) {
+    return {
+      ok: false,
+      error: {
+        id: 'MAP_002',
+        message: `demand_kW konnte nicht ermittelt werden (requestedCapacityKw fehlt oder <=0).`
+      },
+      mapperVersion: MAPPER_VERSION
+    };
+  }
+
+  if (typeof line_capacity_kW !== 'number' || line_capacity_kW < 0) {
+    return {
+      ok: false,
+      error: {
+        id: 'MAP_003',
+        message: `line_capacity_kW konnte nicht ermittelt werden.`
+      },
+      mapperVersion: MAPPER_VERSION
+    };
+  }
+
+  // 5. Erfolg
+  return {
+    ok: true,
+    technicalInput: {
+      demand_kW,
+      trafo_capacity_kVA,
+      line_capacity_kW,
+      voltage_kV,
+      connectionLevel: level
+    },
+    assumptions: {
+      voltageAssumedFromLevel: true,
+      trafoDerivedFromAvailableCapacity:
+        typeof input.trafo_capacity_kVA !== 'number',
+      cosPhiAssumed: 0.8
+    },
+    mapperVersion: MAPPER_VERSION
+  };
+}
+
+module.exports = {
+  mapBusinessToTechnical,
+  MAPPER_VERSION
+};
