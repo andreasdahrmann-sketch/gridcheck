@@ -285,5 +285,77 @@
       "Datenqualitaet C: Vor Antragstellung reale Netzdaten beim VNB anfordern."
     ],
     "hash": "25c1a227d7d65a1e9b1c2b449e208e2fece8f0b1799da3bec325f5d3c4e8624f"
+  },
+  {
+    "id": "d0b6ec39-b558-49fb-939c-af1a69bad484",
+    "zeitstempel": "2026-04-29T17:57:15.168047+00:00",
+    "vorgaenger_hash": "25c1a227d7d65a1e9b1c2b449e208e2fece8f0b1799da3bec325f5d3c4e8624f",
+    "eingabe": {
+      "anlagentyp": "pv",
+      "p_kw": 500.0,
+      "plz": "49661",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NA2XS2Y150",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 8.0,
+      "sk_mva": 250.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 410,
+      "auslastung_prozent": 3.7,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.318,
+      "delta_u_v": 63.6,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.38952,
+      "x_ges_ohm": 3.51666,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "n1_auslastung_prozent": 3.7,
+      "leitung_n1": false,
+      "trafo_n1": true,
+      "topologie": "radial",
+      "topologie_n1": false,
+      "topologie_text": "Radial/Stich: keine echte N-1 moeglich.",
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "bewertung": "ROT",
+      "text": "N-1 Pre-Screen: Radial/Stich: keine echte N-1 moeglich.",
+      "hinweis": "Dies ist ein Pre-Screen. Topologische N-1-Pruefung erfordert vollstaendiges Netzmodell."
+    },
+    "ki": {
+      "konfidenz_prozent": 0,
+      "hinweise": [
+        "KI-Modul nicht verfuegbar"
+      ]
+    },
+    "fazit": {
+      "entscheidung": "A",
+      "text": "PLAUSIBEL: Netzanschluss grundsaetzlich realisierbar.",
+      "detail": "Gesamtscore 78/100. Standardverfahren beim VNB einleiten.",
+      "farbe": "GRUEN"
+    },
+    "empfehlungen": [
+      "Redundanten Anschluss einplanen fuer N-1 Sicherheit.",
+      "Datenqualitaet C: Vor Antragstellung reale Netzdaten beim VNB anfordern."
+    ],
+    "hash": "d8e673299c4503c94981a27576fe69dc417b348290dcdb98e43d3774fbfb4a91"
   }
 ]
