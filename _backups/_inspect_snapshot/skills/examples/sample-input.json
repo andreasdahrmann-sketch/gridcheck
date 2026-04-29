@@ -1,7 +1,0 @@
-{
-  "projectName": "Testprojekt Solarpark Musterstadt",
-  "connectionPower_kW": 2500,
-  "voltageLevel": "MV",
-  "location": { "postalCode": "12345", "city": "Musterstadt" },
-  "type": "generation"
-}

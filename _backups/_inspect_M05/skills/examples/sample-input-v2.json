@@ -1,9 +1,0 @@
-{
-  "projectName": "Solarpark Musterstadt",
-  "applicantName": "Muster Energie GmbH",
-  "connectionLevel": "MV",
-  "requestedCapacityKw": 2500,
-  "estimatedAvailableCapacityKw": 4000,
-  "loadProfileKnown": true,
-  "siteSecured": true
-}
