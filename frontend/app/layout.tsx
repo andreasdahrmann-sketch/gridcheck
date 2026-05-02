@@ -1,12 +1,17 @@
 ﻿import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const interTight = Inter_Tight({
+  subsets: ["latin"],
+  variable: "--font-inter-tight",
+  weight: ["400", "500", "600", "700", "800", "900"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "GridCheck - Netzanschluss Pre-Check",
+  title: "GridCheck — Netzanschluss Pre-Check",
   description: "Intelligente Netzanschlussplanung",
 };
 
@@ -16,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de">
-      <body className={cn("font-sans antialiased", inter.variable)}>
+    <html lang="de" className={interTight.variable}>
+      <body className={cn("bg-brand-bg text-brand-textPrimary font-sans antialiased min-h-screen")}>
         {children}
       </body>
     </html>
