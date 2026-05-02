@@ -25,11 +25,6 @@ class Project(Base):
     leitungslaenge_km = Column(Float, default=1.0)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    # --- NEU: Rollen-Erweiterung (additiv, keine Breaking Changes) ---
-    role = Column(String, default="projektierer")           # projektierer | netzbetreiber | admin
-    role_inputs = Column(Text, default="{}")                # JSON: rollenspez. Eingaben
-    role_results = Column(Text, default="{}")               # JSON: rollenspez. Ergebnisse
-
     checks = relationship("CheckResult", back_populates="project")
     audits = relationship("AuditLog", back_populates="project")
 
@@ -61,4 +56,3 @@ class AuditLog(Base):
     checksum = Column(String)
 
     project = relationship("Project", back_populates="audits")
-

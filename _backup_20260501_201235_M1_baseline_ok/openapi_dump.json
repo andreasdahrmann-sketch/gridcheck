@@ -1,0 +1,465 @@
+﻿{
+    "openapi":  "3.1.0",
+    "info":  {
+                 "title":  "GridCheck Pro API",
+                 "description":  "Pre-Netzanschluss-Check mit N-1 Analyse, Diagnose und KI-Lernmodul",
+                 "version":  "1.0.0"
+             },
+    "paths":  {
+                  "/api/analyze":  {
+                                       "post":  {
+                                                    "summary":  "Analyze",
+                                                    "description":  "Hauptendpoint â fÃ¼hrt Netzanschluss-Analyse aus.",
+                                                    "operationId":  "analyze_api_analyze_post",
+                                                    "requestBody":  {
+                                                                        "content":  {
+                                                                                        "application/json":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "$ref":  "#/components/schemas/AnalyzeRequest"
+                                                                                                                            }
+                                                                                                             }
+                                                                                    },
+                                                                        "required":  true
+                                                                    },
+                                                    "responses":  {
+                                                                      "200":  {
+                                                                                  "description":  "Successful Response",
+                                                                                  "content":  {
+                                                                                                  "application/json":  {
+                                                                                                                           "schema":  {
+
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                              }
+                                                                              },
+                                                                      "422":  {
+                                                                                  "description":  "Validation Error",
+                                                                                  "content":  {
+                                                                                                  "application/json":  {
+                                                                                                                           "schema":  {
+                                                                                                                                          "$ref":  "#/components/schemas/HTTPValidationError"
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                              }
+                                                                              }
+                                                                  }
+                                                }
+                                   },
+                  "/api/check":  {
+                                     "post":  {
+                                                  "summary":  "Check Alias",
+                                                  "operationId":  "check_alias_api_check_post",
+                                                  "requestBody":  {
+                                                                      "content":  {
+                                                                                      "application/json":  {
+                                                                                                               "schema":  {
+                                                                                                                              "$ref":  "#/components/schemas/AnalyzeRequest"
+                                                                                                                          }
+                                                                                                           }
+                                                                                  },
+                                                                      "required":  true
+                                                                  },
+                                                  "responses":  {
+                                                                    "200":  {
+                                                                                "description":  "Successful Response",
+                                                                                "content":  {
+                                                                                                "application/json":  {
+                                                                                                                         "schema":  {
+
+                                                                                                                                    }
+                                                                                                                     }
+                                                                                            }
+                                                                            },
+                                                                    "422":  {
+                                                                                "description":  "Validation Error",
+                                                                                "content":  {
+                                                                                                "application/json":  {
+                                                                                                                         "schema":  {
+                                                                                                                                        "$ref":  "#/components/schemas/HTTPValidationError"
+                                                                                                                                    }
+                                                                                                                     }
+                                                                                            }
+                                                                            }
+                                                                }
+                                              }
+                                 },
+                  "/api/calculate":  {
+                                         "post":  {
+                                                      "summary":  "Calculate Alias",
+                                                      "operationId":  "calculate_alias_api_calculate_post",
+                                                      "requestBody":  {
+                                                                          "content":  {
+                                                                                          "application/json":  {
+                                                                                                                   "schema":  {
+                                                                                                                                  "$ref":  "#/components/schemas/AnalyzeRequest"
+                                                                                                                              }
+                                                                                                               }
+                                                                                      },
+                                                                          "required":  true
+                                                                      },
+                                                      "responses":  {
+                                                                        "200":  {
+                                                                                    "description":  "Successful Response",
+                                                                                    "content":  {
+                                                                                                    "application/json":  {
+                                                                                                                             "schema":  {
+
+                                                                                                                                        }
+                                                                                                                         }
+                                                                                                }
+                                                                                },
+                                                                        "422":  {
+                                                                                    "description":  "Validation Error",
+                                                                                    "content":  {
+                                                                                                    "application/json":  {
+                                                                                                                             "schema":  {
+                                                                                                                                            "$ref":  "#/components/schemas/HTTPValidationError"
+                                                                                                                                        }
+                                                                                                                         }
+                                                                                                }
+                                                                                }
+                                                                    }
+                                                  }
+                                     },
+                  "/api/projects":  {
+                                        "get":  {
+                                                    "summary":  "List Projects",
+                                                    "operationId":  "list_projects_api_projects_get",
+                                                    "responses":  {
+                                                                      "200":  {
+                                                                                  "description":  "Successful Response",
+                                                                                  "content":  {
+                                                                                                  "application/json":  {
+                                                                                                                           "schema":  {
+
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                              }
+                                                                              }
+                                                                  }
+                                                }
+                                    },
+                  "/api/history":  {
+                                       "get":  {
+                                                   "summary":  "List Projects",
+                                                   "operationId":  "list_projects_api_history_get",
+                                                   "responses":  {
+                                                                     "200":  {
+                                                                                 "description":  "Successful Response",
+                                                                                 "content":  {
+                                                                                                 "application/json":  {
+                                                                                                                          "schema":  {
+
+                                                                                                                                     }
+                                                                                                                      }
+                                                                                             }
+                                                                             }
+                                                                 }
+                                               }
+                                   },
+                  "/api/result/{project_id}":  {
+                                                   "get":  {
+                                                               "summary":  "Get Result",
+                                                               "operationId":  "get_result_api_result__project_id__get",
+                                                               "parameters":  [
+                                                                                  {
+                                                                                      "name":  "project_id",
+                                                                                      "in":  "path",
+                                                                                      "required":  true,
+                                                                                      "schema":  {
+                                                                                                     "type":  "integer",
+                                                                                                     "title":  "Project Id"
+                                                                                                 }
+                                                                                  }
+                                                                              ],
+                                                               "responses":  {
+                                                                                 "200":  {
+                                                                                             "description":  "Successful Response",
+                                                                                             "content":  {
+                                                                                                             "application/json":  {
+                                                                                                                                      "schema":  {
+
+                                                                                                                                                 }
+                                                                                                                                  }
+                                                                                                         }
+                                                                                         },
+                                                                                 "422":  {
+                                                                                             "description":  "Validation Error",
+                                                                                             "content":  {
+                                                                                                             "application/json":  {
+                                                                                                                                      "schema":  {
+                                                                                                                                                     "$ref":  "#/components/schemas/HTTPValidationError"
+                                                                                                                                                 }
+                                                                                                                                  }
+                                                                                                         }
+                                                                                         }
+                                                                             }
+                                                           }
+                                               },
+                  "/api/audit/{project_id}":  {
+                                                  "get":  {
+                                                              "summary":  "Get Audit",
+                                                              "operationId":  "get_audit_api_audit__project_id__get",
+                                                              "parameters":  [
+                                                                                 {
+                                                                                     "name":  "project_id",
+                                                                                     "in":  "path",
+                                                                                     "required":  true,
+                                                                                     "schema":  {
+                                                                                                    "type":  "integer",
+                                                                                                    "title":  "Project Id"
+                                                                                                }
+                                                                                 }
+                                                                             ],
+                                                              "responses":  {
+                                                                                "200":  {
+                                                                                            "description":  "Successful Response",
+                                                                                            "content":  {
+                                                                                                            "application/json":  {
+                                                                                                                                     "schema":  {
+
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                        }
+                                                                                        },
+                                                                                "422":  {
+                                                                                            "description":  "Validation Error",
+                                                                                            "content":  {
+                                                                                                            "application/json":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "$ref":  "#/components/schemas/HTTPValidationError"
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                        }
+                                                                                        }
+                                                                            }
+                                                          }
+                                              },
+                  "/":  {
+                            "get":  {
+                                        "summary":  "Root",
+                                        "operationId":  "root__get",
+                                        "responses":  {
+                                                          "200":  {
+                                                                      "description":  "Successful Response",
+                                                                      "content":  {
+                                                                                      "application/json":  {
+                                                                                                               "schema":  {
+
+                                                                                                                          }
+                                                                                                           }
+                                                                                  }
+                                                                  }
+                                                      }
+                                    }
+                        },
+                  "/health":  {
+                                  "get":  {
+                                              "summary":  "Health",
+                                              "operationId":  "health_health_get",
+                                              "responses":  {
+                                                                "200":  {
+                                                                            "description":  "Successful Response",
+                                                                            "content":  {
+                                                                                            "application/json":  {
+                                                                                                                     "schema":  {
+
+                                                                                                                                }
+                                                                                                                 }
+                                                                                        }
+                                                                        }
+                                                            }
+                                          }
+                              }
+              },
+    "components":  {
+                       "schemas":  {
+                                       "AnalyzeRequest":  {
+                                                              "properties":  {
+                                                                                 "projektname":  {
+                                                                                                     "type":  "string",
+                                                                                                     "minLength":  1,
+                                                                                                     "title":  "Projektname"
+                                                                                                 },
+                                                                                 "plz":  {
+                                                                                             "type":  "string",
+                                                                                             "maxLength":  5,
+                                                                                             "minLength":  4,
+                                                                                             "title":  "Plz"
+                                                                                         },
+                                                                                 "anlagentyp":  {
+                                                                                                    "type":  "string",
+                                                                                                    "title":  "Anlagentyp",
+                                                                                                    "default":  "pv"
+                                                                                                },
+                                                                                 "leistung_kw":  {
+                                                                                                     "type":  "number",
+                                                                                                     "exclusiveMinimum":  0.0,
+                                                                                                     "title":  "Leistung Kw"
+                                                                                                 },
+                                                                                 "spannungsebene":  {
+                                                                                                        "type":  "string",
+                                                                                                        "title":  "Spannungsebene",
+                                                                                                        "default":  "20"
+                                                                                                    },
+                                                                                 "cos_phi":  {
+                                                                                                 "type":  "number",
+                                                                                                 "title":  "Cos Phi",
+                                                                                                 "default":  0.95
+                                                                                             },
+                                                                                 "einspeiseart":  {
+                                                                                                      "type":  "string",
+                                                                                                      "title":  "Einspeiseart",
+                                                                                                      "default":  "volleinspeisung"
+                                                                                                  },
+                                                                                 "speicher":  {
+                                                                                                  "type":  "boolean",
+                                                                                                  "title":  "Speicher",
+                                                                                                  "default":  false
+                                                                                              },
+                                                                                 "speicher_kwh":  {
+                                                                                                      "anyOf":  [
+                                                                                                                    {
+                                                                                                                        "type":  "number"
+                                                                                                                    },
+                                                                                                                    {
+                                                                                                                        "type":  "null"
+                                                                                                                    }
+                                                                                                                ],
+                                                                                                      "title":  "Speicher Kwh"
+                                                                                                  },
+                                                                                 "trafo_mva":  {
+                                                                                                   "type":  "number",
+                                                                                                   "title":  "Trafo Mva",
+                                                                                                   "default":  0.63
+                                                                                               },
+                                                                                 "leitungslaenge_km":  {
+                                                                                                           "type":  "number",
+                                                                                                           "title":  "Leitungslaenge Km",
+                                                                                                           "default":  1.0
+                                                                                                       },
+                                                                                 "leitungstyp":  {
+                                                                                                     "type":  "string",
+                                                                                                     "title":  "Leitungstyp",
+                                                                                                     "default":  "NAYY"
+                                                                                                 },
+                                                                                 "querschnitt_mm2":  {
+                                                                                                         "type":  "string",
+                                                                                                         "title":  "Querschnitt Mm2",
+                                                                                                         "default":  "150"
+                                                                                                     },
+                                                                                 "netzverknuepfungspunkt":  {
+                                                                                                                "anyOf":  [
+                                                                                                                              {
+                                                                                                                                  "type":  "string"
+                                                                                                                              },
+                                                                                                                              {
+                                                                                                                                  "type":  "null"
+                                                                                                                              }
+                                                                                                                          ],
+                                                                                                                "title":  "Netzverknuepfungspunkt",
+                                                                                                                "default":  ""
+                                                                                                            },
+                                                                                 "skv_mva":  {
+                                                                                                 "anyOf":  [
+                                                                                                               {
+                                                                                                                   "type":  "number"
+                                                                                                               },
+                                                                                                               {
+                                                                                                                   "type":  "null"
+                                                                                                               }
+                                                                                                           ],
+                                                                                                 "title":  "Skv Mva"
+                                                                                             },
+                                                                                 "parallelsysteme":  {
+                                                                                                         "type":  "integer",
+                                                                                                         "title":  "Parallelsysteme",
+                                                                                                         "default":  1
+                                                                                                     },
+                                                                                 "eigentumsgrenze":  {
+                                                                                                         "type":  "string",
+                                                                                                         "title":  "Eigentumsgrenze",
+                                                                                                         "default":  "HAK"
+                                                                                                     },
+                                                                                 "vorbelastung_mw":  {
+                                                                                                         "anyOf":  [
+                                                                                                                       {
+                                                                                                                           "type":  "number"
+                                                                                                                       },
+                                                                                                                       {
+                                                                                                                           "type":  "null"
+                                                                                                                       }
+                                                                                                                   ],
+                                                                                                         "title":  "Vorbelastung Mw",
+                                                                                                         "default":  0
+                                                                                                     },
+                                                                                 "netz_typ":  {
+                                                                                                  "type":  "string",
+                                                                                                  "title":  "Netz Typ",
+                                                                                                  "default":  "kabel"
+                                                                                              }
+                                                                             },
+                                                              "type":  "object",
+                                                              "required":  [
+                                                                               "projektname",
+                                                                               "plz",
+                                                                               "leistung_kw"
+                                                                           ],
+                                                              "title":  "AnalyzeRequest"
+                                                          },
+                                       "HTTPValidationError":  {
+                                                                   "properties":  {
+                                                                                      "detail":  {
+                                                                                                     "items":  {
+                                                                                                                   "$ref":  "#/components/schemas/ValidationError"
+                                                                                                               },
+                                                                                                     "type":  "array",
+                                                                                                     "title":  "Detail"
+                                                                                                 }
+                                                                                  },
+                                                                   "type":  "object",
+                                                                   "title":  "HTTPValidationError"
+                                                               },
+                                       "ValidationError":  {
+                                                               "properties":  {
+                                                                                  "loc":  {
+                                                                                              "items":  {
+                                                                                                            "anyOf":  [
+                                                                                                                          {
+                                                                                                                              "type":  "string"
+                                                                                                                          },
+                                                                                                                          {
+                                                                                                                              "type":  "integer"
+                                                                                                                          }
+                                                                                                                      ]
+                                                                                                        },
+                                                                                              "type":  "array",
+                                                                                              "title":  "Location"
+                                                                                          },
+                                                                                  "msg":  {
+                                                                                              "type":  "string",
+                                                                                              "title":  "Message"
+                                                                                          },
+                                                                                  "type":  {
+                                                                                               "type":  "string",
+                                                                                               "title":  "Error Type"
+                                                                                           },
+                                                                                  "input":  {
+                                                                                                "title":  "Input"
+                                                                                            },
+                                                                                  "ctx":  {
+                                                                                              "type":  "object",
+                                                                                              "title":  "Context"
+                                                                                          }
+                                                                              },
+                                                               "type":  "object",
+                                                               "required":  [
+                                                                                "loc",
+                                                                                "msg",
+                                                                                "type"
+                                                                            ],
+                                                               "title":  "ValidationError"
+                                                           }
+                                   }
+                   }
+}

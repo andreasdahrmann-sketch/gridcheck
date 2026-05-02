@@ -1,0 +1,602 @@
+﻿# Gri# GridCheck Cursor Rules - immer anwenden
+
+
+
+# ===== 00-gridcheck.mdc =====
+---
+description: Projektziel und Ã¼bergeordnete Leitplanken fÃ¼r GridCheck
+alwaysApply: true
+---
+
+# GridCheck â€“ Pre-Netzanschluss-Check App
+
+## Projektziel
+Eine Diagnose-App fÃ¼r Netzanschluss-PrÃ¼fung von EE-Anlagen (PV, BESS, Wind, Wallbox-Cluster).
+Liefert schnell begrÃ¼ndete Antworten: "Geht / Geht mit Auflagen / Geht nicht" â€“ inkl. N-1-Analyse,
+Netzplan, Empfehlungen. Ziel: Projektierer sparen Wochen, Netzbetreiber sparen PrÃ¼fzeit.
+
+## Kernprinzipien (nicht verhandelbar)
+1. **Kein Ampel-Spielzeug** â€“ jede Aussage ist fachlich begrÃ¼ndet (Norm + Berechnung + Annahmen).
+2. **Revisionssicher** â€“ jede Berechnung ist reproduzierbar, Eingaben + Ergebnisse + Normstand + App-Version werden versioniert gespeichert (Audit-Log, unverÃ¤nderlich).
+3. **Transparenz** â€“ Annahmen, Grenzwerte, Quellen werden im Ergebnis angezeigt.
+4. **Konservativ** â€“ im Zweifel strengerer Grenzwert. Nie "optimistisch" rechnen.
+5. **KI lernend, nicht ratend** â€“ ML-Komponenten ergÃ¤nzen, ersetzen aber nie deterministische NormprÃ¼fung.
+
+## Tech-Stack (verbindlich)
+- Backend: Python 3.11+, FastAPI, SQLAlchemy 2.x, Pydantic v2, PostgreSQL
+- Frontend: React 18 + TypeScript + Vite, TailwindCSS, shadcn/ui, React Hook Form + Zod
+- Deployment: Railway (Backend + DB), Vercel oder Railway (Frontend)
+- Struktur: **flach**, kein Monorepo â€“ `backend/` und `frontend/` nebeneinander im Repo-Root.
+
+## Arbeitsweise der KI-Assistenten
+- Vor jeder Code-Ã„nderung: betroffene Dateien lesen, AbhÃ¤ngigkeiten prÃ¼fen.
+- Keine Halluzinationen. Unsicherheit â†’ nachfragen, nicht erfinden.
+- Details siehe `05-workflow.mdc`.
+
+
+# ===== 01-backend.mdc =====
+---
+description: Backend-Standards (FastAPI, SQLAlchemy, Security)
+globs: backend/**/*.py
+alwaysApply: true
+---
+
+# Backend-Regeln
+
+## Struktur
+backend/
+â”œâ”€â”€ app/
+â”‚   â”œâ”€â”€ main.py              # FastAPI-App, Router-Registrierung
+â”‚   â”œâ”€â”€ core/                # Config, Security, Logging, DB-Session
+â”‚   â”œâ”€â”€ api/v1/              # Endpoints, versioniert (/api/v1/...)
+â”‚   â”œâ”€â”€ models/              # SQLAlchemy ORM-Modelle
+â”‚   â”œâ”€â”€ schemas/             # Pydantic v2 Request/Response-Schemas
+â”‚   â”œâ”€â”€ services/            # Businesslogik (z.B. grid_check, n1_analysis)
+â”‚   â”œâ”€â”€ calculations/        # Reine Rechenkerne (deterministisch, testbar)
+â”‚   â””â”€â”€ audit/               # Revisionssichere Protokollierung
+â”œâ”€â”€ alembic/                 # DB-Migrationen
+â”œâ”€â”€ tests/                   # pytest, Spiegel von app/
+â””â”€â”€ requirements.txt
+
+## Code-Standards
+- Python 3.11+, Type Hints Ã¼berall, `from __future__ import annotations`.
+- Formatter: `ruff format`, Linter: `ruff check`. Kein `black`, kein `flake8` parallel.
+- Pydantic v2 (`model_config`, `Field`, `@field_validator`). Keine v1-Syntax.
+- SQLAlchemy 2.x Style (`Mapped[...]`, `mapped_column`). Keine Legacy-Syntax.
+- Async nur wo sinnvoll (I/O-Endpoints). Rechenkerne synchron + testbar.
+
+## API-Regeln
+- Alle Endpoints unter `/api/v1/...`.
+- Response-Modelle immer explizit (`response_model=...`).
+- Fehler: HTTPException mit klarer `detail`-Struktur `{code, message, hint}`.
+- Keine Businesslogik in Routern â€“ nur Delegation an `services/`.
+
+## Rechenkerne (`calculations/`)
+- **Rein deterministisch**, keine DB-Zugriffe, keine Seiteneffekte.
+- Input + Output als Pydantic-Schemas. Einheiten im Feldnamen (`p_kw`, `u_kv`).
+- Konservativ runden (im Zweifel zu Lasten der Anlage).
+- Jede Berechnung gibt zusÃ¤tzlich Annahmen + verwendete Normversion zurÃ¼ck.
+
+## Security
+- Secrets ausschlieÃŸlich Ã¼ber ENV (`pydantic-settings`). Niemals im Code.
+- Auth: JWT (kurzlebig) + Refresh-Token. PasswÃ¶rter mit `bcrypt` (>=12 rounds).
+- Input-Validation strikt per Pydantic. Keine rohen Dicts aus Requests weiterreichen.
+- CORS: nur konfigurierte Origins. Kein `allow_origins=["*"]` in Prod.
+- Rate-Limiting auf Ã¶ffentliche Endpoints (`slowapi` oder Reverse-Proxy).
+
+## Datenbank & Migrationen
+- Jede SchemaÃ¤nderung â†’ Alembic-Migration. Keine manuellen DB-Ã„nderungen.
+- Migrationen **reversibel** schreiben (down-Funktion ausgefÃ¼llt).
+- Keine destruktiven Migrationen ohne Backup-Nachweis.
+
+## Tests
+- `pytest`, Zielabdeckung Rechenkerne â‰¥ 90 %, Services â‰¥ 70 %.
+- Jeder Bugfix bekommt einen Regressionstest.
+- Fixtures fÃ¼r Test-DB (SQLite oder Postgres-Testcontainer).
+
+## Logging & Audit
+- Strukturiertes Logging (JSON, `structlog`).
+- Audit-Log fÃ¼r jede Berechnung: siehe `05-workflow.mdc` (Revisionssicherheit).
+
+
+
+# ===== 02-frontend.mdc =====
+---
+description: Frontend-Standards (React, TS, Zod, shadcn/ui)
+globs: frontend/**/*.{ts,tsx}
+alwaysApply: true
+---
+
+# Frontend-Regeln
+
+## Struktur
+frontend/
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ main.tsx
+â”‚   â”œâ”€â”€ App.tsx
+â”‚   â”œâ”€â”€ pages/               # Seiten (Routing-Ziele)
+â”‚   â”œâ”€â”€ features/            # Fachliche Module (grid-check, projects, reports)
+â”‚   â”œâ”€â”€ components/          # Wiederverwendbare UI (shadcn/ui-basiert)
+â”‚   â”œâ”€â”€ lib/                 # API-Client, Utils, Hooks
+â”‚   â”œâ”€â”€ schemas/             # Zod-Schemas (spiegeln Backend-Pydantic)
+â”‚   â””â”€â”€ styles/
+â”œâ”€â”€ public/
+â”œâ”€â”€ index.html
+â”œâ”€â”€ tsconfig.json
+â””â”€â”€ package.json
+
+## Code-Standards
+- React 18 + TypeScript **strict** (`"strict": true` in tsconfig).
+- Keine `any`. Bei unvermeidbarem unsafe-Cast: Kommentar mit BegrÃ¼ndung.
+- Komponenten: Funktional, Hooks. Keine Klassen.
+- Dateinamen: Komponenten `PascalCase.tsx`, Hooks `useXxx.ts`, Utils `kebab-case.ts`.
+- Formatter/Linter: `eslint` + `prettier`. Nur **eine** Konfigurationsquelle.
+
+## UI / UX
+- TailwindCSS + shadcn/ui als Basis. Keine Mischung mit Material-UI o.Ã¤.
+- Formulare: React Hook Form + Zod Resolver. Validation-Nachrichten auf Deutsch.
+- Fehler immer nutzernah: was ist falsch + was ist zu tun.
+- LadezustÃ¤nde sichtbar (Skeleton/Spinner). Keine stillen Waits > 500 ms.
+- Barrierefreiheit: Labels, Fokus-States, `aria-*` wo nÃ¶tig.
+
+## API-Client
+- Zentral in `lib/api.ts`, eine Instanz (z.B. `ky` oder `fetch`-Wrapper).
+- Basis-URL aus ENV (`VITE_API_URL`).
+- Response-Schemas mit Zod parsen â†’ garantierte Typsicherheit am Rand.
+- Fehler-Mapping zu UI-freundlichen Meldungen an einer Stelle.
+
+## State
+- Server-State: `@tanstack/react-query`. Kein manuelles Caching.
+- Client-State lokal (`useState`) bevorzugt. Global nur wenn nÃ¶tig (Zustand/Context).
+- Kein Redux.
+
+## Routing
+- `react-router-dom` v6+. Routen zentral in `App.tsx` oder `routes.tsx`.
+- GeschÃ¼tzte Routen Ã¼ber `<ProtectedRoute>`-Wrapper.
+
+## Ergebnisanzeige (GridCheck-spezifisch)
+- Jedes Diagnose-Ergebnis zeigt: Verdict, BegrÃ¼ndung, Annahmen, Norm-Version, App-Version, Berechnungs-ID.
+- Export-Button (PDF) sichtbar, aber nur aktiv wenn Berechnung abgeschlossen.
+- Keine reinen Ampeln ohne Text. Jede Farbe hat eine BegrÃ¼ndung daneben.
+
+## Tests
+- `vitest` + `@testing-library/react`.
+- E2E optional (`playwright`), mindestens Happy-Path Grid-Check.
+
+
+
+# ===== 03-elektrotechnik.mdc =====
+---
+description: Fachregeln Elektrotechnik / Netzanschluss
+alwaysApply: true
+---
+
+# Elektrotechnik-Regeln
+
+## Normgrundlage (Deutschland)
+- **VDE-AR-N 4105** â€“ Niederspannung (â‰¤ 1 kV), Erzeugungsanlagen
+- **VDE-AR-N 4110** â€“ Mittelspannung (> 1 kV bis 35 kV)
+- **VDE-AR-N 4120** â€“ Hochspannung (> 35 kV bis 110 kV)
+- **VDE-AR-N 4100** â€“ Netzanschluss Niederspannung (Verbraucher)
+- **TAB** des jeweiligen Netzbetreibers (kann strenger sein â€“ konservativ!)
+
+Jede Berechnung speichert die **verwendete Normversion** (z. B. "VDE-AR-N 4110:2018-11 inkl. Ã„nderung A1:2023-03").
+
+## Spannungsebenen-Logik
+- NS (LV): â‰¤ 1 kV â†’ VDE 4105 / 4100
+- MS (MV): > 1 kV bis 35 kV â†’ VDE 4110
+- HS (HV): > 35 kV â†’ VDE 4120
+
+## N-1-Analyse
+- **Pflicht** fÃ¼r MS- und HS-AnschlÃ¼sse (ab VDE 4110).
+- FÃ¼r NS nur, wenn Netzbetreiber es verlangt oder Anlage systemrelevant ist.
+- Bei N-1 werden nacheinander alle relevanten Betriebsmittel (Trafo, Leitung) ausgefallen simuliert; Grenzwerte (Spannung, Strom, Kurzschlussleistung) mÃ¼ssen auch dann eingehalten sein.
+
+## Grenzwerte & KonservativitÃ¤t
+- SpannungsÃ¤nderung dU: NS 3%, MS 2% (Richtwerte, TAB kann abweichen).
+- Flicker, Oberschwingungen: nach IEC 61000-3-x bzw. DACHCZ.
+- Kurzschlussleistung Sk'' am VerknÃ¼pfungspunkt: **immer** aus Netzbetreiber-Auskunft, nicht schÃ¤tzen. Fehlt sie â†’ Rechnung mit Vermerk "vorlÃ¤ufig, Sk'' ausstehend".
+
+## Reproduzierbarkeit
+- Jede Berechnung: Input-JSON + Ergebnis-JSON + Norm-Version + Engine-Version in DB.
+- Keine stochastischen Defaults. Alle Annahmen explizit im Ergebnis.
+
+
+# ===== 04-deployment.mdc =====
+---
+description: Deployment (Railway, PostgreSQL, ENV)
+alwaysApply: true
+---
+
+# Deployment-Regeln
+
+## Railway
+- Backend + PostgreSQL als separate Services im selben Projekt.
+- `Procfile` oder `railway.toml` fÃ¼r Start-Command.
+- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Healthcheck-Endpoint: `GET /health` â†’ `{"status":"ok","version":"..."}`
+
+## ENV-Variablen (Pflicht)
+
+### Backend (Railway)
+| Variable              | Zweck                                     | Beispiel / Hinweis                |
+|-----------------------|-------------------------------------------|-----------------------------------|
+| `APP_ENV`             | Umgebung                                  | `dev` \| `staging` \| `prod`      |
+| `APP_VERSION`         | Aus Git-Tag gesetzt, fÃ¼r Audit-Log        | `v1.2.3`                          |
+| `DATABASE_URL`        | Postgres-Verbindung                       | von Railway injiziert             |
+| `JWT_SECRET`          | Signatur Access-Token                     | min. 32 Zeichen, zufÃ¤llig         |
+| `JWT_REFRESH_SECRET`  | Signatur Refresh-Token                    | eigener Wert, â‰  `JWT_SECRET`      |
+| `JWT_ACCESS_TTL_MIN`  | Lebensdauer Access-Token                  | `15`                              |
+| `JWT_REFRESH_TTL_DAYS`| Lebensdauer Refresh-Token                 | `14`                              |
+| `CORS_ORIGINS`        | Komma-getrennte Liste erlaubter Origins   | `https://app.gridcheck.de`        |
+| `LOG_LEVEL`           | Logging-Schwelle                          | `INFO` (prod), `DEBUG` (dev)      |
+| `NORM_VERSION`        | Aktuell genutzte Normensammlung           | `VDE-AR-N-4105:2018-11 + ...`     |
+| `SENTRY_DSN`          | Error-Tracking (optional, empfohlen)      | von Sentry                        |
+
+### Frontend (Vercel/Railway)
+| Variable         | Zweck                                  | Beispiel                          |
+|------------------|----------------------------------------|-----------------------------------|
+| `VITE_API_URL`   | Basis-URL Backend                      | `https://api.gridcheck.de`        |
+| `VITE_APP_ENV`   | Umgebung fÃ¼r UI-Hinweise               | `prod`                            |
+| `VITE_SENTRY_DSN`| Frontend-Error-Tracking (optional)     | von Sentry                        |
+
+### Regeln
+- **Keine** Defaults fÃ¼r Secrets im Code. Fehlt eine Pflicht-Variable â†’ App startet nicht (fail-fast).
+- Secrets werden **nie** geloggt. Auch nicht teilweise.
+- Rotation: `JWT_SECRET` und `JWT_REFRESH_SECRET` mindestens jÃ¤hrlich, bei Verdacht sofort.
+- Lokale Entwicklung: `.env.local` (gitignored). Template `.env.example` wird gepflegt und committed.
+- In CI/CD werden Secrets ausschlieÃŸlich Ã¼ber die Plattform (Railway/Vercel Variables) injiziert.
+
+## PostgreSQL
+- Version: 15+.
+- Backups: tÃ¤glich automatisch (Railway), zusÃ¤tzlich wÃ¶chentliches Offsite-Backup.
+- Migrations: Alembic, **vor** Deploy via CI ausfÃ¼hren. Kein Auto-Migrate beim App-Start in Prod.
+- Connection Pool: `pool_size=5, max_overflow=10` als Startwert.
+
+## CI/CD
+- Bei jedem Push auf `main`: Lint + Tests + Migrations-Check. Nur bei grÃ¼n â†’ Deploy.
+- Tags fÃ¼r Releases: `v1.2.3` â†’ landet in `APP_VERSION`.
+
+
+
+# ===== 05-workflow.mdc =====
+---
+description: Arbeitsweise, Revisionssicherheit, KI-Verhalten
+alwaysApply: true
+---
+
+# Workflow-Regeln
+
+## Arbeitsweise (fÃ¼r KI-Assistenten und Entwickler)
+1. **Lesen vor Schreiben** â€“ bevor Code geÃ¤ndert wird, betroffene Dateien + AbhÃ¤ngigkeiten prÃ¼fen.
+2. **Schritt fÃ¼r Schritt** â€“ groÃŸe Ã„nderungen in kleine, testbare Schritte zerlegen.
+3. **Jedes Zwischenziel testen** â€“ bevor weitergebaut wird.
+4. **Nach Meilensteinen: Backup / Git-Tag.**
+5. **Im Zweifel fragen, nicht raten.** Keine Halluzinationen, keine erfundenen APIs/Pakete.
+6. **Konsistenz** â€“ gleiche Aufgabe â†’ gleiches Tool/Muster. Abweichung begrÃ¼nden.
+
+## Revisionssicherheit (projektweit)
+- Jede Berechnung wird vollstÃ¤ndig gespeichert: Input, Output, App-Version, Norm-Version, User, Timestamp.
+- Historische Berechnungen sind **append-only**. Ã„nderungen erzeugen eine neue Version.
+- Exporte (PDF-Report) enthalten: Projekt-ID, Berechnungs-ID, Hash, Norm-Version, App-Version.
+- LÃ¶schung nur durch Soft-Delete (`deleted_at`), Daten bleiben fÃ¼r Audit erhalten.
+
+## Git
+- Branches: `main` (deployable), `feature/<kurz>`, `fix/<kurz>`.
+- Commits: Konventionell (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`).
+- Keine Commits direkt auf `main` in Produktivphase.
+
+## QualitÃ¤tssicherung vor Code-Ausgabe (KI)
+Vor jedem Code-Vorschlag prÃ¼fen:
+- [ ] Konflikt mit bestehendem Code?
+- [ ] Typen/Schemas konsistent (Backend Pydantic â†” Frontend Zod)?
+- [ ] FehlerfÃ¤lle behandelt?
+- [ ] Security-Implikationen (Input-Validation, Auth, Secrets)?
+- [ ] Test vorhanden oder ergÃ¤nzbar?
+
+## Proaktive Hinweise (erwÃ¼nscht)
+- Optimierungspotenzial benennen (Performance, UX, Security), auch wenn nicht gefragt.
+- Technische Schulden markieren (`# TODO(tech-debt): ...`).
+- Bei Unklarheit in Anforderungen: nachfragen, bevor gecodet wird.
+
+dCheck Cursor Rules - immer anwenden
+
+
+
+# ===== 00-gridcheck.mdc =====
+---
+description: Projektziel und Ã¼bergeordnete Leitplanken fÃ¼r GridCheck
+alwaysApply: true
+---
+
+# GridCheck â€“ Pre-Netzanschluss-Check App
+
+## Projektziel
+Eine Diagnose-App fÃ¼r Netzanschluss-PrÃ¼fung von EE-Anlagen (PV, BESS, Wind, Wallbox-Cluster).
+Liefert schnell begrÃ¼ndete Antworten: "Geht / Geht mit Auflagen / Geht nicht" â€“ inkl. N-1-Analyse,
+Netzplan, Empfehlungen. Ziel: Projektierer sparen Wochen, Netzbetreiber sparen PrÃ¼fzeit.
+
+## Kernprinzipien (nicht verhandelbar)
+1. **Kein Ampel-Spielzeug** â€“ jede Aussage ist fachlich begrÃ¼ndet (Norm + Berechnung + Annahmen).
+2. **Revisionssicher** â€“ jede Berechnung ist reproduzierbar, Eingaben + Ergebnisse + Normstand + App-Version werden versioniert gespeichert (Audit-Log, unverÃ¤nderlich).
+3. **Transparenz** â€“ Annahmen, Grenzwerte, Quellen werden im Ergebnis angezeigt.
+4. **Konservativ** â€“ im Zweifel strengerer Grenzwert. Nie "optimistisch" rechnen.
+5. **KI lernend, nicht ratend** â€“ ML-Komponenten ergÃ¤nzen, ersetzen aber nie deterministische NormprÃ¼fung.
+
+## Tech-Stack (verbindlich)
+- Backend: Python 3.11+, FastAPI, SQLAlchemy 2.x, Pydantic v2, PostgreSQL
+- Frontend: React 18 + TypeScript + Vite, TailwindCSS, shadcn/ui, React Hook Form + Zod
+- Deployment: Railway (Backend + DB), Vercel oder Railway (Frontend)
+- Struktur: **flach**, kein Monorepo â€“ `backend/` und `frontend/` nebeneinander im Repo-Root.
+
+## Arbeitsweise der KI-Assistenten
+- Vor jeder Code-Ã„nderung: betroffene Dateien lesen, AbhÃ¤ngigkeiten prÃ¼fen.
+- Keine Halluzinationen. Unsicherheit â†’ nachfragen, nicht erfinden.
+- Details siehe `05-workflow.mdc`.
+
+
+# ===== 01-backend.mdc =====
+---
+description: Backend-Standards (FastAPI, SQLAlchemy, Security)
+globs: backend/**/*.py
+alwaysApply: true
+---
+
+# Backend-Regeln
+
+## Struktur
+backend/
+â”œâ”€â”€ app/
+â”‚   â”œâ”€â”€ main.py              # FastAPI-App, Router-Registrierung
+â”‚   â”œâ”€â”€ core/                # Config, Security, Logging, DB-Session
+â”‚   â”œâ”€â”€ api/v1/              # Endpoints, versioniert (/api/v1/...)
+â”‚   â”œâ”€â”€ models/              # SQLAlchemy ORM-Modelle
+â”‚   â”œâ”€â”€ schemas/             # Pydantic v2 Request/Response-Schemas
+â”‚   â”œâ”€â”€ services/            # Businesslogik (z.B. grid_check, n1_analysis)
+â”‚   â”œâ”€â”€ calculations/        # Reine Rechenkerne (deterministisch, testbar)
+â”‚   â””â”€â”€ audit/               # Revisionssichere Protokollierung
+â”œâ”€â”€ alembic/                 # DB-Migrationen
+â”œâ”€â”€ tests/                   # pytest, Spiegel von app/
+â””â”€â”€ requirements.txt
+
+## Code-Standards
+- Python 3.11+, Type Hints Ã¼berall, `from __future__ import annotations`.
+- Formatter: `ruff format`, Linter: `ruff check`. Kein `black`, kein `flake8` parallel.
+- Pydantic v2 (`model_config`, `Field`, `@field_validator`). Keine v1-Syntax.
+- SQLAlchemy 2.x Style (`Mapped[...]`, `mapped_column`). Keine Legacy-Syntax.
+- Async nur wo sinnvoll (I/O-Endpoints). Rechenkerne synchron + testbar.
+
+## API-Regeln
+- Alle Endpoints unter `/api/v1/...`.
+- Response-Modelle immer explizit (`response_model=...`).
+- Fehler: HTTPException mit klarer `detail`-Struktur `{code, message, hint}`.
+- Keine Businesslogik in Routern â€“ nur Delegation an `services/`.
+
+## Rechenkerne (`calculations/`)
+- **Rein deterministisch**, keine DB-Zugriffe, keine Seiteneffekte.
+- Input + Output als Pydantic-Schemas. Einheiten im Feldnamen (`p_kw`, `u_kv`).
+- Konservativ runden (im Zweifel zu Lasten der Anlage).
+- Jede Berechnung gibt zusÃ¤tzlich Annahmen + verwendete Normversion zurÃ¼ck.
+
+## Security
+- Secrets ausschlieÃŸlich Ã¼ber ENV (`pydantic-settings`). Niemals im Code.
+- Auth: JWT (kurzlebig) + Refresh-Token. PasswÃ¶rter mit `bcrypt` (>=12 rounds).
+- Input-Validation strikt per Pydantic. Keine rohen Dicts aus Requests weiterreichen.
+- CORS: nur konfigurierte Origins. Kein `allow_origins=["*"]` in Prod.
+- Rate-Limiting auf Ã¶ffentliche Endpoints (`slowapi` oder Reverse-Proxy).
+
+## Datenbank & Migrationen
+- Jede SchemaÃ¤nderung â†’ Alembic-Migration. Keine manuellen DB-Ã„nderungen.
+- Migrationen **reversibel** schreiben (down-Funktion ausgefÃ¼llt).
+- Keine destruktiven Migrationen ohne Backup-Nachweis.
+
+## Tests
+- `pytest`, Zielabdeckung Rechenkerne â‰¥ 90 %, Services â‰¥ 70 %.
+- Jeder Bugfix bekommt einen Regressionstest.
+- Fixtures fÃ¼r Test-DB (SQLite oder Postgres-Testcontainer).
+
+## Logging & Audit
+- Strukturiertes Logging (JSON, `structlog`).
+- Audit-Log fÃ¼r jede Berechnung: siehe `05-workflow.mdc` (Revisionssicherheit).
+
+
+
+# ===== 02-frontend.mdc =====
+---
+description: Frontend-Standards (React, TS, Zod, shadcn/ui)
+globs: frontend/**/*.{ts,tsx}
+alwaysApply: true
+---
+
+# Frontend-Regeln
+
+## Struktur
+frontend/
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ main.tsx
+â”‚   â”œâ”€â”€ App.tsx
+â”‚   â”œâ”€â”€ pages/               # Seiten (Routing-Ziele)
+â”‚   â”œâ”€â”€ features/            # Fachliche Module (grid-check, projects, reports)
+â”‚   â”œâ”€â”€ components/          # Wiederverwendbare UI (shadcn/ui-basiert)
+â”‚   â”œâ”€â”€ lib/                 # API-Client, Utils, Hooks
+â”‚   â”œâ”€â”€ schemas/             # Zod-Schemas (spiegeln Backend-Pydantic)
+â”‚   â””â”€â”€ styles/
+â”œâ”€â”€ public/
+â”œâ”€â”€ index.html
+â”œâ”€â”€ tsconfig.json
+â””â”€â”€ package.json
+
+## Code-Standards
+- React 18 + TypeScript **strict** (`"strict": true` in tsconfig).
+- Keine `any`. Bei unvermeidbarem unsafe-Cast: Kommentar mit BegrÃ¼ndung.
+- Komponenten: Funktional, Hooks. Keine Klassen.
+- Dateinamen: Komponenten `PascalCase.tsx`, Hooks `useXxx.ts`, Utils `kebab-case.ts`.
+- Formatter/Linter: `eslint` + `prettier`. Nur **eine** Konfigurationsquelle.
+
+## UI / UX
+- TailwindCSS + shadcn/ui als Basis. Keine Mischung mit Material-UI o.Ã¤.
+- Formulare: React Hook Form + Zod Resolver. Validation-Nachrichten auf Deutsch.
+- Fehler immer nutzernah: was ist falsch + was ist zu tun.
+- LadezustÃ¤nde sichtbar (Skeleton/Spinner). Keine stillen Waits > 500 ms.
+- Barrierefreiheit: Labels, Fokus-States, `aria-*` wo nÃ¶tig.
+
+## API-Client
+- Zentral in `lib/api.ts`, eine Instanz (z.B. `ky` oder `fetch`-Wrapper).
+- Basis-URL aus ENV (`VITE_API_URL`).
+- Response-Schemas mit Zod parsen â†’ garantierte Typsicherheit am Rand.
+- Fehler-Mapping zu UI-freundlichen Meldungen an einer Stelle.
+
+## State
+- Server-State: `@tanstack/react-query`. Kein manuelles Caching.
+- Client-State lokal (`useState`) bevorzugt. Global nur wenn nÃ¶tig (Zustand/Context).
+- Kein Redux.
+
+## Routing
+- `react-router-dom` v6+. Routen zentral in `App.tsx` oder `routes.tsx`.
+- GeschÃ¼tzte Routen Ã¼ber `<ProtectedRoute>`-Wrapper.
+
+## Ergebnisanzeige (GridCheck-spezifisch)
+- Jedes Diagnose-Ergebnis zeigt: Verdict, BegrÃ¼ndung, Annahmen, Norm-Version, App-Version, Berechnungs-ID.
+- Export-Button (PDF) sichtbar, aber nur aktiv wenn Berechnung abgeschlossen.
+- Keine reinen Ampeln ohne Text. Jede Farbe hat eine BegrÃ¼ndung daneben.
+
+## Tests
+- `vitest` + `@testing-library/react`.
+- E2E optional (`playwright`), mindestens Happy-Path Grid-Check.
+
+
+
+# ===== 03-elektrotechnik.mdc =====
+---
+description: Fachregeln Elektrotechnik / Netzanschluss
+alwaysApply: true
+---
+
+# Elektrotechnik-Regeln
+
+## Normgrundlage (Deutschland)
+- **VDE-AR-N 4105** â€“ Niederspannung (â‰¤ 1 kV), Erzeugungsanlagen
+- **VDE-AR-N 4110** â€“ Mittelspannung (> 1 kV bis 35 kV)
+- **VDE-AR-N 4120** â€“ Hochspannung (> 35 kV bis 110 kV)
+- **VDE-AR-N 4100** â€“ Netzanschluss Niederspannung (Verbraucher)
+- **TAB** des jeweiligen Netzbetreibers (kann strenger sein â€“ konservativ!)
+
+Jede Berechnung speichert die **verwendete Normversion** (z. B. "VDE-AR-N 4110:2018-11 inkl. Ã„nderung A1:2023-03").
+
+## Spannungsebenen-Logik
+- NS (LV): â‰¤ 1 kV â†’ VDE 4105 / 4100
+- MS (MV): > 1 kV bis 35 kV â†’ VDE 4110
+- HS (HV): > 35 kV â†’ VDE 4120
+
+## N-1-Analyse
+- **Pflicht** fÃ¼r MS- und HS-AnschlÃ¼sse (ab VDE 4110).
+- FÃ¼r NS nur, wenn Netzbetreiber es verlangt oder Anlage systemrelevant ist.
+- Bei N-1 werden nacheinander alle relevanten Betriebsmittel (Trafo, Leitung) ausgefallen simuliert; Grenzwerte (Spannung, Strom, Kurzschlussleistung) mÃ¼ssen auch dann eingehalten sein.
+
+## Grenzwerte & KonservativitÃ¤t
+- SpannungsÃ¤nderung dU: NS 3%, MS 2% (Richtwerte, TAB kann abweichen).
+- Flicker, Oberschwingungen: nach IEC 61000-3-x bzw. DACHCZ.
+- Kurzschlussleistung Sk'' am VerknÃ¼pfungspunkt: **immer** aus Netzbetreiber-Auskunft, nicht schÃ¤tzen. Fehlt sie â†’ Rechnung mit Vermerk "vorlÃ¤ufig, Sk'' ausstehend".
+
+## Reproduzierbarkeit
+- Jede Berechnung: Input-JSON + Ergebnis-JSON + Norm-Version + Engine-Version in DB.
+- Keine stochastischen Defaults. Alle Annahmen explizit im Ergebnis.
+
+
+# ===== 04-deployment.mdc =====
+---
+description: Deployment (Railway, PostgreSQL, ENV)
+alwaysApply: true
+---
+
+# Deployment-Regeln
+
+## Railway
+- Backend + PostgreSQL als separate Services im selben Projekt.
+- `Procfile` oder `railway.toml` fÃ¼r Start-Command.
+- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Healthcheck-Endpoint: `GET /health` â†’ `{"status":"ok","version":"..."}`
+
+## ENV-Variablen (Pflicht)
+
+### Backend (Railway)
+| Variable              | Zweck                                     | Beispiel / Hinweis                |
+|-----------------------|-------------------------------------------|-----------------------------------|
+| `APP_ENV`             | Umgebung                                  | `dev` \| `staging` \| `prod`      |
+| `APP_VERSION`         | Aus Git-Tag gesetzt, fÃ¼r Audit-Log        | `v1.2.3`                          |
+| `DATABASE_URL`        | Postgres-Verbindung                       | von Railway injiziert             |
+| `JWT_SECRET`          | Signatur Access-Token                     | min. 32 Zeichen, zufÃ¤llig         |
+| `JWT_REFRESH_SECRET`  | Signatur Refresh-Token                    | eigener Wert, â‰  `JWT_SECRET`      |
+| `JWT_ACCESS_TTL_MIN`  | Lebensdauer Access-Token                  | `15`                              |
+| `JWT_REFRESH_TTL_DAYS`| Lebensdauer Refresh-Token                 | `14`                              |
+| `CORS_ORIGINS`        | Komma-getrennte Liste erlaubter Origins   | `https://app.gridcheck.de`        |
+| `LOG_LEVEL`           | Logging-Schwelle                          | `INFO` (prod), `DEBUG` (dev)      |
+| `NORM_VERSION`        | Aktuell genutzte Normensammlung           | `VDE-AR-N-4105:2018-11 + ...`     |
+| `SENTRY_DSN`          | Error-Tracking (optional, empfohlen)      | von Sentry                        |
+
+### Frontend (Vercel/Railway)
+| Variable         | Zweck                                  | Beispiel                          |
+|------------------|----------------------------------------|-----------------------------------|
+| `VITE_API_URL`   | Basis-URL Backend                      | `https://api.gridcheck.de`        |
+| `VITE_APP_ENV`   | Umgebung fÃ¼r UI-Hinweise               | `prod`                            |
+| `VITE_SENTRY_DSN`| Frontend-Error-Tracking (optional)     | von Sentry                        |
+
+### Regeln
+- **Keine** Defaults fÃ¼r Secrets im Code. Fehlt eine Pflicht-Variable â†’ App startet nicht (fail-fast).
+- Secrets werden **nie** geloggt. Auch nicht teilweise.
+- Rotation: `JWT_SECRET` und `JWT_REFRESH_SECRET` mindestens jÃ¤hrlich, bei Verdacht sofort.
+- Lokale Entwicklung: `.env.local` (gitignored). Template `.env.example` wird gepflegt und committed.
+- In CI/CD werden Secrets ausschlieÃŸlich Ã¼ber die Plattform (Railway/Vercel Variables) injiziert.
+
+## PostgreSQL
+- Version: 15+.
+- Backups: tÃ¤glich automatisch (Railway), zusÃ¤tzlich wÃ¶chentliches Offsite-Backup.
+- Migrations: Alembic, **vor** Deploy via CI ausfÃ¼hren. Kein Auto-Migrate beim App-Start in Prod.
+- Connection Pool: `pool_size=5, max_overflow=10` als Startwert.
+
+## CI/CD
+- Bei jedem Push auf `main`: Lint + Tests + Migrations-Check. Nur bei grÃ¼n â†’ Deploy.
+- Tags fÃ¼r Releases: `v1.2.3` â†’ landet in `APP_VERSION`.
+
+
+
+# ===== 05-workflow.mdc =====
+---
+description: Arbeitsweise, Revisionssicherheit, KI-Verhalten
+alwaysApply: true
+---
+
+# Workflow-Regeln
+
+## Arbeitsweise (fÃ¼r KI-Assistenten und Entwickler)
+1. **Lesen vor Schreiben** â€“ bevor Code geÃ¤ndert wird, betroffene Dateien + AbhÃ¤ngigkeiten prÃ¼fen.
+2. **Schritt fÃ¼r Schritt** â€“ groÃŸe Ã„nderungen in kleine, testbare Schritte zerlegen.
+3. **Jedes Zwischenziel testen** â€“ bevor weitergebaut wird.
+4. **Nach Meilensteinen: Backup / Git-Tag.**
+5. **Im Zweifel fragen, nicht raten.** Keine Halluzinationen, keine erfundenen APIs/Pakete.
+6. **Konsistenz** â€“ gleiche Aufgabe â†’ gleiches Tool/Muster. Abweichung begrÃ¼nden.
+
+## Revisionssicherheit (projektweit)
+- Jede Berechnung wird vollstÃ¤ndig gespeichert: Input, Output, App-Version, Norm-Version, User, Timestamp.
+- Historische Berechnungen sind **append-only**. Ã„nderungen erzeugen eine neue Version.
+- Exporte (PDF-Report) enthalten: Projekt-ID, Berechnungs-ID, Hash, Norm-Version, App-Version.
+- LÃ¶schung nur durch Soft-Delete (`deleted_at`), Daten bleiben fÃ¼r Audit erhalten.
+
+## Git
+- Branches: `main` (deployable), `feature/<kurz>`, `fix/<kurz>`.
+- Commits: Konventionell (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`).
+- Keine Commits direkt auf `main` in Produktivphase.
+
+## QualitÃ¤tssicherung vor Code-Ausgabe (KI)
+Vor jedem Code-Vorschlag prÃ¼fen:
+- [ ] Konflikt mit bestehendem Code?
+- [ ] Typen/Schemas konsistent (Backend Pydantic â†” Frontend Zod)?
+- [ ] FehlerfÃ¤lle behandelt?
+- [ ] Security-Implikationen (Input-Validation, Auth, Secrets)?
+- [ ] Test vorhanden oder ergÃ¤nzbar?
+
+## Proaktive Hinweise (erwÃ¼nscht)
+- Optimierungspotenzial benennen (Performance, UX, Security), auch wenn nicht gefragt.
+- Technische Schulden markieren (`# TODO(tech-debt): ...`).
+- Bei Unklarheit in Anforderungen: nachfragen, bevor gecodet wird.
+

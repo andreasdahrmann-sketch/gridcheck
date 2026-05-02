@@ -1,61 +1,62 @@
----
+﻿---
 description: Frontend-Standards (React, TS, Zod, shadcn/ui)
 globs: frontend/**/*.{ts,tsx}
-alwaysApply: false
+alwaysApply: true
 ---
 
 # Frontend-Regeln
 
 ## Struktur
 frontend/
-├── src/
-│   ├── main.tsx
-│   ├── App.tsx
-│   ├── pages/               # Seiten (Routing-Ziele)
-│   ├── features/            # Fachliche Module (grid-check, projects, reports)
-│   ├── components/          # Wiederverwendbare UI (shadcn/ui-basiert)
-│   ├── lib/                 # API-Client, Utils, Hooks
-│   ├── schemas/             # Zod-Schemas (spiegeln Backend-Pydantic)
-│   └── styles/
-├── public/
-├── index.html
-├── tsconfig.json
-└── package.json
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ main.tsx
+â”‚   â”œâ”€â”€ App.tsx
+â”‚   â”œâ”€â”€ pages/               # Seiten (Routing-Ziele)
+â”‚   â”œâ”€â”€ features/            # Fachliche Module (grid-check, projects, reports)
+â”‚   â”œâ”€â”€ components/          # Wiederverwendbare UI (shadcn/ui-basiert)
+â”‚   â”œâ”€â”€ lib/                 # API-Client, Utils, Hooks
+â”‚   â”œâ”€â”€ schemas/             # Zod-Schemas (spiegeln Backend-Pydantic)
+â”‚   â””â”€â”€ styles/
+â”œâ”€â”€ public/
+â”œâ”€â”€ index.html
+â”œâ”€â”€ tsconfig.json
+â””â”€â”€ package.json
 
 ## Code-Standards
 - React 18 + TypeScript **strict** (`"strict": true` in tsconfig).
-- Keine `any`. Bei unvermeidbarem unsafe-Cast: Kommentar mit Begründung.
+- Keine `any`. Bei unvermeidbarem unsafe-Cast: Kommentar mit BegrÃ¼ndung.
 - Komponenten: Funktional, Hooks. Keine Klassen.
 - Dateinamen: Komponenten `PascalCase.tsx`, Hooks `useXxx.ts`, Utils `kebab-case.ts`.
 - Formatter/Linter: `eslint` + `prettier`. Nur **eine** Konfigurationsquelle.
 
 ## UI / UX
-- TailwindCSS + shadcn/ui als Basis. Keine Mischung mit Material-UI o.ä.
+- TailwindCSS + shadcn/ui als Basis. Keine Mischung mit Material-UI o.Ã¤.
 - Formulare: React Hook Form + Zod Resolver. Validation-Nachrichten auf Deutsch.
 - Fehler immer nutzernah: was ist falsch + was ist zu tun.
-- Ladezustände sichtbar (Skeleton/Spinner). Keine stillen Waits > 500 ms.
-- Barrierefreiheit: Labels, Fokus-States, `aria-*` wo nötig.
+- LadezustÃ¤nde sichtbar (Skeleton/Spinner). Keine stillen Waits > 500 ms.
+- Barrierefreiheit: Labels, Fokus-States, `aria-*` wo nÃ¶tig.
 
 ## API-Client
 - Zentral in `lib/api.ts`, eine Instanz (z.B. `ky` oder `fetch`-Wrapper).
 - Basis-URL aus ENV (`VITE_API_URL`).
-- Response-Schemas mit Zod parsen → garantierte Typsicherheit am Rand.
+- Response-Schemas mit Zod parsen â†’ garantierte Typsicherheit am Rand.
 - Fehler-Mapping zu UI-freundlichen Meldungen an einer Stelle.
 
 ## State
 - Server-State: `@tanstack/react-query`. Kein manuelles Caching.
-- Client-State lokal (`useState`) bevorzugt. Global nur wenn nötig (Zustand/Context).
+- Client-State lokal (`useState`) bevorzugt. Global nur wenn nÃ¶tig (Zustand/Context).
 - Kein Redux.
 
 ## Routing
 - `react-router-dom` v6+. Routen zentral in `App.tsx` oder `routes.tsx`.
-- Geschützte Routen über `<ProtectedRoute>`-Wrapper.
+- GeschÃ¼tzte Routen Ã¼ber `<ProtectedRoute>`-Wrapper.
 
 ## Ergebnisanzeige (GridCheck-spezifisch)
-- Jedes Diagnose-Ergebnis zeigt: Verdict, Begründung, Annahmen, Norm-Version, App-Version, Berechnungs-ID.
+- Jedes Diagnose-Ergebnis zeigt: Verdict, BegrÃ¼ndung, Annahmen, Norm-Version, App-Version, Berechnungs-ID.
 - Export-Button (PDF) sichtbar, aber nur aktiv wenn Berechnung abgeschlossen.
-- Keine reinen Ampeln ohne Text. Jede Farbe hat eine Begründung daneben.
+- Keine reinen Ampeln ohne Text. Jede Farbe hat eine BegrÃ¼ndung daneben.
 
 ## Tests
 - `vitest` + `@testing-library/react`.
 - E2E optional (`playwright`), mindestens Happy-Path Grid-Check.
+
