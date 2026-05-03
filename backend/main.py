@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from db.database import engine, Base
 from api.routes import router
+from api.stakeholders import router as stakeholder_router
+from api.analyze_v2 import router_v2
 
 Base.metadata.create_all(bind=engine)
 
@@ -20,6 +22,8 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(stakeholder_router)
+app.include_router(router_v2)
 
 @app.get("/")
 def root():
@@ -28,3 +32,4 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+

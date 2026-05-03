@@ -1,4 +1,5 @@
-﻿import math
+﻿from engine.n1_ms import bewerte_n1_ms
+import math
 from typing import Optional
 
 # =============================================================================
@@ -19,7 +20,7 @@ LEITUNGSDATEN = {
     'ACSR240':      {'i_max': 645, 'r_km': 0.120, 'x_km': 0.390, 'ebene': 'HS', 'material': 'AlSt', 'querschnitt': 240},
 }
 
-# Typische R/X-Verhältnisse Vorgelagertes Netz
+# Typische R/X-VerhÃ¤ltnisse Vorgelagertes Netz
 RX_RATIO_DEFAULT = {
     'NS': 2.5,
     'MS': 1.5,
@@ -40,7 +41,7 @@ TRAFO_DEFAULTS = {
     'HS': {'s_mva': 63.0, 'uk_prozent': 13.0},
 }
 
-# Referenzkosten für Kostenschätzung
+# Referenzkosten fÃ¼r KostenschÃ¤tzung
 REFERENZKOSTEN = {
     'NS': {'tiefbau_eur_m': 120, 'kabel_eur_m': 45, 'trafostation_eur': 35000,
             'schaltanlage_eur': 15000, 'planung_prozent': 12, 'genehmigung_eur': 5000},
@@ -125,7 +126,7 @@ def berechne_betriebsstrom(s_mva, u_kv):
 # =============================================================================
 
 def berechne_quellenimpedanz(u_kv, sk_mva, rx_ratio):
-    """Z_Q = U² / S_k, aufgeteilt in R_Q und X_Q"""
+    """Z_Q = UÂ² / S_k, aufgeteilt in R_Q und X_Q"""
     u_v = u_kv * 1000.0
     z_q = (u_v ** 2) / (sk_mva * 1e6)
     r_q = z_q / math.sqrt(1 + rx_ratio ** 2)
@@ -134,10 +135,10 @@ def berechne_quellenimpedanz(u_kv, sk_mva, rx_ratio):
 
 
 def berechne_trafoimpedanz(u_kv, s_trafo_mva, uk_prozent):
-    """Z_T = (uk/100) * U² / S_T"""
+    """Z_T = (uk/100) * UÂ² / S_T"""
     u_v = u_kv * 1000.0
     z_t = (uk_prozent / 100.0) * (u_v ** 2) / (s_trafo_mva * 1e6)
-    # Vereinfachung: R_T << X_T, daher X_T ≈ Z_T
+    # Vereinfachung: R_T << X_T, daher X_T Ëœ Z_T
     r_t = z_t * 0.1  # typisch 10% R-Anteil
     x_t = z_t * math.sqrt(1 - 0.1**2)
     return r_t, x_t
@@ -232,7 +233,7 @@ def validiere_eingabe(eingabe):
             fehler.append(f'cos phi ausserhalb 0.8-1.0: {cp}')
         # Widerspruch: cos_phi=1 bei netzdienlicher Regelung
         if cp == 1.0 and eingabe.get('blindleistung_modus') in ('Q(U)', 'Q(P)'):
-            warnungen.append('cos phi = 1.0 bei aktiver Blindleistungsregelung ist widersprüchlich.')
+            warnungen.append('cos phi = 1.0 bei aktiver Blindleistungsregelung ist widersprÃ¼chlich.')
     except (ValueError, TypeError):
         pass
 
@@ -323,7 +324,7 @@ def berechne_datenqualitaet(eingabe):
 # =============================================================================
 
 def berechne_thermisch(s_mva, u_kv, leitungstyp, parallele_systeme=1):
-    """Thermische Prüfung: I_betrieb vs I_zul — immer auf S-Basis"""
+    """Thermische PrÃ¼fung: I_betrieb vs I_zul â€” immer auf S-Basis"""
     daten = LEITUNGSDATEN[leitungstyp]
     i_max = daten['i_max']
 
@@ -349,7 +350,7 @@ def berechne_thermisch(s_mva, u_kv, leitungstyp, parallele_systeme=1):
         's_mva': round(s_mva, 4),
         'bewertung': bewertung,
         'text': text,
-        'hinweis_verlegeart': 'Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C).',
+        'hinweis_verlegeart': 'Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20Â°C).',
     }
 
 
@@ -358,7 +359,7 @@ def berechne_thermisch(s_mva, u_kv, leitungstyp, parallele_systeme=1):
 # =============================================================================
 
 def berechne_trafo(s_mva, trafo_s_mva, bestand_auslastung_prozent=0):
-    """Trafo-Auslastung auf S-Basis mit Bestandsberücksichtigung"""
+    """Trafo-Auslastung auf S-Basis mit BestandsberÃ¼cksichtigung"""
     bestand_s = trafo_s_mva * (bestand_auslastung_prozent / 100.0)
     gesamt_s = bestand_s + s_mva
     auslastung = (gesamt_s / trafo_s_mva) * 100.0
@@ -389,9 +390,9 @@ def berechne_trafo(s_mva, trafo_s_mva, bestand_auslastung_prozent=0):
 
 def berechne_spannung(p_mw, q_mvar, u_kv, r_ges, x_ges, anschlussart):
     """
-    Signierte Spannungsänderung: Δu ≈ (R*P + X*Q) / U²
-    Einspeisung → Spannungsanhebung (positiv)
-    Entnahme → Spannungsabsenkung (negativ)
+    Signierte SpannungsÃ¤nderung: ?u Ëœ (R*P + X*Q) / UÂ²
+    Einspeisung ? Spannungsanhebung (positiv)
+    Entnahme ? Spannungsabsenkung (negativ)
     """
     u_v = u_kv * 1000.0
     p_w = p_mw * 1e6
@@ -409,7 +410,7 @@ def berechne_spannung(p_mw, q_mvar, u_kv, r_ges, x_ges, anschlussart):
         richtung = 'Anhebung (Worst Case Einspeisung)'
 
     delta_u_v = vorzeichen * math.sqrt(3) * (r_ges * p_w + x_ges * q_var) / (math.sqrt(3) * u_v)
-    # Vereinfachte Formel: delta_u ≈ (R*P + X*Q) / U²
+    # Vereinfachte Formel: delta_u Ëœ (R*P + X*Q) / UÂ²
     delta_u_v_approx = vorzeichen * (r_ges * p_w + x_ges * q_var) / u_v
     delta_u_proz = (abs(delta_u_v_approx) / u_v) * 100.0
 
@@ -444,19 +445,19 @@ def berechne_spannung(p_mw, q_mvar, u_kv, r_ges, x_ges, anschlussart):
 
 def berechne_kurzschluss(u_kv, z_ges, s_mva, sk_mva):
     """
-    Kurzschluss-Screening: Ik'', Sk/Sn, Netzrückwirkungs-Screening
+    Kurzschluss-Screening: Ik'', Sk/Sn, NetzrÃ¼ckwirkungs-Screening
     """
     u_v = u_kv * 1000.0
     c = 1.1  # Spannungsfaktor nach IEC 60909
 
     # Ik'' = c * U / (sqrt(3) * |Z_ges|)
     ik_max = (c * u_v) / (math.sqrt(3) * z_ges) if z_ges > 0 else 0
-    ik_min = (0.95 * u_v) / (math.sqrt(3) * z_ges) if z_ges > 0 else 0  # c_min ≈ 0.95
+    ik_min = (0.95 * u_v) / (math.sqrt(3) * z_ges) if z_ges > 0 else 0  # c_min Ëœ 0.95
 
-    # Sk/Sn Verhältnis
+    # Sk/Sn VerhÃ¤ltnis
     sk_sn = sk_mva / s_mva if s_mva > 0 else 999
 
-    # Netzrückwirkungs-Screening: S_anlage/S_k
+    # NetzrÃ¼ckwirkungs-Screening: S_anlage/S_k
     rueckwirkung_ratio = s_mva / sk_mva if sk_mva > 0 else 999
 
     # Sk/Sn Bewertung
@@ -470,7 +471,7 @@ def berechne_kurzschluss(u_kv, z_ges, s_mva, sk_mva):
         sk_bewertung = 'ROT'
         sk_text = 'Kurzschlussniveau kritisch. Anschluss nur nach Detailpruefung.'
 
-    # Netzrückwirkung
+    # NetzrÃ¼ckwirkung
     if rueckwirkung_ratio <= 0.02:
         rw_bewertung = 'GRUEN'
         rw_text = 'Netzrueckwirkungen unkritisch.'
@@ -515,74 +516,72 @@ def berechne_kurzschluss(u_kv, z_ges, s_mva, sk_mva):
 # N-1 PRE-SCREEN (umbenannt, korrekte Terminologie)
 # =============================================================================
 
-def berechne_n1_prescreen(thermisch, trafo, topologie, parallele, redundanz):
+def berechne_n1_prescreen(thermisch, trafo, topologie, parallele, redundanz,
+                          pqs=None, cos_phi=1.0, eingabe=None):
     """
-    N-1 Pre-Screen — KEINE echte N-1 Prüfung.
-    Topologische N-1-Prüfung nur mit vollständigem Netzmodell möglich.
+    N-1 Wrapper:
+    - Topologie-Bewertung kommt aus engine.n1_ms (Stakeholder-faehig, revisionssicher)
+    - Leitungs-N-1 und Trafo-N-1 weiterhin hier (vereinfacht)
+    Rueckgabe ist rueckwaertskompatibel + zusaetzliches Feld 'stakeholder'.
     """
-    # Topologie-Bewertung
-    if topologie == 'stich' or topologie == 'radial':
-        topo_n1 = False
-        topo_text = 'Radial/Stich: keine echte N-1 moeglich.'
-    elif topologie == 'ring_ohne_reserve':
-        topo_n1 = False
-        topo_text = 'Ring ohne Umschaltreserve: N-1 bedingt.'
-    elif topologie == 'ring_mit_reserve':
-        topo_n1 = True
-        topo_text = 'Ring mit Umschaltreserve: N-1 plausibel.'
-    elif topologie == 'doppeleinspeisung':
-        topo_n1 = True
-        topo_text = 'Doppeleinspeisung: gute N-1 Voraussetzung.'
-    else:
-        topo_n1 = False
-        topo_text = 'Topologie unbekannt: N-1 nicht bewertbar.'
+    pqs = pqs or {}
+    eingabe = eingabe or {}
 
-    # Leitungs-N-1
+    # 1) Stakeholder-Bewertung (Topologie)
+    stakeholder = bewerte_n1_ms({
+        "topologie": topologie,
+        "leistung_mw": pqs.get("p_mw", 0.0),
+        "cos_phi": cos_phi,
+        "restkapazitaet_ms_mva": eingabe.get("restkapazitaet_ms_mva"),
+    })
+    topo_n1 = stakeholder["n1_sicher"]
+    topo_text = stakeholder["begruendung_technisch"]
+    topo_bewertung = stakeholder["bewertung"]
+
+    # 2) Leitungs-N-1
     if parallele >= 2:
         n1_auslastung = thermisch['auslastung_prozent'] * parallele / (parallele - 1)
         leitung_n1 = n1_auslastung <= 100
+        leitung_text = f"Parallelsystem-Ausfall: Auslastung {n1_auslastung:.1f}%."
     elif redundanz:
         n1_auslastung = thermisch['auslastung_prozent']
         leitung_n1 = n1_auslastung <= 100
+        leitung_text = "Redundanz vorhanden, aber kein Parallelsystem modelliert."
     else:
         n1_auslastung = thermisch['auslastung_prozent']
         leitung_n1 = False
+        leitung_text = "Keine Leitungsredundanz."
 
-    # Trafo-N-1 (wenn 2+ Trafos)
-    trafo_n1 = trafo['auslastung_prozent'] <= 100  # Vereinfachung
+    # 3) Trafo-N-1 (vereinfacht)
+    trafo_aus = trafo.get('auslastung_prozent', 0)
+    trafo_n1 = trafo_aus <= 70
+    trafo_text = f"Trafo-Auslastung {trafo_aus:.1f}% ({'N-1 ok' if trafo_n1 else 'kein N-1 Spielraum'})."
 
-    n1_sicher = topo_n1 and leitung_n1
-    if n1_sicher:
-        if n1_auslastung <= 80:
-            bewertung = 'GRUEN'
-            text = 'N-1 Pre-Screen: plausibel mit Reserve.'
-        else:
-            bewertung = 'GELB'
-            text = 'N-1 Pre-Screen: plausibel, eingeschraenkte Reserve.'
+    # 4) Gesamtbewertung kombinieren
+    n1_sicher = bool(topo_n1 and leitung_n1 and trafo_n1)
+
+    if topo_bewertung == 'ROT' or not leitung_n1 or trafo_aus > 100:
+        bewertung = 'ROT'
+    elif topo_bewertung == 'GELB' or not trafo_n1:
+        bewertung = 'GELB'
+    elif topo_bewertung == 'GRUEN' and leitung_n1 and trafo_n1:
+        bewertung = 'GRUEN'
     else:
-        if topo_n1 and not leitung_n1:
-            bewertung = 'ROT'
-            text = 'N-1 Pre-Screen: Leitungsueberlastung im Stoerungsfall.'
-        elif not topo_n1:
-            bewertung = 'ROT'
-            text = f'N-1 Pre-Screen: {topo_text}'
-        else:
-            bewertung = 'ROT'
-            text = 'N-1 Pre-Screen: nicht erfuellt.'
+        bewertung = 'GELB'
 
     return {
         'n1_sicher': n1_sicher,
-        'n1_auslastung_prozent': round(n1_auslastung, 1),
-        'leitung_n1': leitung_n1,
-        'trafo_n1': trafo_n1,
-        'topologie': topologie,
-        'topologie_n1': topo_n1,
-        'topologie_text': topo_text,
-        'parallele_systeme': parallele,
-        'redundanz': redundanz,
         'bewertung': bewertung,
-        'text': text,
-        'hinweis': 'Dies ist ein Pre-Screen. Topologische N-1-Pruefung erfordert vollstaendiges Netzmodell.',
+        'topologie': topologie,
+        'topologie_text': topo_text,
+        'leitung_n1': leitung_n1,
+        'leitung_text': leitung_text,
+        'n1_auslastung_prozent': round(n1_auslastung, 2),
+        'trafo_n1': trafo_n1,
+        'trafo_text': trafo_text,
+        'redundanz': redundanz,
+        'parallele_systeme': parallele,
+        'stakeholder': stakeholder,
     }
 
 
@@ -593,7 +592,7 @@ def berechne_n1_prescreen(thermisch, trafo, topologie, parallele, redundanz):
 def berechne_szenarien(p_mw, q_mvar, s_mva, u_kv, r_ges, x_ges, leitungstyp,
                        parallele_systeme, anschlussart, sk_mva, z_ges,
                        trafo_s_mva, bestand_trafo_proz):
-    """4 Pflichtszenarien gemäss Netzplaner-Vorgabe"""
+    """4 Pflichtszenarien gemÃ¤ss Netzplaner-Vorgabe"""
     szenarien = []
 
     def run_szenario(name, p_fakt, q_fakt, beschreibung):
@@ -618,7 +617,7 @@ def berechne_szenarien(p_mw, q_mvar, s_mva, u_kv, r_ges, x_ges, leitungstyp,
     szenarien.append(run_szenario(
         'Max. Einspeisung',
         1.0, 1.0,
-        'Volle Leistung, minimale Netzlast — kritischster Fall fuer Spannungsanhebung.'
+        'Volle Leistung, minimale Netzlast â€” kritischster Fall fuer Spannungsanhebung.'
     ))
 
     # 2. Typischer Betrieb (70%)
@@ -632,7 +631,7 @@ def berechne_szenarien(p_mw, q_mvar, s_mva, u_kv, r_ges, x_ges, leitungstyp,
     szenarien.append(run_szenario(
         'Teillast',
         0.4, 0.4,
-        'Teillastbetrieb bei 40% — fuer Normalbetriebsbewertung.'
+        'Teillastbetrieb bei 40% â€” fuer Normalbetriebsbewertung.'
     ))
 
     # 4. N-1 Reservebetrachtung (100% auf n-1 Systeme)
@@ -682,7 +681,29 @@ def berechne_scores(thermisch, spannung, kurzschluss, n1, datenqualitaet, trafo)
 
     gesamt = round(0.30 * s_kap + 0.25 * s_spg + 0.20 * s_ks + 0.15 * s_n1 + 0.10 * s_dq)
 
-    # Harte Grenze: ROT ueberschreibt Score
+    # Score-Caps:
+    # Ein kritischer Einzelparameter darf nicht durch andere gute Teilwerte "weggemittelt" werden.
+    score_caps = []
+
+    if n1.get('bewertung') == 'ROT':
+        score_caps.append(('N-1-Kriterium nicht erfuellt', 65))
+
+    if spannung.get('bewertung') == 'ROT':
+        score_caps.append(('Spannung kritisch', 40))
+
+    if thermisch.get('bewertung') == 'ROT':
+        score_caps.append(('Leitung thermisch kritisch', 40))
+
+    if trafo.get('bewertung') == 'ROT':
+        score_caps.append(('Trafo thermisch kritisch', 40))
+
+    if kurzschluss.get('bewertung') == 'ROT':
+        score_caps.append(('Kurzschlusskriterium kritisch', 30))
+
+    if score_caps:
+        gesamt = min([gesamt] + [cap for _grund, cap in score_caps])
+
+    # Harte Grenze: echte Grenzwertverletzungen ueberschreiben Score nochmals strenger
     harte_verstoesse = []
     if thermisch['auslastung_prozent'] > 100:
         harte_verstoesse.append('Leitungsueberlastung > 100%')
@@ -691,7 +712,14 @@ def berechne_scores(thermisch, spannung, kurzschluss, n1, datenqualitaet, trafo)
     if spannung['delta_u_prozent'] > 5.0:
         harte_verstoesse.append('Spannungsaenderung > 5%')
 
-    if harte_verstoesse:
+    for grund, cap in score_caps:
+        harte_verstoesse.append(f'{grund} -> Score-Cap {cap}')
+
+    if harte_verstoesse and (
+        thermisch['auslastung_prozent'] > 100
+        or trafo['auslastung_prozent'] > 100
+        or spannung['delta_u_prozent'] > 5.0
+    ):
         gesamt = min(gesamt, 25)
 
     return {
@@ -841,9 +869,9 @@ def pruefe_nb_schwellenwerte(eingabe, thermisch, spannung, kurzschluss):
         'pruefungen': ergebnisse,
         'flags': flags,
         'alle_erfuellt': alle_erfuellt,
-        'bewertung': 'GRUEN' if alle_erfuellt and ergebnisse else
-                     'GELB' if not ergebnisse else
-                     'ROT' if not alle_erfuellt else 'GELB',
+        'bewertung': 'NICHT_GEPRUEFT' if not ergebnisse else
+                     'GRUEN' if alle_erfuellt else
+                     'ROT',
     }
 
 
@@ -891,7 +919,7 @@ def erzeuge_empfehlungen(thermisch, spannung, kurzschluss, n1, trafo, nb_check, 
                 empfehlungen.append(f'NB-Kriterium nicht erfuellt: {p["kriterium"]} '
                                     f'(Grenzwert {p["grenzwert"]}, Ist {p["istwert"]})')
 
-    # Datenqualität
+    # DatenqualitÃ¤t
     if dq['klasse'] in ('C', 'D'):
         empfehlungen.append(f'Datenqualitaet {dq["klasse"]}: Vor Antragstellung reale Netzdaten beim VNB anfordern.')
 
@@ -908,7 +936,7 @@ def erzeuge_empfehlungen(thermisch, spannung, kurzschluss, n1, trafo, nb_check, 
 def erzeuge_fazit(scores, harte_verstoesse):
     """
     3 Entscheidungsebenen:
-    A = Anschluss grundsätzlich plausibel
+    A = Anschluss grundsÃ¤tzlich plausibel
     B = Anschluss bedingt plausibel
     C = Anschluss kritisch / nicht plausibel
     """
@@ -963,7 +991,7 @@ def berechne_netzanschluss(eingabe):
     redundanz = eingabe.get('redundanz', False)
     parallele_systeme = int(eingabe.get('parallele_systeme', 1))
     anschlussart = eingabe['anschlussart']
-    topologie = eingabe.get('topologie', 'radial')
+    topologie = eingabe.get('topologie', 'unbekannt')
     temperatur_c = _float_or(eingabe.get('temperatur_c'), 20)
 
     spannungsebene = bestimme_spannungsebene(u_kv)
@@ -988,7 +1016,7 @@ def berechne_netzanschluss(eingabe):
     trafo = berechne_trafo(pqs['s_mva'], trafo_s_mva, bestand_trafo_proz)
     spannung = berechne_spannung(pqs['p_mw'], pqs['q_mvar'], u_kv, r_ges, x_ges, anschlussart)
     kurzschluss = berechne_kurzschluss(u_kv, z_ges, pqs['s_mva'], sk_mva)
-    n1 = berechne_n1_prescreen(thermisch, trafo, topologie, parallele_systeme, redundanz)
+    n1 = berechne_n1_prescreen(thermisch, trafo, topologie, parallele_systeme, redundanz, pqs=pqs, cos_phi=cos_phi, eingabe=eingabe)
     datenqualitaet = berechne_datenqualitaet(eingabe)
 
     # Szenarien
@@ -1039,3 +1067,4 @@ def berechne_netzanschluss(eingabe):
         'datenqualitaet': datenqualitaet,
         'empfehlungen': empfehlungen,
     }
+

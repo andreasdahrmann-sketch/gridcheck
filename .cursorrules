@@ -1,4 +1,29 @@
-﻿---
+﻿# === HARDE REGELN — NIEMALS VERLETZEN ===
+# Diese Regeln stehen ÜBER allem anderen.
+# Vor JEDER Antwort: Selbstcheck gegen diese Liste.
+
+1. AUSSCHLIESSLICH PowerShell-Einzeiler oder Here-Strings für Windows.
+   - KEINE "öffne in VS Code"-Anweisungen.
+   - KEINE "füge manuell ein"-Anweisungen.
+   - KEINE Markdown-Codeblöcke als Lieferform für Dateiinhalt ohne PowerShell-Wrapper.
+
+2. Datei schreiben = IMMER über PowerShell:
+   - Backup mit Timestamp ZUERST (Copy-Item ... .bak_$ts)
+   - Dann Set-Content / Out-File / Here-String mit -Encoding UTF8
+
+3. Eine Aufgabe pro Antwort. Keine Nebenkriegsschauplätze.
+
+4. Bei Unsicherheit: STOPP + Rückfrage. Niemals raten, niemals erfinden.
+
+5. Selbstcheck vor JEDER Antwort (intern durchgehen):
+   [ ] Ist meine Lieferung ein PowerShell-Befehl? (JA = ok)
+   [ ] Erwähne ich VS Code / "manuell einfügen" / "öffne Datei X"? (NEIN = ok)
+   [ ] Backup vor Schreibvorgang vorhanden? (JA = ok)
+   Wenn ein Punkt nicht passt: Antwort verwerfen und neu schreiben.
+
+# === ENDE HARDE REGELN ===
+
+---
 description: Arbeitsweise und Architekturregeln für die Pre Gridcheck App
 alwaysApply: true
 ---
@@ -443,3 +468,4 @@ Cursor muss vor jeder Codeänderung prüfen:
 8. Gibt es Sicherheits- oder Datenschutzrisiken?
 
 Wenn eine Regel verletzt wird, muss Cursor stoppen und zuerst einen sicheren Vorschlag machen.
+

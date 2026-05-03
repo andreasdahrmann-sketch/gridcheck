@@ -1,7 +1,7 @@
-﻿# C:\Users\andre\gridcheck\backend\api\routes.py
+# C:\Users\andre\gridcheck\backend\api\routes.py
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 import json
 
@@ -16,6 +16,7 @@ router = APIRouter()
 # ============================================================
 
 class AnalyzeRequest(BaseModel):
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
     # --- Step 1: Projektdaten ---
     projektname: str = Field(..., min_length=1)
     plz: str = Field(..., min_length=4, max_length=5)
@@ -33,8 +34,8 @@ class AnalyzeRequest(BaseModel):
     leitungstyp: str = "NAYY"
     querschnitt_mm2: str = "150"
     netzverknuepfungspunkt: Optional[str] = ""
-    skv_mva: Optional[float] = None
-    parallelsysteme: int = 1
+    skv_mva: Optional[float] = Field(default=None, alias="sk_mva")
+    parallelsysteme: int = Field(default=1, alias="parallele_systeme")
     eigentumsgrenze: str = "HAK"
     vorbelastung_mw: Optional[float] = 0
     netz_typ: str = "kabel"
