@@ -11,7 +11,7 @@ from typing import Any, Dict, Literal, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from engine import berechne_netzanschluss, ki_bewertung, speichere_revision
+from engine import berechne_netzanschluss, ki_bewertung
 
 router_v2 = APIRouter(prefix="/api/v2", tags=["v2-Analyse"])
 
@@ -71,11 +71,5 @@ def analyze_v2(req: AnalyzeRequest) -> Dict[str, Any]:
     except Exception:
         result.setdefault("ki", {"konfidenz_prozent": 0,
                                  "hinweise": ["KI-Modul nicht verfuegbar"]})
-
-    # 4) Revision (revisionssicher, nicht kritisch)
-    try:
-        speichere_revision(result)
-    except Exception:
-        pass
 
     return result

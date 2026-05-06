@@ -1,11 +1,10 @@
+from api.v1_projektierer import router as v1_projektierer_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from db.database import engine, Base
 from api.routes import router
 from api.stakeholders import router as stakeholder_router
 from api.analyze_v2 import router_v2
-from api.v1_projektierer import router as v1_projektierer_router
-from api.revisions import router as revisions_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -26,8 +25,6 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(stakeholder_router)
 app.include_router(router_v2)
-app.include_router(v1_projektierer_router)
-app.include_router(revisions_router)
 
 @app.get("/")
 def root():
@@ -37,4 +34,4 @@ def root():
 def health():
     return {"status": "ok"}
 
-
+app.include_router(v1_projektierer_router)

@@ -1,7 +1,4 @@
 ﻿from engine.n1_ms import bewerte_n1_ms
-from engine.revision import speichere_revision
-
-ENGINE_VERSION = "1.2.0"
 import math
 from typing import Optional
 
@@ -561,14 +558,8 @@ def berechne_n1_prescreen(thermisch, trafo, topologie, parallele, redundanz,
     trafo_text = f"Trafo-Auslastung {trafo_aus:.1f}% ({'N-1 ok' if trafo_n1 else 'kein N-1 Spielraum'})."
 
     # 4) Gesamtbewertung kombinieren
-    # n1_sicher: True nur wenn alle drei Ebenen bestaetigt; None bei Datenluecke; sonst False
-    if topo_n1 is None:
-        # Topologie grundsaetzlich faehig, aber Restkapazitaet unbekannt
-        n1_sicher = None if (leitung_n1 and trafo_n1) else False
-    else:
-        n1_sicher = bool(topo_n1 and leitung_n1 and trafo_n1)
+    n1_sicher = bool(topo_n1 and leitung_n1 and trafo_n1)
 
-    # Bewertungs-Kaskade (ROT > GELB > GRUEN)
     if topo_bewertung == 'ROT' or not leitung_n1 or trafo_aus > 100:
         bewertung = 'ROT'
     elif topo_bewertung == 'GELB' or not trafo_n1:
@@ -1008,7 +999,7 @@ def erzeuge_fazit(scores, harte_verstoesse):
 # HAUPTFUNKTION
 # =============================================================================
 
-def berechne_netzanschluss(eingabe, dry_run=False):
+def berechne_netzanschluss(eingabe):
     # Validierung
     fehler, warnungen = validiere_eingabe(eingabe)
     if fehler:
@@ -1073,7 +1064,7 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     empfehlungen = erzeuge_empfehlungen(thermisch, spannung, kurzschluss, n1, trafo,
                                          nb_check, datenqualitaet, pqs, eingabe)
 
-    result = {
+    return {
         'status': 'OK',
         'eingabe': eingabe,
         'warnungen': warnungen,
@@ -1098,12 +1089,5 @@ def berechne_netzanschluss(eingabe, dry_run=False):
         'nb_check': nb_check,
         'datenqualitaet': datenqualitaet,
         'empfehlungen': empfehlungen,
-        'engine_version': ENGINE_VERSION,
     }
-    try:
-        rev = speichere_revision(result, dry_run=dry_run)
-        result['revision'] = rev
-    except Exception as e:
-        result['revision'] = {'fehler': str(e), 'dry_run': dry_run}
-    return result
 

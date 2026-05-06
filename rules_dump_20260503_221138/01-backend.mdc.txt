@@ -1,0 +1,63 @@
+﻿---
+description: Backend-Standards (FastAPI, SQLAlchemy, Security)
+globs: backend/**/*.py
+alwaysApply: true
+---
+
+# Backend-Regeln
+
+## Struktur
+backend/
+â”œâ”€â”€ app/
+â”‚   â”œâ”€â”€ main.py              # FastAPI-App, Router-Registrierung
+â”‚   â”œâ”€â”€ core/                # Config, Security, Logging, DB-Session
+â”‚   â”œâ”€â”€ api/v1/              # Endpoints, versioniert (/api/v1/...)
+â”‚   â”œâ”€â”€ models/              # SQLAlchemy ORM-Modelle
+â”‚   â”œâ”€â”€ schemas/             # Pydantic v2 Request/Response-Schemas
+â”‚   â”œâ”€â”€ services/            # Businesslogik (z.B. grid_check, n1_analysis)
+â”‚   â”œâ”€â”€ calculations/        # Reine Rechenkerne (deterministisch, testbar)
+â”‚   â””â”€â”€ audit/               # Revisionssichere Protokollierung
+â”œâ”€â”€ alembic/                 # DB-Migrationen
+â”œâ”€â”€ tests/                   # pytest, Spiegel von app/
+â””â”€â”€ requirements.txt
+
+## Code-Standards
+- Python 3.11+, Type Hints Ã¼berall, `from __future__ import annotations`.
+- Formatter: `ruff format`, Linter: `ruff check`. Kein `black`, kein `flake8` parallel.
+- Pydantic v2 (`model_config`, `Field`, `@field_validator`). Keine v1-Syntax.
+- SQLAlchemy 2.x Style (`Mapped[...]`, `mapped_column`). Keine Legacy-Syntax.
+- Async nur wo sinnvoll (I/O-Endpoints). Rechenkerne synchron + testbar.
+
+## API-Regeln
+- Alle Endpoints unter `/api/v1/...`.
+- Response-Modelle immer explizit (`response_model=...`).
+- Fehler: HTTPException mit klarer `detail`-Struktur `{code, message, hint}`.
+- Keine Businesslogik in Routern â€“ nur Delegation an `services/`.
+
+## Rechenkerne (`calculations/`)
+- **Rein deterministisch**, keine DB-Zugriffe, keine Seiteneffekte.
+- Input + Output als Pydantic-Schemas. Einheiten im Feldnamen (`p_kw`, `u_kv`).
+- Konservativ runden (im Zweifel zu Lasten der Anlage).
+- Jede Berechnung gibt zusÃ¤tzlich Annahmen + verwendete Normversion zurÃ¼ck.
+
+## Security
+- Secrets ausschlieÃŸlich Ã¼ber ENV (`pydantic-settings`). Niemals im Code.
+- Auth: JWT (kurzlebig) + Refresh-Token. PasswÃ¶rter mit `bcrypt` (>=12 rounds).
+- Input-Validation strikt per Pydantic. Keine rohen Dicts aus Requests weiterreichen.
+- CORS: nur konfigurierte Origins. Kein `allow_origins=["*"]` in Prod.
+- Rate-Limiting auf Ã¶ffentliche Endpoints (`slowapi` oder Reverse-Proxy).
+
+## Datenbank & Migrationen
+- Jede SchemaÃ¤nderung â†’ Alembic-Migration. Keine manuellen DB-Ã„nderungen.
+- Migrationen **reversibel** schreiben (down-Funktion ausgefÃ¼llt).
+- Keine destruktiven Migrationen ohne Backup-Nachweis.
+
+## Tests
+- `pytest`, Zielabdeckung Rechenkerne â‰¥ 90 %, Services â‰¥ 70 %.
+- Jeder Bugfix bekommt einen Regressionstest.
+- Fixtures fÃ¼r Test-DB (SQLite oder Postgres-Testcontainer).
+
+## Logging & Audit
+- Strukturiertes Logging (JSON, `structlog`).
+- Audit-Log fÃ¼r jede Berechnung: siehe `05-workflow.mdc` (Revisionssicherheit).
+

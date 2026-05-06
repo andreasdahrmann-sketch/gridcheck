@@ -1,7 +1,4 @@
 ﻿from engine.n1_ms import bewerte_n1_ms
-from engine.revision import speichere_revision
-
-ENGINE_VERSION = "1.2.0"
 import math
 from typing import Optional
 
@@ -1008,7 +1005,7 @@ def erzeuge_fazit(scores, harte_verstoesse):
 # HAUPTFUNKTION
 # =============================================================================
 
-def berechne_netzanschluss(eingabe, dry_run=False):
+def berechne_netzanschluss(eingabe):
     # Validierung
     fehler, warnungen = validiere_eingabe(eingabe)
     if fehler:
@@ -1073,7 +1070,7 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     empfehlungen = erzeuge_empfehlungen(thermisch, spannung, kurzschluss, n1, trafo,
                                          nb_check, datenqualitaet, pqs, eingabe)
 
-    result = {
+    return {
         'status': 'OK',
         'eingabe': eingabe,
         'warnungen': warnungen,
@@ -1098,12 +1095,5 @@ def berechne_netzanschluss(eingabe, dry_run=False):
         'nb_check': nb_check,
         'datenqualitaet': datenqualitaet,
         'empfehlungen': empfehlungen,
-        'engine_version': ENGINE_VERSION,
     }
-    try:
-        rev = speichere_revision(result, dry_run=dry_run)
-        result['revision'] = rev
-    except Exception as e:
-        result['revision'] = {'fehler': str(e), 'dry_run': dry_run}
-    return result
 

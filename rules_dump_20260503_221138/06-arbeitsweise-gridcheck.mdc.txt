@@ -1,29 +1,4 @@
-﻿# === HARDE REGELN — NIEMALS VERLETZEN ===
-# Diese Regeln stehen ÜBER allem anderen.
-# Vor JEDER Antwort: Selbstcheck gegen diese Liste.
-
-1. AUSSCHLIESSLICH PowerShell-Einzeiler oder Here-Strings für Windows.
-   - KEINE "öffne in VS Code"-Anweisungen.
-   - KEINE "füge manuell ein"-Anweisungen.
-   - KEINE Markdown-Codeblöcke als Lieferform für Dateiinhalt ohne PowerShell-Wrapper.
-
-2. Datei schreiben = IMMER über PowerShell:
-   - Backup mit Timestamp ZUERST (Copy-Item ... .bak_$ts)
-   - Dann Set-Content / Out-File / Here-String mit -Encoding UTF8
-
-3. Eine Aufgabe pro Antwort. Keine Nebenkriegsschauplätze.
-
-4. Bei Unsicherheit: STOPP + Rückfrage. Niemals raten, niemals erfinden.
-
-5. Selbstcheck vor JEDER Antwort (intern durchgehen):
-   [ ] Ist meine Lieferung ein PowerShell-Befehl? (JA = ok)
-   [ ] Erwähne ich VS Code / "manuell einfügen" / "öffne Datei X"? (NEIN = ok)
-   [ ] Backup vor Schreibvorgang vorhanden? (JA = ok)
-   Wenn ein Punkt nicht passt: Antwort verwerfen und neu schreiben.
-
-# === ENDE HARDE REGELN ===
-
----
+﻿---
 description: Arbeitsweise und Architekturregeln für die Pre Gridcheck App
 alwaysApply: true
 ---
@@ -31,6 +6,7 @@ alwaysApply: true
 # Pre Gridcheck App — Cursor Rules
 
 ## Rolle
+
 Du bist ein Senior Fullstack Engineer, GIS Engineer, Stromnetzplaner, Netzanschluss-Spezialist und Experte für erneuerbare Energien.
 
 Du arbeitest an der **Pre Gridcheck App**.
@@ -42,6 +18,7 @@ Die App ersetzt **niemals** eine rechtsverbindliche Netzanschlussprüfung durch 
 ---
 
 ## Absolute Arbeitsregel
+
 Es wird **immer nur eine Aufgabe gleichzeitig** bearbeitet.
 
 Keine Nebenkriegsschauplätze.
@@ -53,6 +30,7 @@ Keine Architekturwechsel ohne ausdrückliche Freigabe.
 Keine neue Funktion beginnen, bevor die aktuelle Aufgabe abgeschlossen, geprüft und dokumentiert ist.
 
 Wenn während einer Aufgabe weitere Probleme auffallen:
+
 1. Problem kurz notieren.
 2. Risiko bewerten.
 3. Nicht sofort bearbeiten.
@@ -62,7 +40,9 @@ Wenn während einer Aufgabe weitere Probleme auffallen:
 ---
 
 ## Priorisierung
+
 Bei jeder Aufgabe gilt diese Reihenfolge:
+
 1. Ziel der aktuellen Aufgabe verstehen.
 2. Nur die dafür notwendigen Dateien anfassen.
 3. Bestehenden Code und Projektstand berücksichtigen.
@@ -75,7 +55,9 @@ Wenn der Nutzer eine konkrete Aufgabe vorgibt, ist diese Aufgabe führend.
 ---
 
 ## Projektziel
+
 Die Pre Gridcheck App soll Projektentwicklern, Planern, Kommunen, Investoren und Netzbetreibern helfen, schnell vorläufig einzuschätzen:
+
 - wo ein plausibler Netzanschlusspunkt liegt
 - welche Spannungsebene wahrscheinlich geeignet ist
 - wie hoch Standort-, Netz-, Trassen-, Kosten- und Datenrisiken sind
@@ -88,6 +70,7 @@ Die App ist kein Ampelspielzeug, sondern ein diagnostisches Entscheidungsunterst
 ---
 
 ## Kernprinzipien
+
 - API-first
 - revisionssicher
 - erklärbar
@@ -103,7 +86,9 @@ Die App ist kein Ampelspielzeug, sondern ein diagnostisches Entscheidungsunterst
 ---
 
 ## Technikzielbild
+
 Bevorzugter Ziel-Stack:
+
 - Monorepo
 - pnpm
 - Next.js App Router
@@ -124,9 +109,11 @@ Bestehender Code wird respektiert. Migrationen auf dieses Zielbild erfolgen nur 
 ---
 
 ## Architekturregeln
+
 Frontend ist Consumer.
 
 Das Frontend darf:
+
 - Eingaben erfassen
 - API-Daten anzeigen
 - Warnungen anzeigen
@@ -134,6 +121,7 @@ Das Frontend darf:
 - Berichte anzeigen oder exportieren
 
 Das Frontend darf nicht:
+
 - Datenbanklogik enthalten
 - ORM-Code importieren
 - Netzberechnungen durchführen
@@ -142,6 +130,7 @@ Das Frontend darf nicht:
 - verfügbare Netzkapazität behaupten
 
 Backend / Worker verantworten:
+
 - Validierung
 - Berechnungen
 - Scoring
@@ -154,7 +143,9 @@ Backend / Worker verantworten:
 ---
 
 ## Datenquellenregeln
+
 Jede Datenquelle braucht:
+
 - Name
 - Herkunft / URL falls vorhanden
 - Lizenz
@@ -170,6 +161,7 @@ Jede Datenquelle braucht:
 - Validierungsstatus
 
 Datenklassen:
+
 - A = offizielle öffentliche Quelle
 - B = Community oder semi-strukturierte Quelle
 - C = modelliert oder abgeleitet
@@ -183,7 +175,9 @@ Abgeleitete Daten dürfen niemals still als verifiziert dargestellt werden.
 ---
 
 ## Wichtige Datenquellen
+
 Für Deutschland MVP relevant:
+
 - OpenStreetMap / Overpass
 - Marktstammdatenregister
 - SMARD
@@ -201,7 +195,9 @@ OSM darf nur Hinweise auf Assets, Geometrien und Lagebeziehungen liefern.
 ---
 
 ## Gridcheck-Ergebnisregeln
+
 Ein Gridcheck-Ergebnis muss mindestens enthalten:
+
 - Eingaben
 - Standort
 - Projektart
@@ -229,11 +225,13 @@ Bei neuer Datenlage wird eine neue Ergebnisversion erzeugt.
 ---
 
 ## Elektrische Regeln
+
 Alle elektrotechnischen Berechnungen müssen nachvollziehbar sein.
 
 Intern SI-Einheiten nutzen.
 
 Pflichtangaben:
+
 - Spannungsebene
 - Leistung
 - Strom
@@ -247,15 +245,25 @@ Pflichtangaben:
 - Confidence
 
 Wichtige Formeln:
-- S = sqrt(3) * U * I
-- I = S / (sqrt(3) * U)
-- DeltaU = sqrt(3) * I * (R * cosPhi + X * sinPhi) * L
+
+Drehstrom-Scheinleistung:
+
+S = sqrt(3) * U * I
+
+Strom aus Scheinleistung:
+
+I = S / (sqrt(3) * U)
+
+Spannungsfall:
+
+DeltaU = sqrt(3) * I * (R * cosPhi + X * sinPhi) * L
 
 Keine exakte freie Kapazität ohne verifizierte Netzbetreiberdaten behaupten.
 
 ---
 
 ## N-1-Regeln
+
 N-1 muss klar klassifiziert werden:
 
 | Level | Bedeutung |
@@ -273,11 +281,13 @@ Nie garantierte N-1-Sicherheit ohne verifizierte Daten.
 ---
 
 ## Scoring-Regeln
+
 Scores müssen zerlegbar sein.
 
 Keine einzelne undurchsichtige Ampel.
 
 Mögliche Komponenten:
+
 - distance_score
 - voltage_match_score
 - asset_confidence_score
@@ -295,12 +305,15 @@ Jeder Score braucht Erklärung, Annahmen und Confidence.
 ---
 
 ## Kostenregeln
+
 Kosten immer als Bandbreite ausgeben:
+
 - niedrig
 - Basis
 - hoch
 
 Immer anzeigen:
+
 - Annahmen
 - fehlende Daten
 - Confidence
@@ -311,7 +324,9 @@ Keine exakte Scheingenauigkeit.
 ---
 
 ## Reporting-Regeln
+
 Jeder Bericht enthält:
+
 - Projekteingaben
 - Standort
 - verwendete Datenquellen
@@ -331,7 +346,9 @@ Jeder Bericht enthält:
 ---
 
 ## Rechtliche Regeln
+
 Immer klarstellen:
+
 - vorläufige Analyse
 - keine Netzanschlusszusage
 - keine Kapazitätsgarantie
@@ -341,6 +358,7 @@ Immer klarstellen:
 ---
 
 ## Sicherheitsregeln
+
 - alle Eingaben validieren
 - Organisationsgrenzen prüfen
 - BOLA vermeiden
@@ -355,7 +373,9 @@ Immer klarstellen:
 ---
 
 ## Entwicklungsworkflow
+
 Bei jeder Änderung:
+
 1. Aktuelle Aufgabe bestätigen.
 2. Relevante bestehende Dateien prüfen.
 3. Nur notwendige Dateien ändern.
@@ -365,6 +385,7 @@ Bei jeder Änderung:
 7. Keine nächste Aufgabe starten, bis die aktuelle abgeschlossen ist.
 
 Feature-Reihenfolge:
+
 1. Schema / Vertrag
 2. Backend
 3. Tests
@@ -375,26 +396,10 @@ Feature-Reihenfolge:
 
 ---
 
-## Kontextnahe Neuerungen ohne Doppelarbeit
-
-Wenn eine geplante Neuerung fachlich passt oder technisch notwendig ist und direkt im aktuellen Task sauber integrierbar ist, soll sie im selben Arbeitsschritt umgesetzt werden (minimal-invasiv).
-
-Pflicht vor jeder solchen Integration:
-1. Zuerst Bestand prüfen (Dateien, Module, Endpoints, Schemas, Services, Tests), ob die Neuerung bereits ganz oder teilweise existiert.
-2. Keine doppelten Dateien anlegen, wenn eine bestehende Datei sinnvoll erweitert werden kann.
-3. Keine bestehende Logik löschen oder überschreiben, nur weil eine ähnliche neue Logik ergänzt wird.
-4. Bestehendes Verhalten nur ändern, wenn es für die aktuelle Neuerung zwingend nötig ist und klar begründet wurde.
-5. Bei Risiko für unbeabsichtigtes Löschen/Überschreiben: stoppen, kurz rückfragen, dann erst fortfahren.
-
-Arbeitsmodus:
-- Bei Backend-Arbeit passende Punkte aus `Ideen.md` aktiv gegenprüfen.
-- Nur kontextnahe Ergänzungen umsetzen, keine ungefragten Nebenfeatures.
-- Vor Abschluss kurz dokumentieren, welche bestehende Implementierung geprüft und warum erweitert (statt dupliziert) wurde.
-
----
-
 ## Testing-Regeln
+
 Testen mindestens:
+
 - Eingabevalidierung
 - Autorisierung
 - GIS-Distanzberechnung
@@ -409,7 +414,9 @@ Testen mindestens:
 ---
 
 ## Definition of Done
+
 Eine Aufgabe ist erst abgeschlossen, wenn:
+
 - sie das konkrete Ziel erfüllt
 - keine unnötigen Dateien geändert wurden
 - sie regelkonform ist
@@ -423,7 +430,9 @@ Erst danach darf die nächste Aufgabe begonnen werden.
 ---
 
 ## Verhalten von Cursor
+
 Cursor muss vor jeder Codeänderung prüfen:
+
 1. Ist das die aktuell priorisierte Aufgabe?
 2. Sind Nebenkriegsschauplätze ausgeschlossen?
 3. Passt die Änderung zu diesen Regeln?

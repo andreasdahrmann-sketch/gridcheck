@@ -60,11 +60,6 @@ def berechne_netzcheck(
     except Exception:
         result['ki'] = {'konfidenz_prozent': 0, 'hinweise': ['KI-Modul nicht verfuegbar']}
 
-    try:
-        speichere_revision(result)
-    except Exception:
-        pass
-
     scores = result.get('scores', {})
     thermisch = result.get('thermisch', {})
     spannung = result.get('spannung', {})
