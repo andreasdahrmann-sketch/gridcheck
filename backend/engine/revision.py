@@ -106,6 +106,9 @@ def speichere_revision(
     ergebnis: Dict[str, Any],
     dry_run: bool = False,
     engine_version: Optional[str] = None,
+    actor_user_id: Optional[int] = None,
+    action_type: Optional[str] = None,
+    project_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Append-only Audit-Log mit Hash-Kette.
@@ -131,6 +134,11 @@ def speichere_revision(
         "engine_version": engine_version,
         "previous_hash": prev,
         "daten": {
+            "meta": {
+                "actor_user_id": actor_user_id,
+                "action_type": action_type,
+                "project_id": project_id,
+            },
             "eingabe": ergebnis.get("eingabe", {}),
             "fazit": ergebnis.get("fazit", {}),
             "scores": ergebnis.get("scores", {}),

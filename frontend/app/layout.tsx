@@ -2,6 +2,7 @@
 import { Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import Providers from "./providers";
 
 const interTight = Inter_Tight({
   subsets: ["latin"],
@@ -23,7 +24,7 @@ export default function RootLayout({
   return (
     <html lang="de" className={interTight.variable}>
       <body className={cn("bg-brand-bg text-brand-textPrimary font-sans antialiased min-h-screen")}>
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

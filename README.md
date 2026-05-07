@@ -36,23 +36,52 @@ gridcheck/
     └── railway-deployment.md
 \\\
 
-## Lokale Entwicklung
+## Lokale Entwicklung (Docker + API + Postgres)
 
-### Backend
-\\\ash
+### 1) Infrastruktur starten (Docker)
+```bash
+docker compose up -d postgres redis
+```
+
+### 2) Backend starten (Python venv)
+```bash
 cd backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload
-\\\
+```
 
-### Frontend
-\\\ash
+Schema-Migration (empfohlen statt auto create):
+```bash
+cd backend
+alembic upgrade head
+```
+Hinweis: Migrations bauen aufeinander auf (`20260507_01` Basisschema, `20260507_02` Query-Indizes).
+
+Setze Umgebungsvariablen (PowerShell Beispiel):
+```powershell
+$env:APP_ENV="dev"
+$env:DATABASE_URL="postgresql+psycopg://gridcheck:gridcheck_dev_2026@localhost:5432/gridcheck"
+$env:CORS_ORIGINS="http://localhost:3000,http://localhost:5173"
+$env:JWT_SECRET="replace-with-random-32-plus-char-secret"
+$env:JWT_REFRESH_SECRET="replace-with-second-random-32-plus-char-secret"
+$env:AUTO_CREATE_SCHEMA="false"
+uvicorn main:app --reload
+```
+
+### 3) Frontend starten (API-Consumer)
+```bash
 cd frontend
-pnpm install
-pnpm dev
-\\\
+npm install
+npm run dev
+```
+
+Das Frontend ruft die API über den Proxy-Pfad `/api/backend/*` auf.
+
+## ENV-Profile
+- `backend/.env.example` -> lokales Development
+- `backend/.env.staging.example` -> staging Baseline
+- `backend/.env.prod.example` -> production Baseline
 
 ## Wichtige Regeln
 - Revisionssicher: Jede Berechnung ist immutable gespeichert

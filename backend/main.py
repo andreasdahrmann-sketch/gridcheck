@@ -1,5 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.responses import Response
 from db.database import engine, Base
 from core.config import settings
 from api.routes import router
@@ -9,14 +13,33 @@ from api.v1_projektierer import router as v1_projektierer_router
 from api.v1_geo import router as v1_geo_router
 from api.v1_ki_feedback import router as v1_ki_router
 from api.revisions import router as revisions_router
+from api.auth import router as auth_router
+from api.projects import router as projects_router
+from api.users import router as users_router
+from api.contact import router as contact_router
 
-Base.metadata.create_all(bind=engine)
+if settings.auto_create_schema:
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="GridCheck Pro API",
     version=settings.app_version,
     description="Pre-Netzanschluss-Check mit N-1 Analyse, Diagnose und KI-Lernmodul",
 )
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next) -> Response:
+        response: Response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+        )
+        return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,6 +48,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
 
 app.include_router(router)
 app.include_router(stakeholder_router, prefix="/api/v1")
@@ -33,6 +59,10 @@ app.include_router(v1_projektierer_router)
 app.include_router(v1_geo_router)
 app.include_router(v1_ki_router)
 app.include_router(revisions_router, prefix="/api/v1")
+app.include_router(auth_router)
+app.include_router(projects_router)
+app.include_router(users_router)
+app.include_router(contact_router)
 
 # Legacy-Compatibility (existing clients), gated via feature flag.
 if settings.enable_legacy_routes:

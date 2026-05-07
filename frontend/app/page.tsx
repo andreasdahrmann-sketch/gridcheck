@@ -1,9 +1,15 @@
 ﻿"use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Header } from "@/components/Header";
-import GridCheckForm from "@/components/GridCheckForm";
-import NetzbetreiberDashboard from "@/components/dashboard/NetzbetreiberDashboard";
+
+const GridCheckForm = dynamic(() => import("@/components/GridCheckForm"), {
+  loading: () => <div className="text-sm text-text-muted">Lade Check-Modul...</div>,
+});
+const NetzbetreiberDashboard = dynamic(() => import("@/components/dashboard/NetzbetreiberDashboard"), {
+  loading: () => <div className="text-sm text-text-muted">Lade Dashboard...</div>,
+});
 
 export default function Home() {
   const [tab, setTab] = useState<"check" | "dashboard">("check");

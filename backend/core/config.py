@@ -18,6 +18,12 @@ class Settings:
     jwt_secret: str | None
     jwt_refresh_secret: str | None
     enable_legacy_routes: bool
+    trusted_hosts: list[str]
+    redis_url: str | None
+    auth_access_cookie: str
+    auth_refresh_cookie: str
+    auth_csrf_cookie: str
+    auto_create_schema: bool
 
 
 def load_settings() -> Settings:
@@ -28,6 +34,16 @@ def load_settings() -> Settings:
     log_level = os.getenv("LOG_LEVEL", "INFO").strip() or "INFO"
     jwt_secret = os.getenv("JWT_SECRET")
     jwt_refresh_secret = os.getenv("JWT_REFRESH_SECRET")
+    trusted_hosts_csv = os.getenv("TRUSTED_HOSTS", "").strip()
+    redis_url = os.getenv("REDIS_URL", "").strip() or None
+    auth_access_cookie = os.getenv("AUTH_ACCESS_COOKIE", "gridcheck_access")
+    auth_refresh_cookie = os.getenv("AUTH_REFRESH_COOKIE", "gridcheck_refresh")
+    auth_csrf_cookie = os.getenv("AUTH_CSRF_COOKIE", "gridcheck_csrf")
+    auto_create_schema_env = os.getenv("AUTO_CREATE_SCHEMA")
+    if auto_create_schema_env is None or auto_create_schema_env.strip() == "":
+        auto_create_schema = app_env in {"dev", "test"}
+    else:
+        auto_create_schema = auto_create_schema_env.strip().lower() in {"1", "true", "yes", "on"}
     # Explizites Override gewinnt. Sonst: in staging/prod/prod-like standardmaessig aus (Migration zu /api/v1).
     legacy_env = os.getenv("ENABLE_LEGACY_ROUTES")
     if legacy_env is not None and legacy_env.strip() != "":
@@ -64,6 +80,12 @@ def load_settings() -> Settings:
         jwt_secret=jwt_secret,
         jwt_refresh_secret=jwt_refresh_secret,
         enable_legacy_routes=enable_legacy_routes,
+        trusted_hosts=_split_csv(trusted_hosts_csv) if trusted_hosts_csv else ["localhost", "127.0.0.1"],
+        redis_url=redis_url,
+        auth_access_cookie=auth_access_cookie,
+        auth_refresh_cookie=auth_refresh_cookie,
+        auth_csrf_cookie=auth_csrf_cookie,
+        auto_create_schema=auto_create_schema,
     )
 
 

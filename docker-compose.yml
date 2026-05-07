@@ -1,0 +1,32 @@
+﻿services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: gridcheck-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gridcheck
+      POSTGRES_PASSWORD: gridcheck_dev_2026
+      POSTGRES_DB: gridcheck
+    ports:
+      - "5433:5432"
+    volumes:
+      - gridcheck_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gridcheck -d gridcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    container_name: gridcheck-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  gridcheck_pgdata:
