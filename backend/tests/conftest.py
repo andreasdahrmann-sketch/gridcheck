@@ -49,3 +49,35 @@ def basis_pv_stich():
         "sk_mva": 250.0,
         "bestehende_einspeisung_mw": 0,
     }
+
+
+@pytest.fixture
+def isolierte_revisionen(tmp_path, monkeypatch):
+    """
+    Isoliert die Revisions-Datei in tmp_path, damit produktive
+    daten/revisionen.jsonl waehrend Tests NIE veraendert wird.
+
+    Patcht REVISIONS_PFAD modulglobal in engine.revision.
+    """
+    from engine import revision as rev_mod
+
+    tmp_file = tmp_path / "revisionen.jsonl"
+    monkeypatch.setattr(rev_mod, "REVISIONS_PFAD", str(tmp_file))
+    # Legacy-Pfad ebenfalls weg-patchen, falls referenziert
+    legacy = tmp_path / "revisionen.json"
+    if hasattr(rev_mod, "LEGACY_PFAD"):
+        monkeypatch.setattr(rev_mod, "LEGACY_PFAD", str(legacy))
+    return tmp_file
+
+
+@pytest.fixture
+def isolierte_ki_feedback(tmp_path, monkeypatch):
+    """
+    Isoliert die KI-Feedback-Datei in tmp_path, damit produktive
+    daten/ki_feedback.jsonl waehrend Tests NIE veraendert wird.
+    """
+    from engine import ki_feedback as ki_fb_mod
+
+    tmp_file = tmp_path / "ki_feedback.jsonl"
+    monkeypatch.setattr(ki_fb_mod, "KI_FEEDBACK_PFAD", str(tmp_file))
+    return tmp_file

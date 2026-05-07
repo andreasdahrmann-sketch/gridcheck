@@ -7,15 +7,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime
-import json
 
 from db.database import get_db
-from db.models import Project, CheckResult, AuditLog, make_checksum
-from engine import berechne_netzcheck
-from api.routes import resolve_cable_key
+from services.stakeholder_service import (
+    commit_endkunde_transaction,
+    commit_projektierer_transaction,
+    run_endkunde_check,
+    run_netzbetreiber_check,
+    run_projektierer_check,
+)
 
-router = APIRouter(prefix="/api/stakeholder", tags=["Stakeholder"])
+router = APIRouter(prefix="/stakeholder", tags=["Stakeholder"])
 
 
 # ============================================================
@@ -64,36 +66,10 @@ def _grobkosten(leistung_kw: float, spannung_kv: float, score: float) -> tuple:
 
 @router.post("/endkunde", response_model=EndkundeResponse)
 def check_endkunde(req: EndkundeRequest, db: Session = Depends(get_db)):
+    service_data = run_endkunde_check(db, req.model_dump())
+    project_id = service_data["project_id"]
+    result = service_data["result"]
     spannung_kv = float(req.spannungsebene)
-    result = berechne_netzcheck(
-        typ=req.anlagentyp,
-        leistung_kw=req.leistung_kw,
-        plz=req.plz,
-        spannung_kv=spannung_kv,
-        skv_mva=None,
-        bestehende_einspeisung_kw=0.0,
-        leitungstyp="NAYY 150",
-        leitungslaenge_km=0.5,
-    )
-
-    project = Project(
-        name=f"Endkunde-Anfrage {req.plz}",
-        plz=req.plz, typ=req.anlagentyp, leistung_kw=req.leistung_kw,
-        spannung_kv=spannung_kv, einspeiseart="volleinspeisung",
-        skv_mva=None, bestehende_einspeisung_kw=0.0,
-        leitungstyp="NAYY 150", leitungslaenge_km=0.5,
-    )
-    db.add(project); db.flush()
-
-    check = CheckResult(
-        project_id=project.id, score=result["score"],
-        spannungsband_ok=result["spannungsband_ok"],
-        thermische_auslastung_ok=result["thermische_auslastung_ok"],
-        kurzschluss_ok=result["kurzschluss_ok"], n1_ok=result["n1_ok"],
-        netzebene=result["netzebene"], empfehlung=result["empfehlung"],
-        details=json.dumps(result.get("details", {}), default=str),
-    )
-    db.add(check)
 
     tendenz, ampel = _tendenz_from_score(result["score"])
     lo, hi = _grobkosten(req.leistung_kw, spannung_kv, result["score"])
@@ -115,15 +91,16 @@ def check_endkunde(req: EndkundeRequest, db: Session = Depends(get_db)):
         schritte = ["Leistung reduzieren pruefen", "Hoehere Spannungsebene pruefen",
                     "Netzbetreiber kontaktieren"]
 
-    audit = AuditLog(
-        project_id=project.id, action="STAKEHOLDER_ENDKUNDE",
-        detail=json.dumps({"request": req.dict(), "tendenz": tendenz}, default=str),
-        checksum=make_checksum({"req": req.dict(), "score": result["score"]}),
+    commit_endkunde_transaction(
+        db,
+        project_id=project_id,
+        req_data=req.model_dump(),
+        tendenz=tendenz,
+        score=result["score"],
     )
-    db.add(audit); db.commit()
 
     return EndkundeResponse(
-        project_id=project.id, tendenz=tendenz, ampel=ampel,
+        project_id=project_id, tendenz=tendenz, ampel=ampel,
         klartext=klartext, grobkosten_eur_min=lo, grobkosten_eur_max=hi,
         naechste_schritte=schritte,
     )
@@ -227,45 +204,19 @@ def _massnahmen(result: dict, req: ProjektiererRequest) -> List[str]:
 
 @router.post("/projektierer", response_model=ProjektiererResponse)
 def check_projektierer(req: ProjektiererRequest, db: Session = Depends(get_db)):
-    cable_key = resolve_cable_key(req.leitungstyp, req.querschnitt_mm2)
-    spannung_kv = float(req.spannungsebene)
-    bestehende_kw = (req.vorbelastung_mw or 0) * 1000.0
+    service_data = run_projektierer_check(db, req.model_dump())
+    project_id = service_data["project_id"]
+    result = service_data["result"]
 
-    result = berechne_netzcheck(
-        typ=req.anlagentyp, leistung_kw=req.leistung_kw, plz=req.plz,
-        spannung_kv=spannung_kv, skv_mva=req.skv_mva,
-        bestehende_einspeisung_kw=bestehende_kw,
-        leitungstyp=cable_key, leitungslaenge_km=req.leitungslaenge_km,
+    commit_projektierer_transaction(
+        db,
+        project_id=project_id,
+        req_data=req.model_dump(),
+        result=result,
     )
-
-    project = Project(
-        name=req.projektname, plz=req.plz, typ=req.anlagentyp,
-        leistung_kw=req.leistung_kw, spannung_kv=spannung_kv,
-        einspeiseart=req.einspeiseart, skv_mva=req.skv_mva,
-        bestehende_einspeisung_kw=bestehende_kw,
-        leitungstyp=cable_key, leitungslaenge_km=req.leitungslaenge_km,
-    )
-    db.add(project); db.flush()
-
-    check = CheckResult(
-        project_id=project.id, score=result["score"],
-        spannungsband_ok=result["spannungsband_ok"],
-        thermische_auslastung_ok=result["thermische_auslastung_ok"],
-        kurzschluss_ok=result["kurzschluss_ok"], n1_ok=result["n1_ok"],
-        netzebene=result["netzebene"], empfehlung=result["empfehlung"],
-        details=json.dumps(result.get("details", {}), default=str),
-    )
-    db.add(check)
-
-    audit = AuditLog(
-        project_id=project.id, action="STAKEHOLDER_PROJEKTIERER",
-        detail=json.dumps({"request": req.dict(), "result": result}, default=str),
-        checksum=make_checksum({"req": req.dict(), "result": result}),
-    )
-    db.add(audit); db.commit()
 
     return ProjektiererResponse(
-        project_id=project.id, score=result["score"],
+        project_id=project_id, score=result["score"],
         spannungsband_ok=result["spannungsband_ok"],
         thermische_auslastung_ok=result["thermische_auslastung_ok"],
         kurzschluss_ok=result["kurzschluss_ok"], n1_ok=result["n1_ok"],
@@ -309,48 +260,12 @@ class NetzbetreiberResponse(ProjektiererResponse):
 
 @router.post("/netzbetreiber", response_model=NetzbetreiberResponse)
 def check_netzbetreiber(req: NetzbetreiberRequest, db: Session = Depends(get_db)):
-    cable_key = resolve_cable_key(req.leitungstyp, req.querschnitt_mm2)
+    service_data = run_netzbetreiber_check(db, req.model_dump())
+    project_id = service_data["project_id"]
+    result = service_data["result"]
+    audit_id = service_data["audit_id"]
+    checksum = service_data["checksum"]
     spannung_kv = float(req.spannungsebene)
-    bestehende_kw = (req.vorbelastung_mw or 0) * 1000.0
-
-    result = berechne_netzcheck(
-        typ=req.anlagentyp, leistung_kw=req.leistung_kw, plz=req.plz,
-        spannung_kv=spannung_kv, skv_mva=req.skv_mva,
-        bestehende_einspeisung_kw=bestehende_kw,
-        leitungstyp=cable_key, leitungslaenge_km=req.leitungslaenge_km,
-    )
-
-    project = Project(
-        name=f"[NB:{req.aktenzeichen}] {req.projektname}",
-        plz=req.plz, typ=req.anlagentyp, leistung_kw=req.leistung_kw,
-        spannung_kv=spannung_kv, einspeiseart=req.einspeiseart,
-        skv_mva=req.skv_mva, bestehende_einspeisung_kw=bestehende_kw,
-        leitungstyp=cable_key, leitungslaenge_km=req.leitungslaenge_km,
-    )
-    db.add(project); db.flush()
-
-    check = CheckResult(
-        project_id=project.id, score=result["score"],
-        spannungsband_ok=result["spannungsband_ok"],
-        thermische_auslastung_ok=result["thermische_auslastung_ok"],
-        kurzschluss_ok=result["kurzschluss_ok"], n1_ok=result["n1_ok"],
-        netzebene=result["netzebene"], empfehlung=result["empfehlung"],
-        details=json.dumps(result.get("details", {}), default=str),
-    )
-    db.add(check)
-
-    audit_payload = {
-        "request": req.dict(), "result": result,
-        "pruefer_id": req.pruefer_id, "aktenzeichen": req.aktenzeichen,
-    }
-    checksum = make_checksum(audit_payload)
-    audit = AuditLog(
-        project_id=project.id, action="STAKEHOLDER_NETZBETREIBER",
-        detail=json.dumps(audit_payload, default=str), checksum=checksum,
-    )
-    db.add(audit); db.flush()
-    audit_id = audit.id
-    db.commit()
 
     # Konformitaet = technische Kriterien (nicht Score!)
     # Basis: Spannungsband + thermisch + Kurzschluss erfuellt.
@@ -374,13 +289,13 @@ def check_netzbetreiber(req: NetzbetreiberRequest, db: Session = Depends(get_db)
     )
 
     revision = RevisionsBlock(
-        timestamp_utc=datetime.utcnow().isoformat() + "Z",
+        timestamp_utc=service_data["timestamp_utc"],
         pruefer_id=req.pruefer_id, aktenzeichen=req.aktenzeichen,
         audit_id=audit_id, checksum_sha256=checksum,
     )
 
     return NetzbetreiberResponse(
-        project_id=project.id, score=result["score"],
+        project_id=project_id, score=result["score"],
         spannungsband_ok=result["spannungsband_ok"],
         thermische_auslastung_ok=result["thermische_auslastung_ok"],
         kurzschluss_ok=result["kurzschluss_ok"], n1_ok=result["n1_ok"],

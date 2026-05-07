@@ -1,7 +1,8 @@
 ﻿"use client";
 import { useState } from "react";
-import { berechneNetzanalyse } from "../lib/engine";
 import type { GridCheckInput, GridCheckResult, Spannungsebene, Topologie } from "../types";
+import VnbBanner from "./VnbBanner";
+import { analyzeGridcheck, AnalyzeApiError } from "../lib/api/analyze";
 
 type CustomerType = "projektierer" | "speicherbetreiber" | "netzbetreiber";
 
@@ -52,16 +53,30 @@ export default function GridCheckForm() {
   const [input, setInput] = useState<GridCheckInput>({ ...INITIAL_INPUT });
   const [meta, setMeta] = useState<MetaData>({ ...INITIAL_META });
   const [result, setResult] = useState<GridCheckResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const ct = meta.kundentyp as CustomerType;
 
   const updateInput = (patch: Partial<GridCheckInput>) => setInput(prev => ({ ...prev, ...patch }));
   const updateMeta = (patch: Partial<MetaData>) => setMeta(prev => ({ ...prev, ...patch }));
 
-  const runAnalysis = () => {
-    const r = berechneNetzanalyse(input);
-    setResult(r);
-    setStep(2);
+  const runAnalysis = async () => {
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    try {
+      const r = await analyzeGridcheck(input);
+      setResult(r);
+      setStep(2);
+    } catch (err) {
+      if (err instanceof AnalyzeApiError) {
+        setAnalysisError(err.message);
+      } else {
+        setAnalysisError("Analyse konnte nicht gestartet werden.");
+      }
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const sectionClass = "bg-gray-800/60 border border-gray-700 rounded-xl p-5";
@@ -107,7 +122,7 @@ export default function GridCheckForm() {
             </div>
             <div>
               <label className={labelClass}>PLZ</label>
-              <input className={inputClass} value={input.plz} onChange={e => updateInput({ plz: e.target.value })} placeholder="z.B. 30159" maxLength={5} />
+              <input className={inputClass} value={input.plz} onChange={e => updateInput({ plz: e.target.value })} placeholder="z.B. 30159" maxLength={5} inputMode="numeric" />
             </div>
             <div>
               <label className={labelClass}>Ort</label>
@@ -121,6 +136,7 @@ export default function GridCheckForm() {
               </select>
             </div>
           </div>
+          <VnbBanner plz={input.plz} />
         </div>
 
         {/* Technische Daten */}
@@ -198,10 +214,22 @@ export default function GridCheckForm() {
           </div>
         </div>
 
+        {analysisError && (
+          <div className="bg-red-900/30 border border-red-700 rounded-xl p-3 text-sm text-red-200">
+            {analysisError}
+          </div>
+        )}
+
         {/* Buttons */}
         <div className="flex justify-between pt-4">
           <button onClick={() => setStep(0)} className="text-gray-400 hover:text-white border border-gray-600 px-6 py-2.5 rounded-lg text-sm transition">Zurueck</button>
-          <button onClick={runAnalysis} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-8 py-2.5 rounded-lg text-sm font-semibold transition">Analyse starten</button>
+          <button
+            onClick={runAnalysis}
+            disabled={isAnalyzing}
+            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:opacity-60 disabled:cursor-not-allowed text-white px-8 py-2.5 rounded-lg text-sm font-semibold transition"
+          >
+            {isAnalyzing ? "Analyse laeuft..." : "Analyse starten"}
+          </button>
         </div>
       </div>
     );

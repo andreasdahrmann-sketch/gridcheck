@@ -34,6 +34,7 @@ Ziel: priorisieren, automatisch Vorschlaege ableiten und schrittweise abarbeiten
 
 - [ ] OpenStreetMap
 - [ ] Overpass API
+- [ ] Spaeter: manuelle Asset-Erfassung in der Karte (Umspannwerk, Trafostation, Leitungssegmente) pro Projekt mit Quelle, Confidence, Nutzer und Zeitstempel fuer revisionssicheren Datenaufbau.
 
 ### Spaetere Ergaenzungen
 

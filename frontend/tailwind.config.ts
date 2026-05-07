@@ -11,24 +11,25 @@ const config: Config = {
     extend: {
       colors: {
         bg: {
-          DEFAULT: "#0A1410",
-          soft: "#0E1F1A",
-          card: "#13201B",
-          elev: "#162822",
+          DEFAULT: "#061A1A",
+          soft: "#0A2323",
+          card: "#0F2B2B",
+          elev: "#123333",
         },
         border: {
-          DEFAULT: "#1F2F28",
-          soft: "#243A32",
+          DEFAULT: "#214242",
+          soft: "#2A5656",
         },
         brand: {
-          orange: "#E67A2E",
-          orangeHover: "#F08A3E",
-          lime: "#C9D67A",
+          orange: "#EE7F2D",
+          orangeHover: "#FF9448",
+          mint: "#5FD0B8",
+          cyan: "#79E0C4",
         },
         text: {
-          DEFAULT: "#E8EDE8",
-          muted: "#8FA39A",
-          dim: "#5F726B",
+          DEFAULT: "#E7F3F0",
+          muted: "#9FC2BA",
+          dim: "#6D938A",
         },
       },
       fontFamily: {
@@ -40,7 +41,7 @@ const config: Config = {
       },
       backgroundImage: {
         "hero-radial":
-          "radial-gradient(1200px 600px at 20% 0%, rgba(230,122,46,0.10), transparent 60%), radial-gradient(900px 500px at 90% 10%, rgba(201,214,122,0.08), transparent 60%)",
+          "radial-gradient(1100px 560px at 18% -5%, rgba(238,127,45,0.14), transparent 62%), radial-gradient(920px 520px at 88% 8%, rgba(95,208,184,0.11), transparent 64%)",
       },
     },
   },

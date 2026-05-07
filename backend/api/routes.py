@@ -3,11 +3,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
-import json
 
+from core.config import settings
 from db.database import get_db
-from db.models import Project, CheckResult, AuditLog, make_checksum
-from engine import berechne_netzcheck
+from services.analysis_service import (
+    get_audit_logs,
+    get_latest_result,
+    list_projects_summary,
+    run_analysis_and_persist,
+)
 
 router = APIRouter()
 
@@ -54,155 +58,67 @@ class AnalyzeResponse(BaseModel):
 
 
 # ============================================================
-#  HELPERS
-# ============================================================
-
-def resolve_cable_key(leitungstyp: str, querschnitt: str) -> str:
-    try:
-        from constants import CABLE_DATABASE
-    except ImportError:
-        return f"{leitungstyp} {querschnitt}"
-    for candidate in (f"{leitungstyp} {querschnitt}",
-                      f"{leitungstyp} {querschnitt}SE",
-                      f"NA2XS2Y {querschnitt}"):
-        if candidate in CABLE_DATABASE:
-            return candidate
-    for k in CABLE_DATABASE:
-        if leitungstyp.upper() in k.upper():
-            return k
-    return "NAYY 150"
-
-
-# ============================================================
 #  ENDPOINTS
 # ============================================================
 
-@router.post("/api/analyze")
+@router.post("/api/v1/analyze")
 def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
     """Hauptendpoint — führt Netzanschluss-Analyse aus."""
-    cable_key = resolve_cable_key(req.leitungstyp, req.querschnitt_mm2)
-    spannung_kv = float(req.spannungsebene)
-    bestehende_kw = (req.vorbelastung_mw or 0) * 1000.0
-
-    result = berechne_netzcheck(
-        typ=req.anlagentyp,
-        leistung_kw=req.leistung_kw,
-        plz=req.plz,
-        spannung_kv=spannung_kv,
-        skv_mva=req.skv_mva,
-        bestehende_einspeisung_kw=bestehende_kw,
-        leitungstyp=cable_key,
-        leitungslaenge_km=req.leitungslaenge_km,
-    )
-
-    project = Project(
-        name=req.projektname,
-        plz=req.plz,
-        typ=req.anlagentyp,
-        leistung_kw=req.leistung_kw,
-        spannung_kv=spannung_kv,
-        einspeiseart=req.einspeiseart,
-        skv_mva=req.skv_mva,
-        bestehende_einspeisung_kw=bestehende_kw,
-        leitungstyp=cable_key,
-        leitungslaenge_km=req.leitungslaenge_km,
-    )
-    db.add(project)
-    db.flush()
-
-    check = CheckResult(
-        project_id=project.id,
-        score=result["score"],
-        spannungsband_ok=result["spannungsband_ok"],
-        thermische_auslastung_ok=result["thermische_auslastung_ok"],
-        kurzschluss_ok=result["kurzschluss_ok"],
-        n1_ok=result["n1_ok"],
-        netzebene=result["netzebene"],
-        empfehlung=result["empfehlung"],
-        details=json.dumps(result.get("details", {}), default=str),
-    )
-    db.add(check)
-
-    audit_payload = {"request": req.dict(), "result": result, "cable_resolved": cable_key}
-    audit = AuditLog(
-        project_id=project.id,
-        action="ANALYSIS_COMPLETED",
-        detail=json.dumps(audit_payload, default=str),
-        checksum=make_checksum(audit_payload),
-    )
-    db.add(audit)
-    db.commit()
-
-    return {"project_id": project.id, **result}
+    return run_analysis_and_persist(db, req.model_dump(by_alias=False))
 
 
 # Aliase für Rückwärtskompatibilität
-@router.post("/api/check")
+@router.post("/api/v1/check")
 def check_alias(req: AnalyzeRequest, db: Session = Depends(get_db)):
     return analyze(req, db)
 
-@router.post("/api/calculate")
+@router.post("/api/v1/calculate")
 def calculate_alias(req: AnalyzeRequest, db: Session = Depends(get_db)):
     return analyze(req, db)
 
 
-@router.get("/api/history")
-@router.get("/api/projects")
+@router.get("/api/v1/history")
+@router.get("/api/v1/projects")
 def list_projects(db: Session = Depends(get_db)):
-    projects = db.query(Project).order_by(Project.created_at.desc()).limit(50).all()
-    return [
-        {
-            "id": p.id,
-            "name": p.name,
-            "plz": p.plz,
-            "typ": p.typ,
-            "leistung_kw": p.leistung_kw,
-            "created_at": str(p.created_at),
-        }
-        for p in projects
-    ]
+    return list_projects_summary(db)
 
 
-@router.get("/api/result/{project_id}")
+@router.get("/api/v1/result/{project_id}")
 def get_result(project_id: int, db: Session = Depends(get_db)):
-    check = (
-        db.query(CheckResult)
-        .filter(CheckResult.project_id == project_id)
-        .order_by(CheckResult.id.desc())
-        .first()
-    )
-    if not check:
-        raise HTTPException(status_code=404, detail="Projekt nicht gefunden")
-    return {
-        "project_id": check.project_id,
-        "score": check.score,
-        "spannungsband_ok": check.spannungsband_ok,
-        "thermische_auslastung_ok": check.thermische_auslastung_ok,
-        "kurzschluss_ok": check.kurzschluss_ok,
-        "n1_ok": check.n1_ok,
-        "netzebene": check.netzebene,
-        "empfehlung": check.empfehlung,
-        "details": json.loads(check.details) if check.details else {},
-    }
+    result = get_latest_result(db, project_id)
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "PROJECT_NOT_FOUND",
+                "message": "Projekt nicht gefunden",
+                "hint": "Pruefen Sie die project_id oder listen Sie Projekte ueber /api/v1/projects.",
+            },
+        )
+    return result
 
 
-@router.get("/api/audit/{project_id}")
+@router.get("/api/v1/audit/{project_id}")
 def get_audit(project_id: int, db: Session = Depends(get_db)):
-    logs = (
-        db.query(AuditLog)
-        .filter(AuditLog.project_id == project_id)
-        .order_by(AuditLog.timestamp)
-        .all()
-    )
+    logs = get_audit_logs(db, project_id)
     if not logs:
-        raise HTTPException(status_code=404, detail="Keine Audit-Logs")
-    return [
-        {
-            "id": l.id,
-            "timestamp": str(l.timestamp),
-            "action": l.action,
-            "detail": l.detail,
-            "checksum": l.checksum,
-        }
-        for l in logs
-    ]
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "AUDIT_LOGS_NOT_FOUND",
+                "message": "Keine Audit-Logs",
+                "hint": "Fuer diese project_id wurden noch keine Audit-Eintraege gespeichert.",
+            },
+        )
+    return logs
+
+
+if settings.enable_legacy_routes:
+    # Legacy aliases (deprecated): keep only when ENABLE_LEGACY_ROUTES=true.
+    router.add_api_route("/api/analyze", analyze, methods=["POST"])
+    router.add_api_route("/api/check", check_alias, methods=["POST"])
+    router.add_api_route("/api/calculate", calculate_alias, methods=["POST"])
+    router.add_api_route("/api/history", list_projects, methods=["GET"])
+    router.add_api_route("/api/projects", list_projects, methods=["GET"])
+    router.add_api_route("/api/result/{project_id}", get_result, methods=["GET"])
+    router.add_api_route("/api/audit/{project_id}", get_audit, methods=["GET"])

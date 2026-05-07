@@ -19,6 +19,18 @@ EEG_MARKTPRAEMIE_EUR_MWH = {
     "BIOGAS": 165.0,
 }
 
+ANLAGENTYP_ALIAS = {
+    "PV": "PV",
+    "PHOTOVOLTAIK": "PV",
+    "WIND": "WIND_ONSHORE",
+    "WIND_ONSHORE": "WIND_ONSHORE",
+    "WIND_OFFSHORE": "WIND_OFFSHORE",
+    "BESS": "BESS",
+    "SPEICHER": "BESS",
+    "BIOGAS": "BIOGAS",
+    "WASSERKRAFT": "WASSERKRAFT",
+}
+
 
 def berechne_erloes(anlagentyp: str, leistung_mw: float,
                     volllaststunden: float = None,
@@ -26,8 +38,14 @@ def berechne_erloes(anlagentyp: str, leistung_mw: float,
     """
     Berechnet jaehrlichen und Lebensdauer-Erloes.
     """
-    typ = (anlagentyp or "DEFAULT").upper()
-    vlh = volllaststunden if volllaststunden else VOLLLASTSTUNDEN.get(typ, VOLLLASTSTUNDEN["DEFAULT"])
+    if leistung_mw <= 0:
+        raise ValueError("leistung_mw muss > 0 sein")
+    if nutzungsdauer_jahre <= 0:
+        raise ValueError("nutzungsdauer_jahre muss > 0 sein")
+
+    raw_typ = (anlagentyp or "DEFAULT").upper()
+    typ = ANLAGENTYP_ALIAS.get(raw_typ, raw_typ)
+    vlh = volllaststunden if volllaststunden is not None else VOLLLASTSTUNDEN.get(typ, VOLLLASTSTUNDEN["DEFAULT"])
 
     # Live-Strompreis (SMARD)
     preis_data = get_strompreis_eur_mwh()

@@ -1,6 +1,7 @@
 ﻿import json
 import os
 import math
+from engine.ki_feedback import berechne_kalibrierung
 
 KI_DATEN_PFAD = 'daten/ki_lerndaten.json'
 
@@ -55,6 +56,14 @@ def berechne_konfidenz(aehnliche):
     konfidenz = min(0.3 + (n * 0.1) + (avg_score * 0.2), 0.98)
     return round(konfidenz, 3)
 
+
+def _entscheidung_key(fazit):
+    if isinstance(fazit, dict):
+        return str(fazit.get('entscheidung', '')).strip().upper()
+    if isinstance(fazit, str):
+        return fazit.split(':')[0].strip().upper()
+    return ''
+
 def erzeuge_ki_hinweise(ergebnis, aehnliche):
     hinweise = []
     if not aehnliche:
@@ -63,13 +72,13 @@ def erzeuge_ki_hinweise(ergebnis, aehnliche):
 
     hinweise.append(f'{len(aehnliche)} aehnliche Faelle gefunden.')
 
-    aktuelles_fazit = ergebnis.get('fazit', '')
+    aktuelles_fazit = _entscheidung_key(ergebnis.get('fazit', ''))
     abweichungen = 0
     for a in aehnliche:
-        altes_fazit = a['eintrag'].get('fazit', '')
+        altes_fazit = _entscheidung_key(a['eintrag'].get('fazit', ''))
         if altes_fazit and aktuelles_fazit:
-            # Vergleiche Kernaussage (erstes Wort: MACHBAR/KRITISCH/EINGESCHRAENKT)
-            if aktuelles_fazit.split(':')[0] != altes_fazit.split(':')[0]:
+            # Vergleiche Kernaussage (A/B/C Entscheidungsebene)
+            if aktuelles_fazit != altes_fazit:
                 abweichungen += 1
 
     if abweichungen > 0:
@@ -89,12 +98,22 @@ def ki_bewertung(ergebnis):
 
     aehnliche = finde_aehnliche(eingabe, lerndaten)
     konfidenz = berechne_konfidenz(aehnliche)
+    kalibrierung = berechne_kalibrierung()
+    faktor = float(kalibrierung.get('kalibrierungsfaktor', 1.0))
+    konfidenz = round(max(0.05, min(0.98, konfidenz * faktor)), 3)
     hinweise = erzeuge_ki_hinweise(ergebnis, aehnliche)
+    if kalibrierung.get('samples', 0) > 0:
+        hinweise.append(
+            f"Kalibrierung aktiv ({kalibrierung['samples']} NB-Feedbacks, Faktor {faktor})."
+        )
+    else:
+        hinweise.append('Kalibrierung inaktiv: noch kein Netzbetreiber-Feedback vorhanden.')
 
     ergebnis['ki'] = {
         'konfidenz': konfidenz,
         'konfidenz_prozent': round(konfidenz * 100, 1),
         'aehnliche_faelle': len(aehnliche),
+        'kalibrierung': kalibrierung,
         'hinweise': hinweise,
     }
 

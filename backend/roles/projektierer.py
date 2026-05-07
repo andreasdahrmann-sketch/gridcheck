@@ -7,6 +7,7 @@ from typing import Any, Dict
 from core.schemas import ProjektiererRequest
 from core.service import run_analysis
 from economics import berechne_erloes
+from engine.optimizer import optimiere
 
 _PROJ_KEYS = (
     "budget_eur",
@@ -61,10 +62,9 @@ def analyze_for_projektierer(req: ProjektiererRequest) -> Dict[str, Any]:
             "fehler": erloes_fehler,
             "hinweis": "Statische Amortisation ohne Kapitalkosten/OPEX. Indikativ.",
         },
-        "optimizer": {
-            "status": "PENDING",
-            "hinweis": "Optimizer-Logik folgt in Sprint 1 / Schritt 3.",
-        },
+        "optimizer": optimiere(result, eingabe, constraints),
     }
     return result
+
+
 

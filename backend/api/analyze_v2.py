@@ -11,9 +11,9 @@ from typing import Any, Dict, Literal, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from engine import berechne_netzanschluss, ki_bewertung
+from services.v1_analysis_service import run_v1_analysis
 
-router_v2 = APIRouter(prefix="/api/v2", tags=["v2-Analyse"])
+router_v2 = APIRouter(tags=["analyse"])
 
 
 class AnalyzeRequest(BaseModel):
@@ -50,9 +50,16 @@ def analyze_v2(req: AnalyzeRequest) -> Dict[str, Any]:
 
     # 1) Berechnung
     try:
-        result = berechne_netzanschluss(eingabe)
+        result = run_v1_analysis(eingabe)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Engine-Fehler: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "ENGINE_ERROR",
+                "message": f"Engine-Fehler: {e}",
+                "hint": "Bitte Eingaben pruefen oder Backend-Logs einsehen.",
+            },
+        )
 
     # 2) Fachliche Validierungsfehler -> 422
     if result.get("status") == "FEHLER":
@@ -64,12 +71,5 @@ def analyze_v2(req: AnalyzeRequest) -> Dict[str, Any]:
                 "warnungen": result.get("warnungen", []),
             },
         )
-
-    # 3) KI-Bewertung (nicht kritisch)
-    try:
-        result = ki_bewertung(result)
-    except Exception:
-        result.setdefault("ki", {"konfidenz_prozent": 0,
-                                 "hinweise": ["KI-Modul nicht verfuegbar"]})
 
     return result

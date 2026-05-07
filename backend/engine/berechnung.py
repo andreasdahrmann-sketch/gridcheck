@@ -1,9 +1,12 @@
 ﻿from engine.n1_ms import bewerte_n1_ms
+from engine.n1_analyse import analysiere_n1
 from engine.revision import speichere_revision
 
 ENGINE_VERSION = "1.2.0"
 import math
 from typing import Optional
+
+from constants import MS_SPANNUNG_SCREENING_STATIONAER
 
 # =============================================================================
 # BETRIEBSMITTELDATEN
@@ -23,7 +26,7 @@ LEITUNGSDATEN = {
     'ACSR240':      {'i_max': 645, 'r_km': 0.120, 'x_km': 0.390, 'ebene': 'HS', 'material': 'AlSt', 'querschnitt': 240},
 }
 
-# Typische R/X-VerhÃ¤ltnisse Vorgelagertes Netz
+# Typische R/X-Verhältnisse Vorgelagertes Netz
 RX_RATIO_DEFAULT = {
     'NS': 2.5,
     'MS': 1.5,
@@ -44,7 +47,7 @@ TRAFO_DEFAULTS = {
     'HS': {'s_mva': 63.0, 'uk_prozent': 13.0},
 }
 
-# Referenzkosten fÃ¼r KostenschÃ¤tzung
+# Referenzkosten für Kostenschätzung
 REFERENZKOSTEN = {
     'NS': {'tiefbau_eur_m': 120, 'kabel_eur_m': 45, 'trafostation_eur': 35000,
             'schaltanlage_eur': 15000, 'planung_prozent': 12, 'genehmigung_eur': 5000},
@@ -117,6 +120,20 @@ def berechne_pqs(p_mw, cos_phi):
     }
 
 
+def berechne_wirksame_leistung(p_mw: float, bestehende_einspeisung_mw: float, anschlussart: str) -> float:
+    """
+    Ermittelt die am Netz wirksame Leistung fuer den aktuellen Check.
+
+    - Einspeisung/Speicher (Worst-Case Einspeisung): bestehende Einspeisung additiv.
+    - Entnahme: bestehende Einspeisung reduziert den Netto-Bezug (nicht negativ).
+    """
+    p = max(0.0, float(p_mw))
+    bestehend = max(0.0, float(bestehende_einspeisung_mw))
+    if anschlussart == 'Entnahme':
+        return max(0.0, p - bestehend)
+    return p + bestehend
+
+
 def berechne_betriebsstrom(s_mva, u_kv):
     """I = S / (sqrt(3) * U) - immer S-basiert"""
     u_v = u_kv * 1000.0
@@ -129,7 +146,7 @@ def berechne_betriebsstrom(s_mva, u_kv):
 # =============================================================================
 
 def berechne_quellenimpedanz(u_kv, sk_mva, rx_ratio):
-    """Z_Q = UÂ² / S_k, aufgeteilt in R_Q und X_Q"""
+    """Z_Q = U² / S_k, aufgeteilt in R_Q und X_Q"""
     u_v = u_kv * 1000.0
     z_q = (u_v ** 2) / (sk_mva * 1e6)
     r_q = z_q / math.sqrt(1 + rx_ratio ** 2)
@@ -138,10 +155,10 @@ def berechne_quellenimpedanz(u_kv, sk_mva, rx_ratio):
 
 
 def berechne_trafoimpedanz(u_kv, s_trafo_mva, uk_prozent):
-    """Z_T = (uk/100) * UÂ² / S_T"""
+    """Z_T = (uk/100) * U² / S_T"""
     u_v = u_kv * 1000.0
     z_t = (uk_prozent / 100.0) * (u_v ** 2) / (s_trafo_mva * 1e6)
-    # Vereinfachung: R_T << X_T, daher X_T Ëœ Z_T
+    # Vereinfachung: R_T << X_T, daher X_T ˜ Z_T
     r_t = z_t * 0.1  # typisch 10% R-Anteil
     x_t = z_t * math.sqrt(1 - 0.1**2)
     return r_t, x_t
@@ -236,7 +253,7 @@ def validiere_eingabe(eingabe):
             fehler.append(f'cos phi ausserhalb 0.8-1.0: {cp}')
         # Widerspruch: cos_phi=1 bei netzdienlicher Regelung
         if cp == 1.0 and eingabe.get('blindleistung_modus') in ('Q(U)', 'Q(P)'):
-            warnungen.append('cos phi = 1.0 bei aktiver Blindleistungsregelung ist widersprÃ¼chlich.')
+            warnungen.append('cos phi = 1.0 bei aktiver Blindleistungsregelung ist widersprüchlich.')
     except (ValueError, TypeError):
         pass
 
@@ -327,7 +344,7 @@ def berechne_datenqualitaet(eingabe):
 # =============================================================================
 
 def berechne_thermisch(s_mva, u_kv, leitungstyp, parallele_systeme=1):
-    """Thermische PrÃ¼fung: I_betrieb vs I_zul â€” immer auf S-Basis"""
+    """Thermische Prüfung: I_betrieb vs I_zul — immer auf S-Basis"""
     daten = LEITUNGSDATEN[leitungstyp]
     i_max = daten['i_max']
 
@@ -353,7 +370,7 @@ def berechne_thermisch(s_mva, u_kv, leitungstyp, parallele_systeme=1):
         's_mva': round(s_mva, 4),
         'bewertung': bewertung,
         'text': text,
-        'hinweis_verlegeart': 'Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20Â°C).',
+        'hinweis_verlegeart': 'Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C).',
     }
 
 
@@ -362,7 +379,7 @@ def berechne_thermisch(s_mva, u_kv, leitungstyp, parallele_systeme=1):
 # =============================================================================
 
 def berechne_trafo(s_mva, trafo_s_mva, bestand_auslastung_prozent=0):
-    """Trafo-Auslastung auf S-Basis mit BestandsberÃ¼cksichtigung"""
+    """Trafo-Auslastung auf S-Basis mit Bestandsberücksichtigung"""
     bestand_s = trafo_s_mva * (bestand_auslastung_prozent / 100.0)
     gesamt_s = bestand_s + s_mva
     auslastung = (gesamt_s / trafo_s_mva) * 100.0
@@ -393,7 +410,7 @@ def berechne_trafo(s_mva, trafo_s_mva, bestand_auslastung_prozent=0):
 
 def berechne_spannung(p_mw, q_mvar, u_kv, r_ges, x_ges, anschlussart):
     """
-    Signierte SpannungsÃ¤nderung: ?u Ëœ (R*P + X*Q) / UÂ²
+    Signierte Spannungsänderung: ?u ˜ (R*P + X*Q) / U²
     Einspeisung ? Spannungsanhebung (positiv)
     Entnahme ? Spannungsabsenkung (negativ)
     """
@@ -413,18 +430,30 @@ def berechne_spannung(p_mw, q_mvar, u_kv, r_ges, x_ges, anschlussart):
         richtung = 'Anhebung (Worst Case Einspeisung)'
 
     delta_u_v = vorzeichen * math.sqrt(3) * (r_ges * p_w + x_ges * q_var) / (math.sqrt(3) * u_v)
-    # Vereinfachte Formel: delta_u Ëœ (R*P + X*Q) / UÂ²
+    # Vereinfachte Formel: delta_u ˜ (R*P + X*Q) / U²
     delta_u_v_approx = vorzeichen * (r_ges * p_w + x_ges * q_var) / u_v
     delta_u_proz = (abs(delta_u_v_approx) / u_v) * 100.0
 
     ebene = bestimme_spannungsebene(u_kv)
 
-    # Ampellogik nach Netzplaner-Vorgabe
-    if delta_u_proz <= 2.0:
+    # Ampellogik: MS konsistent mit constants.MS_SPANNUNG_* (VDE-AR-N 4110 Richtwerte in constants).
+    # NS/HS: unveraendert (2 / 3 / 5), damit keine Nebenwirkung ausserhalb MS.
+    if ebene == 'MS':
+        g = MS_SPANNUNG_SCREENING_STATIONAER['delta_u_gruen_max_pct']
+        y = MS_SPANNUNG_SCREENING_STATIONAER['delta_u_gelb_max_pct']
+        o = MS_SPANNUNG_SCREENING_STATIONAER['delta_u_orange_max_pct']
+        hart_du = MS_SPANNUNG_SCREENING_STATIONAER['delta_u_hartgrenze_pct']
+        ms_tar = MS_SPANNUNG_SCREENING_STATIONAER.get('tar_verweis')
+    else:
+        g, y, o = 2.0, 3.0, 5.0
+        hart_du = 5.0
+        ms_tar = None
+
+    if delta_u_proz <= g:
         bewertung, text = 'GRUEN', f'Spannungs{richtung.lower()} unkritisch.'
-    elif delta_u_proz <= 3.0:
+    elif delta_u_proz <= y:
         bewertung, text = 'GELB', f'Spannungs{richtung.lower()} akzeptabel, Reserve eingeschraenkt.'
-    elif delta_u_proz <= 5.0:
+    elif delta_u_proz <= o:
         bewertung, text = 'ORANGE', f'Spannungs{richtung.lower()} grenzwertig.'
     else:
         bewertung, text = 'ROT', f'Spannungs{richtung.lower()} ueberschreitet zulaessigen Bereich!'
@@ -435,6 +464,8 @@ def berechne_spannung(p_mw, q_mvar, u_kv, r_ges, x_ges, anschlussart):
         'richtung': richtung,
         'vorzeichen': 'positiv' if vorzeichen > 0 else 'negativ',
         'spannungsebene': ebene,
+        'delta_u_hartgrenze_pct': hart_du,
+        'ms_norm_tar': ms_tar,
         'r_ges_ohm': round(r_ges, 5),
         'x_ges_ohm': round(x_ges, 5),
         'bewertung': bewertung,
@@ -448,19 +479,19 @@ def berechne_spannung(p_mw, q_mvar, u_kv, r_ges, x_ges, anschlussart):
 
 def berechne_kurzschluss(u_kv, z_ges, s_mva, sk_mva):
     """
-    Kurzschluss-Screening: Ik'', Sk/Sn, NetzrÃ¼ckwirkungs-Screening
+    Kurzschluss-Screening: Ik'', Sk/Sn, Netzrückwirkungs-Screening
     """
     u_v = u_kv * 1000.0
     c = 1.1  # Spannungsfaktor nach IEC 60909
 
     # Ik'' = c * U / (sqrt(3) * |Z_ges|)
     ik_max = (c * u_v) / (math.sqrt(3) * z_ges) if z_ges > 0 else 0
-    ik_min = (0.95 * u_v) / (math.sqrt(3) * z_ges) if z_ges > 0 else 0  # c_min Ëœ 0.95
+    ik_min = (0.95 * u_v) / (math.sqrt(3) * z_ges) if z_ges > 0 else 0  # c_min ˜ 0.95
 
-    # Sk/Sn VerhÃ¤ltnis
+    # Sk/Sn Verhältnis
     sk_sn = sk_mva / s_mva if s_mva > 0 else 999
 
-    # NetzrÃ¼ckwirkungs-Screening: S_anlage/S_k
+    # Netzrückwirkungs-Screening: S_anlage/S_k
     rueckwirkung_ratio = s_mva / sk_mva if sk_mva > 0 else 999
 
     # Sk/Sn Bewertung
@@ -474,7 +505,7 @@ def berechne_kurzschluss(u_kv, z_ges, s_mva, sk_mva):
         sk_bewertung = 'ROT'
         sk_text = 'Kurzschlussniveau kritisch. Anschluss nur nach Detailpruefung.'
 
-    # NetzrÃ¼ckwirkung
+    # Netzrückwirkung
     if rueckwirkung_ratio <= 0.02:
         rw_bewertung = 'GRUEN'
         rw_text = 'Netzrueckwirkungen unkritisch.'
@@ -601,7 +632,7 @@ def berechne_n1_prescreen(thermisch, trafo, topologie, parallele, redundanz,
 def berechne_szenarien(p_mw, q_mvar, s_mva, u_kv, r_ges, x_ges, leitungstyp,
                        parallele_systeme, anschlussart, sk_mva, z_ges,
                        trafo_s_mva, bestand_trafo_proz):
-    """4 Pflichtszenarien gemÃ¤ss Netzplaner-Vorgabe"""
+    """4 Pflichtszenarien gemäss Netzplaner-Vorgabe"""
     szenarien = []
 
     def run_szenario(name, p_fakt, q_fakt, beschreibung):
@@ -626,7 +657,7 @@ def berechne_szenarien(p_mw, q_mvar, s_mva, u_kv, r_ges, x_ges, leitungstyp,
     szenarien.append(run_szenario(
         'Max. Einspeisung',
         1.0, 1.0,
-        'Volle Leistung, minimale Netzlast â€” kritischster Fall fuer Spannungsanhebung.'
+        'Volle Leistung, minimale Netzlast — kritischster Fall fuer Spannungsanhebung.'
     ))
 
     # 2. Typischer Betrieb (70%)
@@ -640,7 +671,7 @@ def berechne_szenarien(p_mw, q_mvar, s_mva, u_kv, r_ges, x_ges, leitungstyp,
     szenarien.append(run_szenario(
         'Teillast',
         0.4, 0.4,
-        'Teillastbetrieb bei 40% â€” fuer Normalbetriebsbewertung.'
+        'Teillastbetrieb bei 40% — fuer Normalbetriebsbewertung.'
     ))
 
     # 4. N-1 Reservebetrachtung (100% auf n-1 Systeme)
@@ -734,8 +765,11 @@ def berechne_scores(thermisch, spannung, kurzschluss, n1, datenqualitaet, trafo)
         harte_verstoesse.append('Leitungsueberlastung > 100%')
     if trafo['auslastung_prozent'] > 100:
         harte_verstoesse.append('Trafoueberlastung > 100%')
-    if spannung['delta_u_prozent'] > 5.0:
-        harte_verstoesse.append('Spannungsaenderung > 5%')
+    du_hart = float(spannung.get('delta_u_hartgrenze_pct', 5.0))
+    if spannung['delta_u_prozent'] > du_hart:
+        harte_verstoesse.append(
+            f"Spannungsaenderung > {du_hart}% (Hartgrenze fuer {spannung.get('spannungsebene', '?')})"
+        )
 
     # Nur KRITISCHE Caps (cap <= 40) gelten als harte Verstoesse -> Auto-C
     # Grenzwertige Caps (cap > 40) reduzieren nur den Score, fuehren aber nicht zwingend zu C
@@ -749,7 +783,7 @@ def berechne_scores(thermisch, spannung, kurzschluss, n1, datenqualitaet, trafo)
     if harte_verstoesse and (
         thermisch['auslastung_prozent'] > 100
         or trafo['auslastung_prozent'] > 100
-        or spannung['delta_u_prozent'] > 5.0
+        or spannung['delta_u_prozent'] > du_hart
     ):
         gesamt = min(gesamt, 25)
 
@@ -951,7 +985,7 @@ def erzeuge_empfehlungen(thermisch, spannung, kurzschluss, n1, trafo, nb_check, 
                 empfehlungen.append(f'NB-Kriterium nicht erfuellt: {p["kriterium"]} '
                                     f'(Grenzwert {p["grenzwert"]}, Ist {p["istwert"]})')
 
-    # DatenqualitÃ¤t
+    # Datenqualität
     if dq['klasse'] in ('C', 'D'):
         empfehlungen.append(f'Datenqualitaet {dq["klasse"]}: Vor Antragstellung reale Netzdaten beim VNB anfordern.')
 
@@ -968,7 +1002,7 @@ def erzeuge_empfehlungen(thermisch, spannung, kurzschluss, n1, trafo, nb_check, 
 def erzeuge_fazit(scores, harte_verstoesse):
     """
     3 Entscheidungsebenen:
-    A = Anschluss grundsÃ¤tzlich plausibel
+    A = Anschluss grundsätzlich plausibel
     B = Anschluss bedingt plausibel
     C = Anschluss kritisch / nicht plausibel
     """
@@ -1025,11 +1059,13 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     anschlussart = eingabe['anschlussart']
     topologie = eingabe.get('topologie', 'unbekannt')
     temperatur_c = _float_or(eingabe.get('temperatur_c'), 20)
+    bestehende_einspeisung_mw = _float_or(eingabe.get('bestehende_einspeisung_mw'), 0)
 
     spannungsebene = bestimme_spannungsebene(u_kv)
 
-    # P-Q-S Modell
-    pqs = berechne_pqs(p_mw, cos_phi)
+    # P-Q-S Modell am wirksamen Netzleistungspunkt (inkl. bestehender Einspeisung)
+    p_mw_wirksam = berechne_wirksame_leistung(p_mw, bestehende_einspeisung_mw, anschlussart)
+    pqs = berechne_pqs(p_mw_wirksam, cos_phi)
 
     # Impedanzmodell
     sk_mva = _float_or(eingabe.get('sk_mva'), SK_DEFAULT[spannungsebene])
@@ -1058,6 +1094,18 @@ def berechne_netzanschluss(eingabe, dry_run=False):
         anschlussart, sk_mva, z_ges, trafo_s_mva, bestand_trafo_proz
     )
 
+    # N-1 Detailanalyse (aus Szenario "N-1 Stoerungsfall")
+    n1_szenario = next((s for s in szenarien if s.get('name') == 'N-1 Stoerungsfall'), None)
+    if n1_szenario:
+        n1_analyse = analysiere_n1(
+            eingabe=eingabe,
+            thermisch_n1=n1_szenario.get('thermisch', {}),
+            spannung_n1=n1_szenario.get('spannung', {}),
+            zusatzlast_mw=p_mw_wirksam,
+        )
+    else:
+        n1_analyse = {'status': 'NICHT_BEWERTET', 'text': 'Kein N-1 Szenario verfuegbar.'}
+
     # Scores
     scores = berechne_scores(thermisch, spannung, kurzschluss, n1, datenqualitaet, trafo)
     fazit = erzeuge_fazit(scores, scores['harte_verstoesse'])
@@ -1077,6 +1125,11 @@ def berechne_netzanschluss(eingabe, dry_run=False):
         'status': 'OK',
         'eingabe': eingabe,
         'warnungen': warnungen,
+        'annahmen': {
+            'leistung_mw_neuanlage': round(p_mw, 4),
+            'bestehende_einspeisung_mw': round(bestehende_einspeisung_mw, 4),
+            'leistung_mw_wirksam': round(p_mw_wirksam, 4),
+        },
         'pqs': pqs,
         'impedanz': {
             'r_q': round(r_q, 5), 'x_q': round(x_q, 5),
@@ -1090,6 +1143,7 @@ def berechne_netzanschluss(eingabe, dry_run=False):
         'spannung': spannung,
         'kurzschluss': kurzschluss,
         'n1': n1,
+        'n1_analyse': n1_analyse,
         'szenarien': szenarien,
         'scores': scores,
         'fazit': fazit,

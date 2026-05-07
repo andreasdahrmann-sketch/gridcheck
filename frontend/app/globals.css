@@ -9,43 +9,44 @@
 }
 
 html, body {
-  background: #0A1410;
-  color: #E8EDE8;
+  background: #061A1A;
+  color: #E7F3F0;
   font-family: "Inter", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 body {
   background-image:
-    radial-gradient(1200px 600px at 20% 0%, rgba(230,122,46,0.10), transparent 60%),
-    radial-gradient(900px 500px at 90% 10%, rgba(201,214,122,0.08), transparent 60%),
-    linear-gradient(180deg, #0A1410 0%, #0E1F1A 100%);
+    radial-gradient(1100px 560px at 18% -5%, rgba(238,127,45,0.14), transparent 62%),
+    radial-gradient(920px 520px at 88% 8%, rgba(95,208,184,0.11), transparent 64%),
+    linear-gradient(180deg, #061A1A 0%, #0A2323 100%);
   background-attachment: fixed;
 }
 
 @layer components {
   .pill {
     @apply inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider;
-    background: rgba(230,122,46,0.12);
-    color: #E67A2E;
-    border: 1px solid rgba(230,122,46,0.25);
+    background: rgba(238,127,45,0.14);
+    color: #EE7F2D;
+    border: 1px solid rgba(238,127,45,0.34);
   }
   .card {
     @apply rounded-2xl border bg-bg-card border-border p-6;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
   }
   .card-hover {
     @apply transition hover:border-border-soft hover:bg-bg-elev;
   }
   .btn-primary {
     @apply inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white;
-    background: #E67A2E;
+    background: #EE7F2D;
     transition: background .15s ease;
   }
-  .btn-primary:hover { background: #F08A3E; }
+  .btn-primary:hover { background: #FF9448; }
   .btn-ghost {
     @apply inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold;
-    color: #E8EDE8;
-    border: 1px solid #243A32;
+    color: #E7F3F0;
+    border: 1px solid #2A5656;
   }
-  .btn-ghost:hover { background: #162822; }
+  .btn-ghost:hover { background: #123333; }
 }

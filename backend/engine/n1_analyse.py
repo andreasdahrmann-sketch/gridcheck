@@ -1,0 +1,524 @@
+"""
+engine/n1_analyse.py — Orchestrator für vollständige N-1-Analyse (MS).
+
+Bewertet 4 Komponenten unabhängig und aggregiert zu Gesamtergebnis:
+  1. Topologie       (Adapter zu n1_ms.bewerte_n1_ms)
+  2. Leitung-N-1     (Auslastung bei Ausfall eines Parallelsystems)
+  3. Trafo-N-1       (Auslastung bei Ausfall eines UW-Trafos)
+  4. Spannung-N-1    (ΔU bei Ausfall eines Parallelsystems)
+
+Liefert N1-Klasse (N1-0..N1-4) + Konfidenz + revisionssichere Begründungen.
+
+Quellen Grenzwerte:
+  - VDE-AR-N 4110:2018-11 (TAR Mittelspannung)
+  - DIN EN 50160 (Spannungsqualität)
+  - DIN EN 60076-7 (Trafo-Belastbarkeit)
+  - DIN VDE 0276-620 (MS-Kabel)
+
+Versionierung: berechnungs_version + backend für Revisionssicherheit.
+"""
+from __future__ import annotations
+from typing import Any
+import math
+
+from engine.n1_ms import bewerte_n1_ms
+
+from constants import MS_SPANNUNG_N1_SCREENING
+
+VERSION = "n1-analyse-1.0.0"
+BACKEND = "heuristik_v1"
+
+# ----------------------------------------------------------------------
+# GRENZWERTE (fachlich validiert, siehe Modul-Docstring)
+# ----------------------------------------------------------------------
+GRENZEN = {
+    "trafo": {
+        "gruen_max_prozent": 100.0,
+        "gelb_max_prozent": 120.0,
+    },
+    "leitung": {
+        "gruen_max_prozent": 100.0,
+        "gelb_max_prozent": 135.0,
+    },
+    "spannung_n1": {
+        "gruen_max_prozent": 5.0,
+        "gelb_max_prozent": 10.0,
+    },
+}
+
+
+# ----------------------------------------------------------------------
+# Hilfsfunktionen
+# ----------------------------------------------------------------------
+def _f(x, default=None):
+    """None-/Fehler-sicheres float-Casting."""
+    try:
+        if x is None:
+            return default
+        return float(x)
+    except (TypeError, ValueError):
+        return default
+
+
+def _bewertung_aus_prozent(p: float, gruen_max: float, gelb_max: float) -> str:
+    """Klassifiziert Auslastung in GRUEN/GELB/ROT."""
+    if p <= gruen_max:
+        return "GRUEN"
+    if p <= gelb_max:
+        return "GELB"
+    return "ROT"
+
+
+def _max_bewertung(*bewertungen: str) -> str:
+    """Schlechteste Bewertung gewinnt (worst-case)."""
+    rang = {"GRUEN": 0, "GELB": 1, "ROT": 2, "NICHT_GEPRUEFT": -1}
+    aktiv = [b for b in bewertungen if b in rang and rang[b] >= 0]
+    if not aktiv:
+        return "NICHT_GEPRUEFT"
+    return max(aktiv, key=lambda b: rang[b])
+
+
+# ----------------------------------------------------------------------
+# 1. Trafo-N-1
+# ----------------------------------------------------------------------
+def bewerte_trafo_n1(umspannwerk: dict | None, zusatzlast_mw: float, cos_phi: float) -> dict:
+    """
+    Trafo-N-1: Bei Ausfall des größten Trafos müssen restliche die Gesamtlast tragen.
+
+    Eingabe:
+      umspannwerk = {"trafos": [{"sn_mva":25, "belastung_aktuell_mw":14}, ...]}
+      zusatzlast_mw = neue Anlage (Einspeisung -> negativ verrechnen, Bezug -> positiv)
+      cos_phi = Leistungsfaktor (zur Umrechnung MW -> MVA)
+
+    Output: bewertung, auslastung_n1_prozent, engpass_trafo_idx, Begründungen.
+    """
+    if not umspannwerk or not umspannwerk.get("trafos"):
+        return {
+            "bewertung": "NICHT_GEPRUEFT",
+            "auslastung_n1_prozent": None,
+            "engpass_trafo_idx": -1,
+            "begruendung_technisch": "Keine Trafodaten vorhanden — N-1-Trafobewertung übersprungen.",
+            "begruendung_klartext": "Es liegen keine Daten zum Umspannwerk vor. Trafoausfall wurde nicht geprüft.",
+        }
+
+    trafos = umspannwerk["trafos"]
+    if len(trafos) < 2:
+        return {
+            "bewertung": "ROT",
+            "auslastung_n1_prozent": None,
+            "engpass_trafo_idx": 0,
+            "begruendung_technisch": f"UW hat nur {len(trafos)} Trafo — keine N-1-Redundanz möglich.",
+            "begruendung_klartext": "Im Umspannwerk steht nur ein einziger Transformator zur Verfügung. Bei dessen Ausfall gibt es keine Reserve.",
+        }
+
+    cphi = _f(cos_phi, 0.95) or 0.95
+    if cphi <= 0:
+        cphi = 0.95
+    zusatz_mva = abs(_f(zusatzlast_mw, 0.0) or 0.0) / cphi
+
+    # Gesamt-MVA-Last vor Ausfall
+    last_aktuell_mva = 0.0
+    sn_total_mva = 0.0
+    for t in trafos:
+        last_aktuell_mva += abs(_f(t.get("belastung_aktuell_mw"), 0.0) or 0.0) / cphi
+        sn_total_mva += _f(t.get("sn_mva"), 0.0) or 0.0
+
+    last_gesamt_mva = last_aktuell_mva + zusatz_mva
+
+    # Worst-Case: größter Trafo fällt aus
+    sn_max = max((_f(t.get("sn_mva"), 0.0) or 0.0) for t in trafos)
+    idx_max = max(range(len(trafos)), key=lambda i: _f(trafos[i].get("sn_mva"), 0.0) or 0.0)
+    sn_rest = sn_total_mva - sn_max
+
+    if sn_rest <= 0:
+        return {
+            "bewertung": "ROT",
+            "auslastung_n1_prozent": None,
+            "engpass_trafo_idx": idx_max,
+            "begruendung_technisch": "Restkapazität nach N-1 = 0 MVA.",
+            "begruendung_klartext": "Wenn der größte Transformator ausfällt, bleibt keine Trafokapazität übrig.",
+        }
+
+    auslastung_n1 = (last_gesamt_mva / sn_rest) * 100.0
+    bew = _bewertung_aus_prozent(
+        auslastung_n1,
+        GRENZEN["trafo"]["gruen_max_prozent"],
+        GRENZEN["trafo"]["gelb_max_prozent"],
+    )
+
+    tech = (f"N-1 Trafo: Last_ges={last_gesamt_mva:.2f} MVA "
+            f"(inkl. Zusatz {zusatz_mva:.2f} MVA), Sn_rest={sn_rest:.2f} MVA "
+            f"nach Ausfall T{idx_max} ({sn_max:.1f} MVA) -> "
+            f"Auslastung_N1={auslastung_n1:.1f}% (Grenzen: GRÜN≤{GRENZEN['trafo']['gruen_max_prozent']}%, "
+            f"GELB≤{GRENZEN['trafo']['gelb_max_prozent']}%).")
+
+    if bew == "GRUEN":
+        klar = (f"Auch bei Ausfall des größten Trafos im Umspannwerk reicht die verbleibende "
+                f"Kapazität ({auslastung_n1:.0f}% Auslastung). Reserve vorhanden.")
+    elif bew == "GELB":
+        klar = (f"Bei Ausfall des größten Trafos liegt die Auslastung bei {auslastung_n1:.0f}%. "
+                f"Kurzzeitüberlast zulässig, aber zeitlich begrenzt — Engpassrisiko.")
+    else:
+        klar = (f"Bei Ausfall des größten Trafos wäre die Auslastung {auslastung_n1:.0f}% — "
+                f"das ist nicht zulässig. Trafoverstärkung oder zusätzlicher Trafo nötig.")
+
+    return {
+        "bewertung": bew,
+        "auslastung_n1_prozent": round(auslastung_n1, 2),
+        "engpass_trafo_idx": idx_max,
+        "begruendung_technisch": tech,
+        "begruendung_klartext": klar,
+    }
+
+
+# ----------------------------------------------------------------------
+# 2. Leitung-N-1
+# ----------------------------------------------------------------------
+def bewerte_leitung_n1(thermisch_n1: dict | None) -> dict:
+    """
+    Leitung-N-1: Auslastung bei Ausfall eines Parallelsystems.
+
+    Eingabe: thermisch_n1 = Ergebnis von berechne_thermisch() für (parallele_systeme - 1).
+             Erwartet: {"auslastung_prozent": float, "i_betrieb_a": float, "i_max_a": float}
+             Falls None oder parallele_systeme=1 -> ROT (kein Schutz).
+    """
+    if not thermisch_n1:
+        return {
+            "bewertung": "ROT",
+            "auslastung_n1_prozent": None,
+            "iz_a": None,
+            "i_n1_a": None,
+            "begruendung_technisch": "Nur 1 Leitungssystem oder keine N-1-Berechnung möglich.",
+            "begruendung_klartext": "Bei nur einer Leitung gibt es keinen Ersatz, falls diese ausfällt.",
+        }
+
+    auslastung = _f(thermisch_n1.get("auslastung_prozent"))
+    if auslastung is None:
+        return {
+            "bewertung": "NICHT_GEPRUEFT",
+            "auslastung_n1_prozent": None,
+            "iz_a": _f(thermisch_n1.get("i_max_a")),
+            "i_n1_a": _f(thermisch_n1.get("i_betrieb_a")),
+            "begruendung_technisch": "Auslastung im N-1-Fall nicht ermittelbar.",
+            "begruendung_klartext": "Die Auslastung der verbleibenden Leitung im Ausfallszenario konnte nicht berechnet werden.",
+        }
+
+    bew = _bewertung_aus_prozent(
+        auslastung,
+        GRENZEN["leitung"]["gruen_max_prozent"],
+        GRENZEN["leitung"]["gelb_max_prozent"],
+    )
+
+    iz = _f(thermisch_n1.get("i_max_a"))
+    # Kompatibel zu alter und neuer Thermik-Struktur:
+    # - i_betrieb_a (alt)
+    # - i_pro_system_a (neu, korrekt fuer Parallelsysteme)
+    # - i_betrieb_gesamt_a (fallback)
+    i_n1 = _f(thermisch_n1.get("i_betrieb_a"))
+    if i_n1 is None:
+        i_n1 = _f(thermisch_n1.get("i_pro_system_a"))
+    if i_n1 is None:
+        i_n1 = _f(thermisch_n1.get("i_betrieb_gesamt_a"))
+
+    tech = (f"N-1 Leitung: I_N1={i_n1:.0f} A, Iz={iz:.0f} A -> "
+            f"Auslastung_N1={auslastung:.1f}% (Grenzen: GRÜN≤{GRENZEN['leitung']['gruen_max_prozent']}%, "
+            f"GELB≤{GRENZEN['leitung']['gelb_max_prozent']}%).") if iz and i_n1 else \
+           f"N-1 Leitung: Auslastung_N1={auslastung:.1f}%."
+
+    if bew == "GRUEN":
+        klar = f"Bei Ausfall eines Parallelsystems trägt das verbleibende {auslastung:.0f}% — Dauerbetrieb möglich."
+    elif bew == "GELB":
+        klar = (f"Bei Ausfall eines Parallelsystems liegt die Auslastung bei {auslastung:.0f}%. "
+                f"Kurzzeitüberlast zulässig, aber Engpassrisiko.")
+    else:
+        klar = (f"Bei Ausfall eines Parallelsystems wäre die Restleitung mit {auslastung:.0f}% überlastet. "
+                f"Stärkerer Querschnitt oder zusätzliches System nötig.")
+
+    return {
+        "bewertung": bew,
+        "auslastung_n1_prozent": round(auslastung, 2),
+        "iz_a": round(iz, 1) if iz else None,
+        "i_n1_a": round(i_n1, 1) if i_n1 else None,
+        "begruendung_technisch": tech,
+        "begruendung_klartext": klar,
+    }
+
+
+# ----------------------------------------------------------------------
+# 3. Spannung-N-1
+# ----------------------------------------------------------------------
+def _ist_ms_nennspannung(u_kv: float | None) -> bool:
+    """Gleiche MS-Abgrenzung wie engine.berechnung.bestimme_spannungsebene: 1 kV <= U < 60 kV."""
+    if u_kv is None:
+        return False
+    return 1.0 <= u_kv < 60.0
+
+
+def bewerte_spannung_n1(
+    spannung_n1: dict | None,
+    nennspannung_kv: float | None = None,
+) -> dict:
+    """
+    Spannung-N-1: ΔU bei Ausfall eines Parallelsystems.
+
+    Eingabe: {"delta_u_prozent": float} aus szenarien-Berechnung für N-1.
+    Ohne nennspannung_kv: Legacy-Grenzen GRÜN/GELB wie bisher (5%/10%).
+    Mit MS (nennspannung 1..60 kV): Grenzen aus constants.MS_SPANNUNG_N1_SCREENING,
+    konsistent mit constants.THRESHOLDS n1_delta_u_warn / n1_delta_u_crit.
+    """
+    gelb_legacy = GRENZEN["spannung_n1"]["gelb_max_prozent"]
+
+    if not spannung_n1:
+        return {
+            "bewertung": "NICHT_GEPRUEFT",
+            "delta_u_n1_prozent": None,
+            "grenze_prozent": gelb_legacy,
+            "begruendung_technisch": "Keine Spannungsdaten für N-1-Fall.",
+            "begruendung_klartext": "Spannungsänderung im Ausfallszenario wurde nicht berechnet.",
+        }
+
+    delta = _f(spannung_n1.get("delta_u_prozent"))
+    if delta is None:
+        return {
+            "bewertung": "NICHT_GEPRUEFT",
+            "delta_u_n1_prozent": None,
+            "grenze_prozent": gelb_legacy,
+            "begruendung_technisch": "ΔU im N-1-Fall nicht ermittelbar.",
+            "begruendung_klartext": "Die Spannungsänderung konnte nicht ermittelt werden.",
+        }
+
+    if _ist_ms_nennspannung(nennspannung_kv):
+        gruen_m = MS_SPANNUNG_N1_SCREENING["gruen_max_pct"]
+        gelb_m = MS_SPANNUNG_N1_SCREENING["gelb_max_pct"]
+        norm_txt = (
+            "MS N-1-Screening konsistent mit constants.THRESHOLDS "
+            "(n1_delta_u_warn / n1_delta_u_crit)"
+        )
+    else:
+        gruen_m = GRENZEN["spannung_n1"]["gruen_max_prozent"]
+        gelb_m = GRENZEN["spannung_n1"]["gelb_max_prozent"]
+        norm_txt = "Legacy-Screening (5%/10%), ohne MS-Nennspannung nicht vereinheitlicht."
+
+    delta_abs = abs(delta)
+    bew = _bewertung_aus_prozent(delta_abs, gruen_m, gelb_m)
+
+    tech = (
+        f"N-1 Spannung: |ΔU_N1|={delta_abs:.2f}% "
+        f"(Grenzen: GRÜN≤{gruen_m}%, GELB≤{gelb_m}%; {norm_txt})."
+    )
+
+    if bew == "GRUEN":
+        klar = f"Spannungsänderung im Ausfallfall {delta_abs:.1f}% — gut innerhalb Grenzen."
+    elif bew == "GELB":
+        klar = f"Spannungsänderung im Ausfallfall {delta_abs:.1f}% — grenzwertig, kurzzeitig zulässig."
+    else:
+        klar = (
+            f"Spannungsänderung im Ausfallfall {delta_abs:.1f}% — überschreitet {gelb_m}% "
+            "(Screening). Spannungshaltung / Detailprüfung erforderlich."
+        )
+
+    return {
+        "bewertung": bew,
+        "delta_u_n1_prozent": round(delta_abs, 2),
+        "grenze_prozent": gelb_m,
+        "begruendung_technisch": tech,
+        "begruendung_klartext": klar,
+    }
+
+
+# ----------------------------------------------------------------------
+# 4. N1-Klasse + Konfidenz
+# ----------------------------------------------------------------------
+def bestimme_n1_klasse(n1_topo: dict, n1_leit: dict, n1_trafo: dict, n1_spg: dict, dso_daten_vorhanden: bool = False) -> str:
+    """
+    Klassifiziert Tiefe der N-1-Analyse:
+      N1-0: nichts geprüft
+      N1-1: nur Topologie
+      N1-2: + Leitung
+      N1-3: + Trafo + Spannung (alle 4)
+      N1-4: + DSO-Daten (Realnetz-Validierung)
+    """
+    geprueft = {
+        "topo":    n1_topo.get("bewertung") not in (None, "NICHT_GEPRUEFT"),
+        "leit":    n1_leit.get("bewertung") not in (None, "NICHT_GEPRUEFT"),
+        "trafo":   n1_trafo.get("bewertung") not in (None, "NICHT_GEPRUEFT"),
+        "spg":     n1_spg.get("bewertung") not in (None, "NICHT_GEPRUEFT"),
+    }
+    n = sum(1 for v in geprueft.values() if v)
+
+    if dso_daten_vorhanden and n >= 4:
+        return "N1-4"
+    if geprueft["topo"] and geprueft["leit"] and geprueft["trafo"] and geprueft["spg"]:
+        return "N1-3"
+    if geprueft["topo"] and geprueft["leit"]:
+        return "N1-2"
+    if geprueft["topo"]:
+        return "N1-1"
+    return "N1-0"
+
+
+def berechne_konfidenz(n1_klasse: str, anzahl_default_annahmen: int) -> float:
+    """
+    Konfidenz 0.1..1.0 abhängig von N1-Klasse und Anzahl default-Annahmen.
+    """
+    basis = {
+        "N1-0": 0.10,
+        "N1-1": 0.30,
+        "N1-2": 0.55,
+        "N1-3": 0.80,
+        "N1-4": 1.00,
+    }.get(n1_klasse, 0.10)
+    malus = 0.05 * max(0, anzahl_default_annahmen)
+    konf = basis - malus
+    return round(max(0.10, min(1.00, konf)), 2)
+
+
+# ----------------------------------------------------------------------
+# 5. Engpass-Komponente
+# ----------------------------------------------------------------------
+def _engpass(n1_topo: dict, n1_leit: dict, n1_trafo: dict, n1_spg: dict) -> str:
+    """Liefert die Komponente mit der schlechtesten Bewertung."""
+    rang = {"GRUEN": 0, "GELB": 1, "ROT": 2}
+    kandidaten = [
+        ("topologie", n1_topo.get("bewertung")),
+        ("leitung",   n1_leit.get("bewertung")),
+        ("trafo",     n1_trafo.get("bewertung")),
+        ("spannung",  n1_spg.get("bewertung")),
+    ]
+    aktiv = [(k, b) for k, b in kandidaten if b in rang]
+    if not aktiv:
+        return "keine"
+    worst = max(aktiv, key=lambda kb: rang[kb[1]])
+    if rang[worst[1]] == 0:
+        return "keine"
+    return worst[0]
+
+
+# ----------------------------------------------------------------------
+# 6. Empfehlungen
+# ----------------------------------------------------------------------
+def _empfehlungen(n1_topo: dict, n1_leit: dict, n1_trafo: dict, n1_spg: dict) -> list[str]:
+    emp = []
+    if n1_trafo.get("bewertung") == "ROT":
+        emp.append("Umspannwerk verstärken (zusätzlicher Trafo oder größere Sn).")
+    elif n1_trafo.get("bewertung") == "GELB":
+        emp.append("Trafo-Überlastreserve mit DSO klären (Zeitdauer, Notbetrieb).")
+    if n1_leit.get("bewertung") == "ROT":
+        emp.append("Größerer Kabelquerschnitt oder zusätzliches Parallelsystem.")
+    elif n1_leit.get("bewertung") == "GELB":
+        emp.append("Leitung im N-1-Fall grenzwertig — Lastmanagement prüfen.")
+    if n1_spg.get("bewertung") == "ROT":
+        emp.append("Spannungshaltung erforderlich (Q(U)-Regelung, Stufensteller, Kompensation).")
+    elif n1_spg.get("bewertung") == "GELB":
+        emp.append("Q(U)-Statik mit DSO abstimmen.")
+    if n1_topo.get("bewertung") == "ROT":
+        emp.append("Topologie ungeeignet — Ringeinbindung oder zweite Einspeisung prüfen.")
+    if not emp:
+        emp.append("Keine kritischen N-1-Verstöße — Anschluss netzseitig technisch machbar.")
+    return emp
+
+
+# ----------------------------------------------------------------------
+# Public API
+# ----------------------------------------------------------------------
+def analysiere_n1(eingabe: dict,
+                  thermisch_n1: dict | None = None,
+                  spannung_n1: dict | None = None,
+                  zusatzlast_mw: float | None = None) -> dict:
+    """
+    Hauptfunktion: vollständige N-1-Analyse.
+
+    Args:
+        eingabe: Originaleingabe (mit optional 'umspannwerk', 'topologie', etc.)
+        thermisch_n1: Ergebnis berechne_thermisch() für (parallele_systeme - 1)
+        spannung_n1: Ergebnis Spannungsfall-Berechnung im N-1-Fall (Dict mit 'delta_u_prozent')
+        zusatzlast_mw: Wirkleistung der neuen Anlage (default: aus eingabe.leistung_mw)
+
+    Returns:
+        Strukturiertes Dict mit n1_topologie, n1_leitung, n1_trafo, n1_spannung,
+        gesamt (bewertung, n1_klasse, konfidenz, empfehlungen), annahmen,
+        berechnungs_version, backend.
+    """
+    eingabe = eingabe or {}
+
+    # 1. Topologie via vorhandenes Modul
+    n1_topo = bewerte_n1_ms({
+        "topologie": eingabe.get("topologie"),
+        "leistung_mw": eingabe.get("leistung_mw"),
+        "cos_phi": eingabe.get("cos_phi"),
+        "restkapazitaet_ms_mva": eingabe.get("restkapazitaet_ms_mva"),
+    })
+
+    # 2. Leitung-N-1
+    n1_leit = bewerte_leitung_n1(thermisch_n1)
+
+    # 3. Trafo-N-1
+    p_mw = _f(zusatzlast_mw if zusatzlast_mw is not None else eingabe.get("leistung_mw"), 0.0) or 0.0
+    n1_trafo = bewerte_trafo_n1(
+        eingabe.get("umspannwerk"),
+        p_mw,
+        eingabe.get("cos_phi"),
+    )
+
+    # 4. Spannung-N-1
+    u_nenn = _f(eingabe.get("nennspannung"))
+    n1_spg = bewerte_spannung_n1(spannung_n1, nennspannung_kv=u_nenn)
+
+    # 5. Aggregation
+    gesamt_bew = _max_bewertung(
+        n1_topo.get("bewertung"),
+        n1_leit.get("bewertung"),
+        n1_trafo.get("bewertung"),
+        n1_spg.get("bewertung"),
+    )
+
+    # 6. Annahmen sammeln (Quelle: user vs. default)
+    annahmen = []
+    if not eingabe.get("umspannwerk"):
+        annahmen.append({
+            "feld": "umspannwerk",
+            "wert": None,
+            "quelle": "default",
+            "begruendung": "Keine UW-Daten — Trafo-N-1 nicht prüfbar (max. N1-2).",
+        })
+    if eingabe.get("topologie") in (None, "unbekannt", ""):
+        annahmen.append({
+            "feld": "topologie",
+            "wert": eingabe.get("topologie"),
+            "quelle": "default",
+            "begruendung": "Topologie unbekannt — konservativ ROT.",
+        })
+    if eingabe.get("restkapazitaet_ms_mva") is None:
+        annahmen.append({
+            "feld": "restkapazitaet_ms_mva",
+            "wert": None,
+            "quelle": "default",
+            "begruendung": "Keine Restkapazität bekannt — Topologie-Bewertung GELB bei Ring/vermascht.",
+        })
+
+    n_default = sum(1 for a in annahmen if a["quelle"] == "default")
+
+    # 7. N1-Klasse + Konfidenz
+    klasse = bestimme_n1_klasse(n1_topo, n1_leit, n1_trafo, n1_spg, dso_daten_vorhanden=False)
+    konf = berechne_konfidenz(klasse, n_default)
+
+    # 8. Empfehlungen + Engpass
+    emp = _empfehlungen(n1_topo, n1_leit, n1_trafo, n1_spg)
+    engpass = _engpass(n1_topo, n1_leit, n1_trafo, n1_spg)
+
+    return {
+        "n1_topologie": n1_topo,
+        "n1_leitung":   n1_leit,
+        "n1_trafo":     n1_trafo,
+        "n1_spannung":  n1_spg,
+        "gesamt": {
+            "bewertung": gesamt_bew,
+            "engpass_komponente": engpass,
+            "n1_klasse": klasse,
+            "konfidenz": konf,
+            "empfehlungen": emp,
+        },
+        "annahmen": annahmen,
+        "berechnungs_version": VERSION,
+        "backend": BACKEND,
+    }

@@ -73,6 +73,22 @@ THRESHOLDS = {
     "n1_delta_u_crit": 0.05,
 }
 
+# --- Mittelspannung: einheitliche Screening-Schwellen (Engine, nur MS) ---
+# Stationaer: Richtwerte aus VOLTAGE_LEVELS MS_* (warn/crit) + oranges Band bis 5% vor ROT.
+_MS_REF = VOLTAGE_LEVELS["MS_20"]
+MS_SPANNUNG_SCREENING_STATIONAER = {
+    "delta_u_gruen_max_pct": round(_MS_REF["delta_u_warn"] * 100, 2),
+    "delta_u_gelb_max_pct": round(_MS_REF["delta_u_crit"] * 100, 2),
+    "delta_u_orange_max_pct": 5.0,
+    "delta_u_hartgrenze_pct": round(_MS_REF["delta_u_crit"] * 100, 2),
+    "tar_verweis": _MS_REF["tar"],
+}
+# N-1-Spannung (Screening): konsistent mit THRESHOLDS n1_delta_u_warn / n1_delta_u_crit
+MS_SPANNUNG_N1_SCREENING = {
+    "gruen_max_pct": round(THRESHOLDS["n1_delta_u_warn"] * 100, 2),
+    "gelb_max_pct": round(THRESHOLDS["n1_delta_u_crit"] * 100, 2),
+}
+
 PLAUSIBILITY = {
     "NS":    {"p_min_kw": 1,     "p_max_kw": 300},
     "MS_10": {"p_min_kw": 100,   "p_max_kw": 20000},

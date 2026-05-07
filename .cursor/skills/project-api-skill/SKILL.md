@@ -1,4 +1,4 @@
-﻿---
+---
 name: project-api-skill
 description: Standardisiert API-Arbeit in diesem Gridcheck-Projekt. Use when implementing or reviewing backend API endpoints, request/response schemas, error contracts, API versioning, validation, security checks, or API tests.
 ---

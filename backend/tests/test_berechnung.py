@@ -82,3 +82,35 @@ class TestRobustheit:
         }
         r = berechne_netzanschluss(e)
         assert r["status"] in ("OK", "WARNUNG")
+
+
+class TestBestehendeEinspeisung:
+    def test_bestehende_einspeisung_erhoeht_wirksame_leistung_bei_einspeisung(self, basis_pv_ms):
+        e = dict(basis_pv_ms)
+        e["leistung_mw"] = 5.0
+        e["bestehende_einspeisung_mw"] = 3.0
+        e["anschlussart"] = "Einspeisung"
+        r = berechne_netzanschluss(e)
+        assert r["status"] == "OK"
+        assert r["annahmen"]["leistung_mw_wirksam"] == 8.0
+        assert r["pqs"]["p_mw"] == 8.0
+
+    def test_bestehende_einspeisung_reduziert_netto_bezug(self, basis_pv_ms):
+        e = dict(basis_pv_ms)
+        e["leistung_mw"] = 5.0
+        e["bestehende_einspeisung_mw"] = 3.0
+        e["anschlussart"] = "Entnahme"
+        r = berechne_netzanschluss(e)
+        assert r["status"] == "OK"
+        assert r["annahmen"]["leistung_mw_wirksam"] == 2.0
+        assert r["pqs"]["p_mw"] == 2.0
+
+
+class TestMSSpannungNormKonsistenz:
+    def test_ms_stationaere_hartgrenze_3_pct(self, basis_pv_ms):
+        r = berechne_netzanschluss(basis_pv_ms)
+        assert r["status"] == "OK"
+        sp = r["spannung"]
+        assert sp["spannungsebene"] == "MS"
+        assert sp["delta_u_hartgrenze_pct"] == 3.0
+        assert sp.get("ms_norm_tar")

@@ -1,4 +1,4 @@
-﻿# === HARDE REGELN — NIEMALS VERLETZEN ===
+# === HARDE REGELN — NIEMALS VERLETZEN ===
 # Diese Regeln stehen ÜBER allem anderen.
 # Vor JEDER Antwort: Selbstcheck gegen diese Liste.
 
@@ -372,24 +372,6 @@ Feature-Reihenfolge:
 5. Auditprüfung
 6. Sicherheitsprüfung
 7. fachliche Plausibilitätsprüfung
-
----
-
-## Kontextnahe Neuerungen ohne Doppelarbeit
-
-Wenn eine geplante Neuerung fachlich passt oder technisch notwendig ist und direkt im aktuellen Task sauber integrierbar ist, soll sie im selben Arbeitsschritt umgesetzt werden (minimal-invasiv).
-
-Pflicht vor jeder solchen Integration:
-1. Zuerst Bestand prüfen (Dateien, Module, Endpoints, Schemas, Services, Tests), ob die Neuerung bereits ganz oder teilweise existiert.
-2. Keine doppelten Dateien anlegen, wenn eine bestehende Datei sinnvoll erweitert werden kann.
-3. Keine bestehende Logik löschen oder überschreiben, nur weil eine ähnliche neue Logik ergänzt wird.
-4. Bestehendes Verhalten nur ändern, wenn es für die aktuelle Neuerung zwingend nötig ist und klar begründet wurde.
-5. Bei Risiko für unbeabsichtigtes Löschen/Überschreiben: stoppen, kurz rückfragen, dann erst fortfahren.
-
-Arbeitsmodus:
-- Bei Backend-Arbeit passende Punkte aus `Ideen.md` aktiv gegenprüfen.
-- Nur kontextnahe Ergänzungen umsetzen, keine ungefragten Nebenfeatures.
-- Vor Abschluss kurz dokumentieren, welche bestehende Implementierung geprüft und warum erweitert (statt dupliziert) wurde.
 
 ---
 
