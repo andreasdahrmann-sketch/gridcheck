@@ -17,6 +17,7 @@ from api.auth import router as auth_router
 from api.projects import router as projects_router
 from api.users import router as users_router
 from api.contact import router as contact_router
+from api.v2_reports import router_reports
 
 if settings.auto_create_schema:
     Base.metadata.create_all(bind=engine)
@@ -63,6 +64,7 @@ app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(users_router)
 app.include_router(contact_router)
+app.include_router(router_reports, prefix="/api")
 
 # Legacy-Compatibility (existing clients), gated via feature flag.
 if settings.enable_legacy_routes:

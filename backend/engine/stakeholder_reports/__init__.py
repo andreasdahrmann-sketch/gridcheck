@@ -1,19 +1,12 @@
 ﻿"""
-Stakeholder-spezifische PDF-Reports (Projektierer, Netzbetreiber,
-Endkunde/Investor, Parkbetreiber).
+Stakeholder reports package.
 
-Done-Gate Sprint 1 (verbindlich pro Report):
-1. Pflichtinhalte (Eingaben, Standort, Leistung, Score)
-2. Transparenzblock (Annahmen, Unsicherheiten, Warnungen)
-3. Revisionssicherheit (Hash, UTC, App-Version, Norm-Version)
-4. Datenquellen-Block (Quellen + Stand)
-5. N-1 deklariert (Level + Aussagegrenzen)
-6. Disclaimer
-7. Formatqualitaet (Einheiten konsistent)
-8. Realfall-Test
-9. Smoke-Test
-10. Meilenstein-Sicherung
+Keeps backward compatibility with the existing PDF skeleton while adding
+the new mapping/renderer flow for stakeolder-specific HTML reports.
 """
-from engine.stakeholder_reports.base import StakeholderReport, ReportKontext
 
-__all__ = ["StakeholderReport", "ReportKontext"]
+from engine.stakeholder_reports.base import ReportKontext, StakeholderReport
+
+REPORT_SCHEMA_VERSION = "1.0.0"
+
+__all__ = ["ReportKontext", "StakeholderReport", "REPORT_SCHEMA_VERSION"]

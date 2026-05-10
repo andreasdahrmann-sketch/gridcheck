@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Invest Stakeholder Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+    h1, h2 { margin-bottom: 6px; }
+    .muted { color: #555; font-size: 12px; }
+    .ok { color: #0a7a31; }
+    .bad { color: #b11b1b; }
+    ul { margin-top: 4px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+    th, td { border: 1px solid #ddd; text-align: left; padding: 6px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Investoren – Kurzreport</h1>
+  <div class="muted">Version {{ report.report_version }} | Normstand {{ report.app_normstand }}</div>
+  <div class="muted">Engine-Revision: {{ report.engine_revision_hash or "n/a" }}</div>
+
+  <h2>Projektkern</h2>
+  <ul>
+    <li>Standort: {{ report.standort }} (PLZ: {{ report.plz or "n/a" }})</li>
+    <li>Leistung: {{ "%.3f"|format(report.leistung_mw) }} MW</li>
+    <li>Spannungsebene: {{ report.spannungsebene }}</li>
+    <li>Anschlussart: {{ report.anschlussart }}</li>
+    <li>Einschätzung Screening:
+      {% if report.geht %}<span class="ok">Geht</span>{% else %}<span class="bad">Geht-nicht</span>{% endif %}
+      ({{ report.entscheidung }})
+    </li>
+  </ul>
+
+  {% if report.kosten_indikation %}
+  <h2>Kosten-Indikation</h2>
+  <p class="muted">Indikativ aus Engine-Kostenmodul; Bandbreiten/Annahmen siehe technischer Report.</p>
+  <table>
+    <thead><tr><th>Feld</th><th>Wert</th></tr></thead>
+    <tbody>
+      {% for key, val in report.kosten_indikation.items() %}
+      <tr><td>{{ key }}</td><td>{{ val }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <h2>N-1 Status</h2>
+  <ul>
+    <li>{{ report.n1_status }}</li>
+    <li>{{ report.n1_detail }}</li>
+  </ul>
+
+  <h2>Auflagen</h2>
+  {% if report.auflagen %}
+  <ul>{% for w in report.auflagen %}<li>{{ w }}</li>{% endfor %}</ul>
+  {% else %}
+  <p>Keine Auflagen gemeldet.</p>
+  {% endif %}
+
+  <h2>Empfohlene Maßnahmen</h2>
+  {% if report.empfohlene_massnahmen %}
+  <ul>{% for m in report.empfohlene_massnahmen %}<li>{{ m }}</li>{% endfor %}</ul>
+  {% else %}
+  <p>Keine Maßnahmen gemeldet.</p>
+  {% endif %}
+
+  <h2>Normen-Snapshot</h2>
+  <table>
+    <thead><tr><th>Norm</th><th>Titel</th><th>Stand</th><th>Kategorie</th></tr></thead>
+    <tbody>
+      {% for n in report.normen_snapshot %}
+      <tr><td>{{ n.norm_id }}</td><td>{{ n.titel }}</td><td>{{ n.stand }}</td><td>{{ n.kategorie }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p class="muted">Vorläufige Analyse. Keine verbindliche Netzanschlusszusage.</p>
+</body>
+</html>
