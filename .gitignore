@@ -4,6 +4,12 @@ node_modules/
 out/
 dist/
 build/
+frontend/.capacitor/
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/ios/App/App/public/
+frontend/ios/App/Pods/
+frontend/ios/DerivedData/
 
 # Python / Backend
 __pycache__/
@@ -48,10 +54,8 @@ npm-debug.log*
 *.dump
 *.sql.gz
 
-# SQLite-Datenbanken (enthalten Daten - DSGVO!)
+# Lokale Datenbank-Artefakte / Legacy-Dateien (enthalten Daten)
 *.db
-*.sqlite
-*.sqlite3
 *.db.LOCAL_BACKUP
 
 # GridCheck lokale Artefakte / Backups / Reports
@@ -71,3 +75,29 @@ CHAT_CONTEXT_LOCAL.md
 
 # Weitere lokale Backup-Endungen
 *.bak-*
+
+# === L3.2: Audit-Dumps & Kontext-Exporte (lokal, niemals committen) ===
+# Timestamped Audit-Dumps (Pattern: name_YYYYMMDD_HHMMSS.txt)
+*_20[0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].txt
+# Konkrete Kontext-/Audit-Exporte
+apicalls_*.txt
+audit_*.txt
+auth_*.txt
+berechnung_*.txt
+cleanup_*.txt
+cleanup_inventur_*.txt
+engine_state*.txt
+kontext_*.txt
+nextcfg_*.txt
+Gridcheck-Kontext-BUNDLE.txt
+_struktur.txt
+context.cmd
+# Milestone-Backups (lokal)
+_milestone_backups/
+**/_milestone_backups/
+# OpenAPI-Audits
+**/_audit_openapi.json
+
+# === L3.2b: Milestone-Backups einzelner Dateien ===
+*.milestone_auth_*
+*.milestone_*_20[0-9][0-9][0-9][0-9][0-9][0-9]_*
