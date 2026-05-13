@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
@@ -9,7 +9,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Unsere eigenen Tabellen - nur diese werden von Alembic verwaltet
 MANAGED_TABLES = {
     "users", "projects", "project_members", "check_results",
-    "project_files", "audit_log"
+    "project_files", "audit_log",
+    "analysis_runs", "billing_events", "billing_entitlements",
+    "site_markers",
+    "asset_candidates", "generation_assets", "system_signals",
+    "weather_resource", "ground_risk", "cost_indices", "gridcheck_result_audit",
+    "revision_records", "ki_feedback_records", "report_revision_records",
 }
 
 config = context.config
@@ -17,8 +22,14 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+from core.config import settings
 from db.models import Base
 target_metadata = Base.metadata
+
+if settings.database_url:
+    # `alembic upgrade head` must follow the active DATABASE_URL / backend .env,
+    # not the stale fallback value from alembic.ini.
+    config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 def include_object(object, name, type_, reflected, compare_to):
     """Nur unsere eigenen Tabellen verwalten - alle anderen ignorieren."""
