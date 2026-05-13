@@ -105,7 +105,7 @@ Die App ist kein Ampelspielzeug, sondern ein diagnostisches Entscheidungsunterst
 ## Technikzielbild
 Bevorzugter Ziel-Stack:
 - Monorepo
-- pnpm
+- npm
 - Next.js App Router
 - React
 - Tailwind
@@ -416,3 +416,10 @@ Cursor muss vor jeder CodeÃ¤nderung prÃ¼fen:
 8. Gibt es Sicherheits- oder Datenschutzrisiken?
 
 Wenn eine Regel verletzt wird, muss Cursor stoppen und zuerst einen sicheren Vorschlag machen.
+## Code-Änderungen unter Windows
+- ALLE Code-Änderungen werden als ausführbare PowerShell-Befehle ausgegeben (kein manuelles Editieren).
+- Backup vor jeder Änderung via Copy-Item mit Zeitstempel.
+- Datei-Edits via (Get-Content -Raw) -replace ... | Set-Content -NoNewline.
+- Nach jeder Änderung: Verifikations-Befehl (Select-String) mit ausgeben.
+- Rollback-Befehl immer mitliefern.
+- Keine "öffne Editor"/"ändere manuell"-Anweisungen.
