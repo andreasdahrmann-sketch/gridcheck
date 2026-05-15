@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -16,9 +18,9 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 class RegisterRequest(BaseModel):
     email: str = Field(..., min_length=5, max_length=254)
-    password: str = Field(..., min_length=8, max_length=128)
+    password: str = Field(..., min_length=12, max_length=128)
     full_name: str | None = Field(default=None, max_length=120)
-    role: str = Field(default="endkunde", pattern="^(projektierer|netzbetreiber|endkunde|admin)$")
+    role: Literal["projektierer", "netzbetreiber", "endkunde"] = "endkunde"
 
 
 class LoginRequest(BaseModel):

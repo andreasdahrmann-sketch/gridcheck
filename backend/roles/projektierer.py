@@ -1,4 +1,9 @@
-﻿"""Projektierer-Rolle: Engine-Ergebnis + Constraints + Wirtschaftlichkeit."""
+﻿"""Projektierer-Rolle: Engine-Ergebnis + Constraints + Wirtschaftlichkeit.
+
+DEPRECATED (Phase 2): New stakeholder report flow is implemented under
+engine.stakeholder_reports + /api/v2/reports/projektierer.
+Kept for backward compatibility with existing v1 endpoints/tests.
+"""
 
 from __future__ import annotations
 

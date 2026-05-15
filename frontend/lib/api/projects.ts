@@ -1,4 +1,11 @@
+import type { GridCheckInput, GridCheckResult } from "@/types";
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
+
+export type ProjectRoleInputs = Partial<GridCheckInput> & {
+  kundentyp?: string;
+  projektname?: string;
+  erzeugungstyp?: string;
+};
 
 export type Project = {
   id: number;
@@ -7,7 +14,11 @@ export type Project = {
   typ: string;
   leistung_kw: number;
   description?: string | null;
+  role_inputs: ProjectRoleInputs;
+  role_results: Partial<GridCheckResult>;
   owner_user_id?: number | null;
+  created_at?: string;
+  updated_at?: string | null;
 };
 
 const BASE = "/api/backend/api/v1/projects";
@@ -31,7 +42,15 @@ export async function getProject(projectId: number) {
 }
 
 export async function createProject(
-  payload: { name: string; plz: string; typ: string; leistung_kw: number; description?: string }
+  payload: {
+    name: string;
+    plz: string;
+    typ: string;
+    leistung_kw: number;
+    description?: string;
+    role_inputs?: ProjectRoleInputs;
+    role_results?: Partial<GridCheckResult>;
+  }
 ) {
   const csrf = getCsrfTokenFromCookie();
   const res = await fetch(BASE, {

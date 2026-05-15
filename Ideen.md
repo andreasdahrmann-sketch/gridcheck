@@ -283,6 +283,12 @@ Moegliche Preise:
 - [ ] Lizenz: 30.000-200.000 EUR+ pro Jahr
 - [ ] Support/SLA zusaetzlich
 
+### Umsetzungsstand (konkretisiert)
+
+- [x] Paketstruktur und Scope-Grenzen in `docs/monetarisierungspakete.md` dokumentiert.
+- [ ] Feature-Mapping in konkrete Tickets mit Akzeptanzkriterien ueberfuehren.
+- [ ] Preisannahmen je Zielsegment in Vertriebshypothesen testen.
+
 ## Zusaetzliche Umsatzhebel
 
 - [ ] API-Zugriff
@@ -299,6 +305,40 @@ Moegliche Preise:
 - [ ] Marktberichte
 - [ ] Netzanschluss-Heatmaps
 - [ ] Anschlusskosten-Benchmarking
+
+## Spaetere Folgeideen (nicht aktueller Sprint)
+
+Diese Punkte sind bewusst **nicht** Teil des aktuellen Sprints und dienen nur als strukturierter Spaeter-Backlog fuer den aktuellen Themenblock.
+
+### Mobile / Vor-Ort-Erfassung
+
+- [ ] PWA-Setup fuer mobile Homescreen- und Install-Nutzung vorbereiten.
+- [ ] MVP-Idee: Vor-Ort-Trafo- und Umspannwerk-Marker direkt in der Karte erfassen.
+- [ ] GPS-, Kamera- und Foto-Upload fuer Feldbegehungen vorsehen.
+- [ ] Spaeter: OCR fuer Typenschilder und andere Foto-Metadaten pruefen.
+
+### Community- und Grid-Scout-Daten
+
+- [ ] Crowdsourced Grid Data / "Grid Scout" als spaeteres Community-Modul pruefen.
+- [ ] Trust-Level fuer Community-Hinweise fuehren: unverified, confirmed, verified.
+- [ ] Community-Daten immer klar von offiziellen Quellen trennen und nicht als verifizierte Netzkapazitaet darstellen.
+- [ ] Gamification / Level-System nur als spaeteren Motivationslayer betrachten, nicht als MVP-Bestandteil.
+- [ ] Community-Datenzugriff oder erweiterte Scout-Daten als Premium-Funktion pruefen.
+
+### Validierung / Operations
+
+- [ ] VNB-Validierungs-Dashboard fuer Sichtung, Freigabe und Nachpflege externer/community-basierter Daten vorsehen.
+- [ ] Workflow fuer spaetere manuelle Verifikation von Fotos, Standort-Hinweisen und Asset-Meldungen definieren.
+
+### Monetarisierung / Datenprodukte
+
+- [ ] Datenverkauf und API-Zugriff fuer aggregierte oder validierte Grid-Daten spaeter bewerten.
+- [ ] Pruefen, welche Datenprodukte als Premium-, API- oder B2B-Modul vermarktbar sind.
+
+### Recht / Datenschutz
+
+- [ ] Rechtliche und DSGVO-Hinweise fuer Standortdaten, Fotos, Uploads und Community-Beitraege frueh mitdenken.
+- [ ] Einwilligung, Rechte an Uploads, sensible Infrastrukturdaten und Loesch-/Pruefprozesse spaeter konkretisieren.
 
 ## Abarbeitungsmodus (Vorschlag)
 

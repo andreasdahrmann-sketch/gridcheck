@@ -55,7 +55,7 @@ backend/
 ## Tests
 - `pytest`, Zielabdeckung Rechenkerne â‰¥ 90 %, Services â‰¥ 70 %.
 - Jeder Bugfix bekommt einen Regressionstest.
-- Fixtures fÃ¼r Test-DB (SQLite oder Postgres-Testcontainer).
+- Fixtures fuer Test-DB ausschliesslich mit PostgreSQL (lokal per Docker auf Port 5433 oder CI-Postgres-Service).
 
 ## Logging & Audit
 - Strukturiertes Logging (JSON, `structlog`).

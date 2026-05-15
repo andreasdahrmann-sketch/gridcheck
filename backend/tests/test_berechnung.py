@@ -1,7 +1,6 @@
 ﻿"""
 Tests fuer engine.berechnung.berechne_netzanschluss (Integration).
 """
-import pytest
 from engine.berechnung import berechne_netzanschluss
 
 
@@ -31,10 +30,16 @@ class TestBerechnungSmoke:
 class TestN1Integration:
     """N-1 muss in Gesamtberechnung korrekt durchschlagen."""
 
-    def test_ring_redundant_ist_gruen(self, basis_pv_ms):
+    def test_ring_redundant_ms_topologie_gruen_detail_kann_rot_sein(self, basis_pv_ms):
+        """Ring+Redundanz+Restkap erfuellen den MS-Topologie-Pre-Check (siehe n1_ms/stakeholder-Block).
+        Nach konsolidierung mit analysiere_n1 (Spannung im N-1-Stoerungsfall) kann die Gesamtbewertung ROT bleiben (N1-2, Engpass Spannung)."""
         r = berechne_netzanschluss(basis_pv_ms)
-        assert r["n1"]["bewertung"] == "GRUEN"
-        assert r["n1"]["n1_sicher"] is True
+        assert r["status"] == "OK"
+        assert r["n1"]["stakeholder"]["bewertung"] == "GRUEN"
+        assert r["n1"]["stakeholder"]["n1_sicher"] is True
+        assert r["n1"]["bewertung"] == "ROT"
+        assert r["n1"]["n1_sicher"] is False
+        assert r["n1"]["engpass_komponente"] == "spannung"
 
     def test_stich_ist_rot_und_capt_score(self, basis_pv_stich):
         r = berechne_netzanschluss(basis_pv_stich)
@@ -42,12 +47,51 @@ class TestN1Integration:
         assert r["fazit"]["entscheidung"] == "C"
         assert r["fazit"]["farbe"] == "ROT"
 
-    def test_ring_ohne_restkap_ist_gelb_unbestimmt(self, basis_pv_ms):
+    def test_ring_ohne_restkap_topologie_gelb_konsolidiert_rot(self, basis_pv_ms):
+        """Ohne bekannte MS-Restkapazitaet bleibt der Topologie-Pre-Check GELB/n1_sicher=None (Datenluecke).
+        Die konsolidierte N-1-Aussage folgt weiterhin dem Detail-Screening und kann bei Spannungsengpass ROT sein."""
         e = dict(basis_pv_ms)
         e["restkapazitaet_ms_mva"] = None
         r = berechne_netzanschluss(e)
-        assert r["n1"]["bewertung"] == "GELB"
-        assert r["n1"]["n1_sicher"] is None
+        assert r["status"] == "OK"
+        assert r["n1"]["stakeholder"]["bewertung"] == "GELB"
+        assert r["n1"]["stakeholder"]["n1_sicher"] is None
+        assert r["n1"]["bewertung"] == "ROT"
+        assert r["n1"]["n1_sicher"] is False
+
+    def test_umspannwerk_engpass_verschaerft_n1_detailbewertung(self, basis_pv_ms):
+        e = dict(basis_pv_ms)
+        e["umspannwerk"] = {
+            "trafos": [
+                {"sn_mva": 10.0, "belastung_aktuell_mw": 9.0},
+                {"sn_mva": 10.0, "belastung_aktuell_mw": 9.0},
+            ]
+        }
+        r = berechne_netzanschluss(e)
+        assert r["status"] == "OK"
+        assert r["n1"]["bewertung"] == "ROT"
+        assert r["n1"]["n1_sicher"] is False
+        assert r["n1"]["n1_klasse"] == "N1-3"
+        assert r["n1"]["engpass_komponente"] == "trafo"
+        assert "Engpass trafo" in r["n1"]["detail_text"]
+        assert r["scores"]["versorgungssicherheit"] == 10
+        assert any("N-1-Screening als N1-3" in note for note in r["transparenz"]["confidence_notes"])
+        assert any("Umspannwerk" in text or "Trafo" in text for text in r["empfehlungen"])
+
+    def test_abgangsreserve_erscheint_in_n1_detail_und_nachweisen(self, basis_pv_ms):
+        e = dict(basis_pv_ms)
+        e["umspannwerk"] = {
+            "abgaenge": [
+                {"label": "A1", "primary": True, "i_max_a": 630, "belastung_aktuell_a": 520},
+                {"label": "A2", "i_max_a": 630, "belastung_aktuell_a": 300},
+            ]
+        }
+        r = berechne_netzanschluss(e)
+        assert r["status"] == "OK"
+        assert r["n1"]["n1_klasse"] == "N1-2"
+        assert "Abgang" in r["n1"]["detail_text"]
+        assert "Abgangsreserve / Betriebsmittelpfad" in r["n1"]["nachweise_vorhanden"]
+        assert any("N-1-Aussage aktuell nur als N1-2" in text for text in r["warnungen"])
 
 
 class TestFazitLogik:

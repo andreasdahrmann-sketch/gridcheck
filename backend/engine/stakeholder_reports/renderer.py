@@ -127,9 +127,14 @@ def enrich_report_with_revision_metadata(
     html_checksum: str | None = None,
 ) -> dict[str, Any]:
     enriched = copy.deepcopy(report_data)
-    source_revision_hash = str(
-        enriched.get("source_revision_hash") or enriched.get("engine_revision_hash") or ""
-    ).strip() or None
+    source_revision_hash = (
+        str(
+            enriched.get("source_revision_hash")
+            or enriched.get("engine_revision_hash")
+            or ""
+        ).strip()
+        or None
+    )
     report_verify_path = build_report_verify_path(report_hash)
 
     report_revision: dict[str, Any] = {
@@ -181,20 +186,34 @@ def verify_report_revision_record(record: ReportRevisionRecord) -> dict[str, Any
             "report_data": report_data,
         }
 
+    revision_meta = report_data.get("report_revision")
+    timestamp_iso = record.timestamp.isoformat()
+    if isinstance(revision_meta, dict):
+        embedded_ts = revision_meta.get("timestamp")
+        if isinstance(embedded_ts, str) and embedded_ts.strip():
+            # Persistenz nutzt diesen String fuer den Report-Hash; bei TIMESTAMP ohne TZ
+            # weicht record.timestamp.isoformat() nach DB-Roundtrip davon ab.
+            timestamp_iso = embedded_ts.strip()
+
     report_checksum = compute_report_checksum(report_data)
     expected_hash = compute_report_revision_hash(
         revisionsnummer=int(record.revisionsnummer),
         uuid_value=record.uuid,
-        timestamp_iso=record.timestamp.isoformat(),
+        timestamp_iso=timestamp_iso,
         report_type=record.report_type,
         previous_hash=record.previous_hash,
         engine_revision_hash=record.engine_revision_hash,
         report_checksum=report_checksum,
     )
 
-    revision_meta = report_data.get("report_revision")
-    stored_report_checksum = revision_meta.get("report_checksum") if isinstance(revision_meta, dict) else None
-    stored_html_checksum = revision_meta.get("html_checksum") if isinstance(revision_meta, dict) else None
+    stored_report_checksum = (
+        revision_meta.get("report_checksum")
+        if isinstance(revision_meta, dict)
+        else None
+    )
+    stored_html_checksum = (
+        revision_meta.get("html_checksum") if isinstance(revision_meta, dict) else None
+    )
     actual_html_checksum = compute_html_checksum(record.html_content)
     report_hash_matches = expected_hash == record.hash
     report_checksum_matches = stored_report_checksum in {None, report_checksum}
@@ -229,6 +248,8 @@ def persist_report_revision(
     engine_revision_hash: str,
     report_type: str = "projektierer",
     db: Session | None = None,
+    *,
+    revision_uuid: str | None = None,
 ) -> dict[str, Any]:
     if not engine_revision_hash or not engine_revision_hash.strip():
         raise ValueError(
@@ -247,17 +268,26 @@ def persist_report_revision(
                 .first()
             )
             previous = latest.hash if latest else "GENESIS"
-            next_number = int(
-                session.query(func.coalesce(func.max(ReportRevisionRecord.revisionsnummer), 0)).scalar()
-                or 0
-            ) + 1
+            next_number = (
+                int(
+                    session.query(
+                        func.coalesce(func.max(ReportRevisionRecord.revisionsnummer), 0)
+                    ).scalar()
+                    or 0
+                )
+                + 1
+            )
             timestamp = datetime.now(timezone.utc)
             timestamp_iso = timestamp.isoformat()
-            revision_uuid = str(uuid.uuid4())
+            revision_uuid_value = (
+                str(revision_uuid).strip() if revision_uuid else str(uuid.uuid4())
+            )
+            if not revision_uuid_value:
+                revision_uuid_value = str(uuid.uuid4())
             report_checksum = compute_report_checksum(report_data)
             payload_hash = compute_report_revision_hash(
                 revisionsnummer=next_number,
-                uuid_value=revision_uuid,
+                uuid_value=revision_uuid_value,
                 timestamp_iso=timestamp_iso,
                 report_type=report_type,
                 previous_hash=previous,
@@ -267,7 +297,7 @@ def persist_report_revision(
             enriched_report = enrich_report_with_revision_metadata(
                 report_data,
                 revisionsnummer=next_number,
-                uuid_value=revision_uuid,
+                uuid_value=revision_uuid_value,
                 timestamp_iso=timestamp_iso,
                 report_hash=payload_hash,
                 engine_revision_hash=engine_revision_hash,
@@ -278,7 +308,7 @@ def persist_report_revision(
             enriched_report = enrich_report_with_revision_metadata(
                 report_data,
                 revisionsnummer=next_number,
-                uuid_value=revision_uuid,
+                uuid_value=revision_uuid_value,
                 timestamp_iso=timestamp_iso,
                 report_hash=payload_hash,
                 engine_revision_hash=engine_revision_hash,
@@ -288,7 +318,7 @@ def persist_report_revision(
 
             record = ReportRevisionRecord(
                 revisionsnummer=next_number,
-                uuid=revision_uuid,
+                uuid=revision_uuid_value,
                 timestamp=timestamp,
                 schema_version=REPORT_SCHEMA_VERSION,
                 report_type=report_type,
@@ -306,7 +336,7 @@ def persist_report_revision(
                 return {
                     "revisionsnummer": next_number,
                     "hash": payload_hash,
-                    "uuid": revision_uuid,
+                    "uuid": revision_uuid_value,
                     "timestamp": timestamp_iso,
                     "engine_revision_hash": engine_revision_hash,
                     "verify_path": build_report_verify_path(payload_hash),
@@ -321,4 +351,3 @@ def persist_report_revision(
                 if db is not None or attempt >= _MAX_INSERT_RETRIES:
                     raise
                 attempt += 1
-

@@ -15,7 +15,7 @@
 ### Backend (backend/)
 - fastapi, uvicorn
 - pydantic
-- sqlite3 (built-in)
+- PostgreSQL 16 + psycopg2
 - python-dotenv
 - Ggf. weitere: requirements.txt prüfen
 
@@ -35,7 +35,7 @@
 ## Offene TODOs
 - [ ] page.tsx ist KAPUTT (duplizierter Code – muss gefixt werden!)
 - [ ] Backend API-Routen vollständig implementieren
-- [ ] Datenbankschema (SQLite) definieren + migrieren
+- [ ] Datenbankschema (PostgreSQL/Alembic) weiterentwickeln
 - [ ] Auth-System implementieren
 - [ ] PDF-Export
 - [ ] KI-Integration (OpenAI)

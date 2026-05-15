@@ -1,0 +1,30 @@
+import type { ReportProfile } from "../types/report-profile";
+
+export const projectDeveloperReportProfile: ReportProfile = {
+  stakeholderType: "project_developer",
+  title: "Netzanschluss-Precheck für Projektierer",
+  subtitle: "Technische Vorbewertung, Anschlussvarianten und nächste Schritte",
+  tone: "practical",
+  detailLevel: "standard",
+  tableDensity: "medium",
+  includeExecutiveSummary: true,
+  includeTechnicalAppendix: true,
+  includeCostDetails: true,
+  includeAuditBlock: true,
+  includeDisclaimer: true,
+  sections: [
+    { id: "cover", title: "Deckblatt", required: true },
+    { id: "short_conclusion", title: "Kurzfazit", required: true },
+    { id: "project_overview", title: "Projektübersicht", required: true },
+    { id: "location_grid_context", title: "Standort- und Netzumfeld", required: true },
+    { id: "connection_variants", title: "Anschlussvarianten", required: true },
+    { id: "technical_assessment", title: "Technische Bewertung", required: true },
+    { id: "what_if", title: "Was-wäre-wenn-Szenarien", required: false },
+    { id: "cost_range", title: "Kostenbandbreite", required: true },
+    { id: "risks", title: "Hauptrisiken", required: true },
+    { id: "next_steps", title: "Empfohlene nächste Schritte", required: true },
+    { id: "sources", title: "Datenquellen und Annahmen", required: true },
+    { id: "audit", title: "Revisionsdaten", required: true },
+    { id: "disclaimer", title: "Hinweis zur Einordnung", required: true },
+  ],
+};

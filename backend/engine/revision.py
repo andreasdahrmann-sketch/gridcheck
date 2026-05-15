@@ -1,234 +1,237 @@
-﻿"""
-Revisionssicheres Audit-Log (GoBD-konform).
-Version: revision-2.0.0
+"""
+Revisionssicheres Audit-Log (GoBD-konform) auf PostgreSQL-Basis.
+Version: revision-2.1.0
 """
 from __future__ import annotations
 
-import json
-import os
 import hashlib
+import json
 import uuid
-import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-SCHEMA_VERSION = "2.0.0"
-REVISIONS_PFAD = os.path.join("daten", "revisionen.jsonl")
-LEGACY_PFAD = os.path.join("daten", "revisionen.json")
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from db.database import SessionLocal
+from db.models import RevisionRecord
+
+SCHEMA_VERSION = "2.1.0"
+_MAX_INSERT_RETRIES = 3
 
 
-def _kanonisiere(daten: Dict[str, Any]) -> str:
+def _kanonisiere(daten: dict[str, Any]) -> str:
     return json.dumps(daten, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
 
 
-def _hash(daten: Dict[str, Any]) -> str:
+def _hash(daten: dict[str, Any]) -> str:
     return hashlib.sha256(_kanonisiere(daten).encode("utf-8")).hexdigest()
 
 
-def _ensure_dir() -> None:
-    os.makedirs("daten", exist_ok=True)
+def build_revision_data(
+    ergebnis: dict[str, Any],
+    *,
+    actor_user_id: int | None = None,
+    action_type: str | None = None,
+    project_id: int | None = None,
+) -> dict[str, Any]:
+    return {
+        "meta": {
+            "actor_user_id": actor_user_id,
+            "action_type": action_type,
+            "project_id": project_id,
+        },
+        "eingabe": ergebnis.get("eingabe", {}),
+        "fazit": ergebnis.get("fazit", {}),
+        "scores": ergebnis.get("scores", {}),
+        "thermisch": ergebnis.get("thermisch", {}),
+        "spannung": ergebnis.get("spannung", {}),
+        "kurzschluss": ergebnis.get("kurzschluss", {}),
+        "n1": ergebnis.get("n1", {}),
+        "trafo": ergebnis.get("trafo", {}),
+        "impedanz": ergebnis.get("impedanz", {}),
+        "pqs": ergebnis.get("pqs", {}),
+        "datenqualitaet": ergebnis.get("datenqualitaet", {}),
+        "warnungen": ergebnis.get("warnungen", []),
+        "empfehlungen": ergebnis.get("empfehlungen", []),
+        "ki": ergebnis.get("ki", {}),
+        "nb_check": ergebnis.get("nb_check", {}),
+    }
 
 
-def _migriere_legacy_falls_noetig() -> None:
-    if os.path.exists(REVISIONS_PFAD):
-        return
-    if not os.path.exists(LEGACY_PFAD):
-        return
+def _resolve_engine_version(engine_version: str | None) -> str:
+    if engine_version is not None:
+        return engine_version
     try:
-        with open(LEGACY_PFAD, "r", encoding="utf-8") as f:
-            alt = json.load(f)
-        if not isinstance(alt, list):
-            return
-        _ensure_dir()
-        with open(REVISIONS_PFAD, "w", encoding="utf-8") as f:
-            for eintrag in alt:
-                f.write(json.dumps(eintrag, ensure_ascii=False) + "\n")
-        os.replace(LEGACY_PFAD, LEGACY_PFAD + ".migrated")
+        from engine.berechnung import ENGINE_VERSION as _engine_version
     except Exception:
-        pass
+        return "unknown"
+    return _engine_version
 
 
-def _letzter_hash() -> str:
-    if not os.path.exists(REVISIONS_PFAD):
-        return "GENESIS"
-    last = "GENESIS"
-    with open(REVISIONS_PFAD, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                eintrag = json.loads(line)
-                last = eintrag.get("hash", last)
-            except Exception:
-                continue
-    return last
-
-
-def _zaehle_revisionen() -> int:
-    if not os.path.exists(REVISIONS_PFAD):
-        return 0
-    n = 0
-    with open(REVISIONS_PFAD, "r", encoding="utf-8") as f:
-        for line in f:
-            if line.strip():
-                n += 1
-    return n
-
-
-def _atomares_append(eintrag: Dict[str, Any]) -> None:
-    _ensure_dir()
-    bestehend = ""
-    if os.path.exists(REVISIONS_PFAD):
-        with open(REVISIONS_PFAD, "r", encoding="utf-8") as f:
-            bestehend = f.read()
-    fd, tmp = tempfile.mkstemp(prefix=".rev_", dir="daten", text=True)
+@contextmanager
+def _session_scope(db: Session | None):
+    if db is not None:
+        yield db, False
+        return
+    session = SessionLocal()
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            if bestehend:
-                f.write(bestehend)
-                if not bestehend.endswith("\n"):
-                    f.write("\n")
-            f.write(json.dumps(eintrag, ensure_ascii=False) + "\n")
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, REVISIONS_PFAD)
-    except Exception:
-        if os.path.exists(tmp):
-            try:
-                os.remove(tmp)
-            except Exception:
-                pass
-        raise
+        yield session, True
+    finally:
+        session.close()
+
+
+def _latest_record(db: Session) -> RevisionRecord | None:
+    return (
+        db.query(RevisionRecord)
+        .order_by(RevisionRecord.revisionsnummer.desc(), RevisionRecord.id.desc())
+        .first()
+    )
+
+
+def _next_revision_number(db: Session) -> int:
+    current = db.query(func.max(RevisionRecord.revisionsnummer)).scalar()
+    return int(current or 0) + 1
+
+
+def _record_to_entry(record: RevisionRecord) -> dict[str, Any]:
+    try:
+        data = json.loads(record.data_json)
+    except json.JSONDecodeError:
+        data = {}
+    return {
+        "revisionsnummer": int(record.revisionsnummer),
+        "uuid": record.uuid,
+        "timestamp": record.timestamp.isoformat(),
+        "schema_version": record.schema_version,
+        "engine_version": record.engine_version,
+        "previous_hash": record.previous_hash,
+        "daten": data,
+        "hash": record.hash,
+    }
 
 
 def speichere_revision(
-    ergebnis: Dict[str, Any],
+    ergebnis: dict[str, Any],
     dry_run: bool = False,
-    engine_version: Optional[str] = None,
-    actor_user_id: Optional[int] = None,
-    action_type: Optional[str] = None,
-    project_id: Optional[int] = None,
-) -> Dict[str, Any]:
+    engine_version: str | None = None,
+    actor_user_id: int | None = None,
+    action_type: str | None = None,
+    project_id: int | None = None,
+    db: Session | None = None,
+) -> dict[str, Any]:
     """
     Append-only Audit-Log mit Hash-Kette.
-    dry_run=True: berechnet Hash, schreibt aber NICHT (fuer Tests).
+    dry_run=True: berechnet Hash, schreibt aber NICHT.
     """
-    _migriere_legacy_falls_noetig()
+    resolved_engine_version = _resolve_engine_version(engine_version)
+    data = build_revision_data(
+        ergebnis,
+        actor_user_id=actor_user_id,
+        action_type=action_type,
+        project_id=project_id,
+    )
 
-    prev = _letzter_hash()
-    rev_nr = _zaehle_revisionen() + 1
+    with _session_scope(db) as (session, owns_session):
+        attempt = 0
+        while True:
+            latest = _latest_record(session)
+            prev = latest.hash if latest else "GENESIS"
+            rev_nr = _next_revision_number(session)
+            timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
+            entry = {
+                "revisionsnummer": rev_nr,
+                "uuid": str(uuid.uuid4()),
+                "timestamp": timestamp.isoformat(),
+                "schema_version": SCHEMA_VERSION,
+                "engine_version": resolved_engine_version,
+                "previous_hash": prev,
+                "daten": data,
+            }
+            entry_hash = _hash(entry)
+            entry["hash"] = entry_hash
 
-    if engine_version is None:
-        try:
-            from engine.berechnung import ENGINE_VERSION as _EV
-            engine_version = _EV
-        except Exception:
-            engine_version = "unknown"
+            meta = {
+                "revisionsnummer": rev_nr,
+                "uuid": entry["uuid"],
+                "timestamp": entry["timestamp"],
+                "schema_version": SCHEMA_VERSION,
+                "engine_version": resolved_engine_version,
+                "previous_hash": prev,
+                "hash": entry_hash,
+                "dry_run": dry_run,
+            }
+            if dry_run:
+                return meta
 
-    eintrag = {
-        "revisionsnummer": rev_nr,
-        "uuid": str(uuid.uuid4()),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "schema_version": SCHEMA_VERSION,
-        "engine_version": engine_version,
-        "previous_hash": prev,
-        "daten": {
-            "meta": {
-                "actor_user_id": actor_user_id,
-                "action_type": action_type,
-                "project_id": project_id,
-            },
-            "eingabe": ergebnis.get("eingabe", {}),
-            "fazit": ergebnis.get("fazit", {}),
-            "scores": ergebnis.get("scores", {}),
-            "thermisch": ergebnis.get("thermisch", {}),
-            "spannung": ergebnis.get("spannung", {}),
-            "kurzschluss": ergebnis.get("kurzschluss", {}),
-            "n1": ergebnis.get("n1", {}),
-            "trafo": ergebnis.get("trafo", {}),
-            "impedanz": ergebnis.get("impedanz", {}),
-            "pqs": ergebnis.get("pqs", {}),
-            "datenqualitaet": ergebnis.get("datenqualitaet", {}),
-            "warnungen": ergebnis.get("warnungen", []),
-            "empfehlungen": ergebnis.get("empfehlungen", []),
-            "ki": ergebnis.get("ki", {}),
-            "nb_check": ergebnis.get("nb_check", {}),
-        },
-    }
-
-    h = _hash(eintrag)
-    eintrag["hash"] = h
-
-    meta = {
-        "revisionsnummer": rev_nr,
-        "uuid": eintrag["uuid"],
-        "timestamp": eintrag["timestamp"],
-        "schema_version": SCHEMA_VERSION,
-        "engine_version": engine_version,
-        "previous_hash": prev,
-        "hash": h,
-        "dry_run": dry_run,
-    }
-
-    if dry_run:
-        return meta
-
-    _atomares_append(eintrag)
-    return meta
-
-
-def lade_revisionen() -> List[Dict[str, Any]]:
-    _migriere_legacy_falls_noetig()
-    if not os.path.exists(REVISIONS_PFAD):
-        return []
-    out: List[Dict[str, Any]] = []
-    with open(REVISIONS_PFAD, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
+            record = RevisionRecord(
+                revisionsnummer=rev_nr,
+                uuid=entry["uuid"],
+                timestamp=timestamp,
+                schema_version=SCHEMA_VERSION,
+                engine_version=resolved_engine_version,
+                previous_hash=prev,
+                hash=entry_hash,
+                actor_user_id=actor_user_id,
+                action_type=action_type,
+                project_id=project_id,
+                data_json=_kanonisiere(data),
+            )
             try:
-                out.append(json.loads(line))
-            except Exception:
-                continue
-    return out
+                session.add(record)
+                session.flush()
+                if owns_session:
+                    session.commit()
+                return meta
+            except IntegrityError:
+                if owns_session:
+                    session.rollback()
+                if db is not None or attempt >= _MAX_INSERT_RETRIES:
+                    raise
+                attempt += 1
 
 
-def pruefe_integritaet() -> Dict[str, Any]:
-    """Streaming-Verify der Hash-Kette."""
-    fehler: List[str] = []
-    engine_versions: Dict[str, int] = {}
+def lade_revisionen(db: Session | None = None) -> list[dict[str, Any]]:
+    with _session_scope(db) as (session, _):
+        records = (
+            session.query(RevisionRecord)
+            .order_by(RevisionRecord.revisionsnummer.asc(), RevisionRecord.id.asc())
+            .all()
+        )
+        return [_record_to_entry(record) for record in records]
+
+
+def pruefe_integritaet(db: Session | None = None) -> dict[str, Any]:
+    """Verifiziert die komplette Hash-Kette aus PostgreSQL."""
+    fehler: list[str] = []
+    engine_versions: dict[str, int] = {}
     anzahl = 0
     prev = "GENESIS"
 
-    if not os.path.exists(REVISIONS_PFAD):
-        return {"ok": True, "anzahl": 0, "fehler": [], "engine_versions": {}}
+    for i, eintrag in enumerate(lade_revisionen(db), start=1):
+        anzahl += 1
+        engine_version = str(eintrag.get("engine_version") or "unknown")
+        engine_versions[engine_version] = engine_versions.get(engine_version, 0) + 1
 
-    with open(REVISIONS_PFAD, "r", encoding="utf-8") as f:
-        for i, line in enumerate(f, start=1):
-            line = line.strip()
-            if not line:
-                continue
-            anzahl += 1
-            try:
-                eintrag = json.loads(line)
-            except Exception as e:
-                fehler.append(f"Zeile {i}: JSON kaputt ({e})")
-                continue
+        gespeicherter_hash = eintrag.get("hash")
+        if eintrag.get("previous_hash") != prev:
+            fehler.append(
+                "Zeile "
+                f"{i}: previous_hash-Bruch (erwartet {prev[:12]}, war {str(eintrag.get('previous_hash'))[:12]})"
+            )
 
-            ev = eintrag.get("engine_version", "unknown")
-            engine_versions[ev] = engine_versions.get(ev, 0) + 1
+        ohne_hash = {k: v for k, v in eintrag.items() if k != "hash"}
+        recomputed = _hash(ohne_hash)
+        if recomputed != gespeicherter_hash:
+            fehler.append(f"Zeile {i}: Hash-Mismatch")
 
-            gespeicherter_hash = eintrag.get("hash")
-            if eintrag.get("previous_hash") != prev:
-                fehler.append(f"Zeile {i}: previous_hash-Bruch (erwartet {prev[:12]}, war {str(eintrag.get('previous_hash'))[:12]})")
+        prev = str(gespeicherter_hash or prev)
 
-            ohne_hash = {k: v for k, v in eintrag.items() if k != "hash"}
-            recomputed = _hash(ohne_hash)
-            if recomputed != gespeicherter_hash:
-                fehler.append(f"Zeile {i}: Hash-Mismatch")
-
-            prev = gespeicherter_hash or prev
-
-    return {"ok": len(fehler) == 0, "anzahl": anzahl, "fehler": fehler, "engine_versions": engine_versions}
+    return {
+        "ok": len(fehler) == 0,
+        "anzahl": anzahl,
+        "fehler": fehler,
+        "engine_versions": engine_versions,
+    }

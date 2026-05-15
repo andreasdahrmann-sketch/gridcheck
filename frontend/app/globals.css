@@ -6,21 +6,89 @@
 
 :root {
   color-scheme: dark;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
 }
 
-html, body {
+html,
+body {
   background: #061A1A;
   color: #E7F3F0;
   font-family: "Inter", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+html.capacitor,
+html.capacitor body {
+  overscroll-behavior-y: none;
+}
+
 body {
+  min-height: 100svh;
   background-image:
     radial-gradient(1100px 560px at 18% -5%, rgba(238,127,45,0.14), transparent 62%),
     radial-gradient(920px 520px at 88% 8%, rgba(95,208,184,0.11), transparent 64%),
     linear-gradient(180deg, #061A1A 0%, #0A2323 100%);
   background-attachment: fixed;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.leaflet-container {
+  background: #061a1a;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.leaflet-control-zoom a {
+  background: rgba(6, 26, 26, 0.92);
+  color: #e7f3f0;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.leaflet-control-zoom a:hover {
+  background: rgba(18, 51, 51, 0.98);
+}
+
+.leaflet-tooltip {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(6, 26, 26, 0.96);
+  color: #e7f3f0;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
+}
+
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+  border-top-color: rgba(6, 26, 26, 0.96);
+  border-bottom-color: rgba(6, 26, 26, 0.96);
+  border-left-color: rgba(6, 26, 26, 0.96);
+  border-right-color: rgba(6, 26, 26, 0.96);
+}
+
+.safe-area-top {
+  padding-top: var(--safe-area-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: var(--safe-area-bottom);
+}
+
+.safe-area-x {
+  padding-left: var(--safe-area-left);
+  padding-right: var(--safe-area-right);
 }
 
 @layer components {

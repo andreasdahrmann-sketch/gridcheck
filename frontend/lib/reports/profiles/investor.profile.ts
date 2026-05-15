@@ -1,0 +1,30 @@
+import type { ReportProfile } from "../types/report-profile";
+
+export const investorReportProfile: ReportProfile = {
+  stakeholderType: "investor",
+  title: "Grid Connection Investment Risk Report",
+  subtitle: "Netzanschlussrisiko, CAPEX-Bandbreite und Investment-Relevanz",
+  tone: "executive",
+  detailLevel: "compact",
+  tableDensity: "high",
+  includeExecutiveSummary: true,
+  includeTechnicalAppendix: true,
+  includeCostDetails: true,
+  includeAuditBlock: true,
+  includeDisclaimer: true,
+  sections: [
+    { id: "cover", title: "Deckblatt", required: true },
+    { id: "executive_summary", title: "Executive Summary", required: true },
+    { id: "investment_conclusion", title: "Investment-Fazit", required: true },
+    { id: "risk_matrix", title: "Risikomatrix", required: true },
+    { id: "capex_range", title: "CAPEX-Bandbreite", required: true },
+    { id: "timeline_risk", title: "Zeitplanrisiko", required: true },
+    { id: "scenarios", title: "Szenarien und Sensitivität", required: true },
+    { id: "valuation_impact", title: "Einfluss auf Projektwert", required: false },
+    { id: "due_diligence_items", title: "Offene Due-Diligence-Punkte", required: true },
+    { id: "technical_appendix", title: "Technischer Anhang", required: true },
+    { id: "sources", title: "Quellen und Annahmen", required: true },
+    { id: "audit", title: "Revisionsdaten", required: true },
+    { id: "disclaimer", title: "Disclaimer", required: true },
+  ],
+};

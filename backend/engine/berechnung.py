@@ -1,8 +1,8 @@
-﻿from engine.n1_ms import bewerte_n1_ms
+from engine.n1_ms import bewerte_n1_ms
 from engine.n1_analyse import analysiere_n1
 from engine.revision import speichere_revision
 
-ENGINE_VERSION = "1.2.0"
+ENGINE_VERSION = "1.3.0"
 import math
 from typing import Optional
 
@@ -625,6 +625,124 @@ def berechne_n1_prescreen(thermisch, trafo, topologie, parallele, redundanz,
     }
 
 
+def _bewertung_rang(bewertung):
+    return {
+        'NICHT_GEPRUEFT': -1,
+        'GRUEN': 0,
+        'GELB': 1,
+        'ORANGE': 2,
+        'ROT': 3,
+    }.get(str(bewertung or '').upper(), -1)
+
+
+def _schlechteste_bewertung(*bewertungen):
+    aktive = [b for b in bewertungen if _bewertung_rang(b) >= 0]
+    if not aktive:
+        return 'NICHT_GEPRUEFT'
+    return max(aktive, key=_bewertung_rang)
+
+
+def _append_unique_text(items, text):
+    if text and text not in items:
+        items.append(text)
+
+
+def _n1_annahmen_texte(n1_detail):
+    annahmen = []
+    for item in n1_detail.get('annahmen', []) if isinstance(n1_detail, dict) else []:
+        if not isinstance(item, dict):
+            continue
+        begruendung = _safe_text(item.get('begruendung'))
+        if begruendung:
+            annahmen.append(begruendung)
+    return annahmen
+
+
+def _n1_detailtext(n1_basis, n1_detail):
+    detail_gesamt = n1_detail.get('gesamt', {}) if isinstance(n1_detail, dict) else {}
+    teile = []
+    n1_klasse = _safe_text(detail_gesamt.get('n1_klasse'))
+    bewertung = _safe_text(detail_gesamt.get('bewertung') or n1_basis.get('bewertung'))
+    engpass = _safe_text(detail_gesamt.get('engpass_komponente'))
+    stufenbegruendung = _safe_text(detail_gesamt.get('stufenbegruendung'))
+
+    if n1_klasse:
+        teile.append(f'N-1-Level {n1_klasse}')
+    if bewertung:
+        teile.append(f'Gesamtbewertung {bewertung}')
+    if engpass and engpass != 'keine':
+        teile.append(f'Engpass {engpass}')
+    if stufenbegruendung:
+        teile.append(stufenbegruendung)
+
+    komponenten = []
+    for label, key in (
+        ('Topologie', 'n1_topologie'),
+        ('Abgang', 'n1_abgang'),
+        ('Leitung', 'n1_leitung'),
+        ('Trafo', 'n1_trafo'),
+        ('Spannung', 'n1_spannung'),
+    ):
+        block = n1_detail.get(key, {}) if isinstance(n1_detail, dict) else {}
+        if not isinstance(block, dict):
+            continue
+        if _safe_text(block.get('bewertung')) in ('', 'NICHT_GEPRUEFT'):
+            continue
+        klartext = _safe_text(block.get('begruendung_klartext'))
+        if klartext:
+            komponenten.append(f'{label}: {klartext}')
+
+    if komponenten:
+        teile.append(' | '.join(komponenten[:2]))
+    basis_text = _safe_text(n1_basis.get('topologie_text'))
+    if basis_text and not komponenten:
+        teile.append(basis_text)
+
+    return '. '.join(teil for teil in teile if teil)
+
+
+def konsolidiere_n1_ergebnis(n1_basis, n1_detail):
+    basis = dict(n1_basis or {})
+    if not isinstance(n1_detail, dict):
+        basis['detail_text'] = _safe_text(basis.get('topologie_text'))
+        basis['detail_empfehlungen'] = []
+        basis['detail_annahmen'] = []
+        return basis
+
+    detail_gesamt = n1_detail.get('gesamt', {}) if isinstance(n1_detail.get('gesamt'), dict) else {}
+    detail_bewertung = _safe_text(detail_gesamt.get('bewertung'))
+    detail_empfehlungen = [
+        str(item) for item in detail_gesamt.get('empfehlungen', [])
+        if str(item).strip()
+    ]
+    detail_annahmen = _n1_annahmen_texte(n1_detail)
+
+    basis['bewertung'] = _schlechteste_bewertung(basis.get('bewertung'), detail_bewertung)
+    basis['n1_klasse'] = detail_gesamt.get('n1_klasse')
+    basis['n1_konfidenz'] = detail_gesamt.get('konfidenz')
+    basis['engpass_komponente'] = detail_gesamt.get('engpass_komponente', 'keine')
+    basis['stufenbegruendung'] = detail_gesamt.get('stufenbegruendung')
+    basis['nachweise_vorhanden'] = detail_gesamt.get('nachweise_vorhanden', [])
+    basis['nachweise_fehlend'] = detail_gesamt.get('nachweise_fehlend', [])
+    basis['dso_daten_vorhanden'] = detail_gesamt.get('dso_daten_vorhanden')
+    basis['detail_empfehlungen'] = detail_empfehlungen
+    basis['detail_annahmen'] = detail_annahmen
+
+    if detail_bewertung == 'ROT':
+        basis['n1_sicher'] = False
+    elif detail_bewertung == 'GELB' and basis.get('n1_sicher') is not None:
+        basis['n1_sicher'] = False
+
+    detail_text = _n1_detailtext(basis, n1_detail)
+    if detail_text:
+        basis['detail_text'] = detail_text
+        basis['topologie_text'] = detail_text
+    else:
+        basis['detail_text'] = _safe_text(basis.get('topologie_text'))
+
+    return basis
+
+
 # =============================================================================
 # SZENARIOANALYSE
 # =============================================================================
@@ -831,6 +949,32 @@ def berechne_kosten(eingabe, spannungsebene, entfernung_km, parallele_systeme):
                      'kosten_schaltanlage_eur', 'kosten_genehmigung_eur']
     eigene_count = sum(1 for f in eigene_felder if _is_valid_number(eingabe.get(f)))
     konfidenz = 40 + (eigene_count / len(eigene_felder)) * 40
+    spread_low = 0.15
+    spread_high = 0.25
+    risikotreiber = []
+    band_annahmen = [
+        'Kosten werden bewusst als Bandbreite und nicht als punktgenaue Aussage ausgegeben.',
+        'Bandbreite basiert auf Anschlussdistanz, Spannungsebene, Parallelitaet und Anteil projektspezifischer Kosteneingaben.',
+    ]
+
+    if eigene_count == 0:
+        spread_low += 0.05
+        spread_high += 0.10
+        risikotreiber.append('Kostenbasis beruht ueberwiegend auf Referenzwerten ohne projektspezifische Einzelpreise.')
+    if entfernung_km >= 5:
+        spread_high += 0.05
+        risikotreiber.append('Laengere Trassenentfernung kann Tiefbau-, Kabel- und Wegerechtskosten erhoehen.')
+    if spannungsebene in ('MS', 'HS'):
+        spread_high += 0.05
+        risikotreiber.append('MS/HS-Anschluss erhoeht Stations-, Schutz- und Schaltanlagenscope.')
+    if parallele_systeme > 1:
+        spread_high += 0.05
+        risikotreiber.append('Parallele Systeme erhoehen Material- und Tiefbauaufwand.')
+
+    spread_low = min(spread_low, 0.25)
+    spread_high = min(spread_high, 0.45)
+    band_niedrig = investition_gesamt * (1 - spread_low)
+    band_hoch = investition_gesamt * (1 + spread_high)
 
     return {
         'kosten_trasse_eur': round(kosten_trasse),
@@ -839,9 +983,14 @@ def berechne_kosten(eingabe, spannungsebene, entfernung_km, parallele_systeme):
         'kosten_planung_eur': round(kosten_planung),
         'kosten_bkz_eur': round(bkz),
         'investition_gesamt_eur': round(investition_gesamt),
+        'band_niedrig_eur': round(band_niedrig),
+        'band_basis_eur': round(investition_gesamt),
+        'band_hoch_eur': round(band_hoch),
         'betriebskosten_pa_eur': round(betriebskosten_pa),
         'konfidenz_prozent': round(konfidenz),
         'quelle': 'Eigene + Referenz' if eigene_count > 0 else 'Referenzwerte',
+        'band_annahmen': band_annahmen,
+        'hauptrisikotreiber': risikotreiber,
     }
 
 
@@ -996,6 +1145,398 @@ def erzeuge_empfehlungen(thermisch, spannung, kurzschluss, n1, trafo, nb_check, 
 
 
 # =============================================================================
+# ERWEITERTE PROJEKT- / STAKEHOLDER-DIAGNOSE
+# =============================================================================
+
+def _safe_text(value, fallback=''):
+    if value is None:
+        return fallback
+    text = str(value).strip()
+    return text if text else fallback
+
+
+def _clamp_score(value: float) -> int:
+    return max(0, min(100, int(round(value))))
+
+
+def normalisiere_projektprofil(eingabe, p_mw):
+    raw_components = eingabe.get('project_components') or []
+    komponenten = []
+    total_installed_kw = 0.0
+    summary = []
+
+    for item in raw_components:
+        if not isinstance(item, dict):
+            continue
+        typ = _safe_text(item.get('component_type'), 'other')
+        capacity_kw = max(0.0, float(item.get('capacity_kw') or 0))
+        energy_kwh = _float_or_none(item.get('energy_kwh'))
+        max_export_kw = max(0.0, float(item.get('max_export_kw') or 0))
+        max_import_kw = max(0.0, float(item.get('max_import_kw') or 0))
+        controllable = bool(item.get('controllable', False))
+        label = _safe_text(item.get('label'), typ.upper())
+        if capacity_kw <= 0:
+            continue
+        komponenten.append({
+            'component_type': typ,
+            'label': label,
+            'capacity_kw': round(capacity_kw, 2),
+            'energy_kwh': round(energy_kwh, 2) if energy_kwh is not None else None,
+            'max_export_kw': round(max_export_kw, 2) if max_export_kw > 0 else None,
+            'max_import_kw': round(max_import_kw, 2) if max_import_kw > 0 else None,
+            'controllable': controllable,
+        })
+        total_installed_kw += capacity_kw
+        text = f'{label}: {round(capacity_kw, 1)} kW'
+        if energy_kwh is not None:
+            text += f' / {round(energy_kwh, 1)} kWh'
+        summary.append(text)
+
+    if not komponenten:
+        fallback_kw = round(max(0.0, float(p_mw)) * 1000, 2)
+        fallback_type = _safe_text(eingabe.get('anlagentyp'), 'PV')
+        komponenten = [{
+            'component_type': fallback_type.lower(),
+            'label': fallback_type,
+            'capacity_kw': fallback_kw,
+            'energy_kwh': None,
+            'max_export_kw': fallback_kw,
+            'max_import_kw': 0.0,
+            'controllable': False,
+        }]
+        total_installed_kw = fallback_kw
+        summary = [f'{fallback_type}: {round(fallback_kw, 1)} kW']
+
+    nap = eingabe.get('netzanschlusspunkt') if isinstance(eingabe.get('netzanschlusspunkt'), dict) else {}
+    max_export_kw = _float_or_none(nap.get('max_export_kw'))
+    max_import_kw = _float_or_none(nap.get('max_import_kw'))
+    if max_export_kw is None:
+        exportfaehige_typen = {'pv', 'wind', 'battery', 'other'}
+        max_export_kw = sum(
+            float(c.get('max_export_kw') or c.get('capacity_kw') or 0)
+            for c in komponenten
+            if c.get('component_type') in exportfaehige_typen
+        )
+        if max_export_kw <= 0:
+            max_export_kw = round(max(0.0, p_mw) * 1000, 2)
+    if max_import_kw is None:
+        max_import_kw = sum(float(c.get('max_import_kw') or 0) for c in komponenten if c.get('component_type') in ('battery', 'load', 'charging', 'electrolyzer', 'heat_pump'))
+
+    is_hybrid = len({c['component_type'] for c in komponenten}) > 1
+    if is_hybrid:
+        text = (
+            'Hybridprojekt erkannt. Entscheidend fuer die Bewertung ist die maximale Wirkung am Netzanschlusspunkt, '
+            'nicht nur die Summe installierter Leistungen.'
+        )
+    else:
+        text = 'Einzelprojektprofil ohne ausgepraegte Hybridkopplung.'
+
+    return {
+        'components': komponenten,
+        'total_installed_kw': round(total_installed_kw, 2),
+        'component_count': len(komponenten),
+        'is_hybrid': is_hybrid,
+        'component_summary': summary,
+        'max_export_kw': round(max_export_kw or 0.0, 2),
+        'max_import_kw': round(max_import_kw or 0.0, 2),
+        'summary': text,
+    }
+
+
+def bewerte_speicherprofil(eingabe, projektprofil):
+    storage = eingabe.get('storage_profile') if isinstance(eingabe.get('storage_profile'), dict) else {}
+    components = projektprofil.get('components', [])
+    battery_component = next((c for c in components if c.get('component_type') == 'battery'), None)
+    relevant = bool(storage.get('has_storage')) or battery_component is not None
+    mode = _safe_text(storage.get('operation_mode'), 'unknown')
+    warnings = []
+    benefit_flags = []
+    score = 10
+
+    if not relevant:
+        return {
+            'relevant': False,
+            'operation_mode': 'unknown',
+            'flexibility_score': 0,
+            'grid_support_score': 0,
+            'benefit_flags': [],
+            'warnings': [],
+            'summary': 'Kein Speicherprofil angegeben. Zusätzliche Flexibilitätsvorteile werden nicht unterstellt.',
+            'disclaimer': 'Netzdienliche Effekte werden nur bewertet, wenn Speicherkonzept und Steuerbarkeit angegeben sind.',
+        }
+
+    power_kw = _float_or_none(storage.get('power_kw'))
+    energy_kwh = _float_or_none(storage.get('energy_kwh'))
+    if battery_component is not None:
+        if power_kw is None:
+            power_kw = float(battery_component.get('capacity_kw') or 0)
+        if energy_kwh is None:
+            energy_kwh = _float_or_none(battery_component.get('energy_kwh'))
+
+    if power_kw:
+        score += 20
+    if energy_kwh:
+        score += 10
+    if storage.get('reactive_power_capable'):
+        score += 15
+        benefit_flags.append('Blindleistungsbereitstellung moeglich')
+    if storage.get('remote_control_capable'):
+        score += 15
+        benefit_flags.append('Fernsteuerbarkeit angegeben')
+    if storage.get('schedule_based_dispatch'):
+        score += 10
+        benefit_flags.append('Fahrplanbetrieb vorgesehen')
+    if storage.get('dynamic_export_limit'):
+        score += 10
+        benefit_flags.append('Dynamische Einspeisebegrenzung vorgesehen')
+    if storage.get('curtailment_ready'):
+        score += 10
+        benefit_flags.append('Abregelung / kuratives Verhalten vorgesehen')
+    if storage.get('peak_shaving'):
+        score += 5
+        benefit_flags.append('Peak-Shaving / Lastmanagement moeglich')
+
+    grid_support_bonus = {
+        'grid_support': 25,
+        'partial_grid_support': 15,
+        'hybrid': 10,
+        'market': 0,
+        'unknown': 0,
+    }.get(mode, 0)
+    grid_support_score = _clamp_score(score + grid_support_bonus)
+
+    if mode in ('market', 'unknown'):
+        warnings.append('Speicherprofil ist nicht eindeutig netzdienlich beschrieben. Positive Effekte werden daher konservativ begrenzt.')
+    if not storage.get('remote_control_capable'):
+        warnings.append('Fernsteuerbarkeit nicht bestaetigt. Abstimmungsfaehigkeit mit dem VNB bleibt offen.')
+
+    summary = (
+        'Speicherprofil mit netzdienlichen Elementen erkannt.'
+        if grid_support_score >= 60
+        else 'Speicher vorhanden, aber netzdienliche Betriebsweise nur teilweise oder noch offen beschrieben.'
+    )
+
+    return {
+        'relevant': True,
+        'operation_mode': mode,
+        'flexibility_score': _clamp_score(score),
+        'grid_support_score': grid_support_score,
+        'benefit_flags': benefit_flags,
+        'warnings': warnings,
+        'summary': summary,
+        'disclaimer': (
+            'Netzdienliche Speicher- oder Flexibilitaetskonzepte koennen die technische Bewertung und Abstimmungsfaehigkeit '
+            'verbessern. Eine bevorzugte Behandlung ist daraus nicht ableitbar und haengt vom zustaendigen Netzbetreiber ab.'
+        ),
+    }
+
+
+def bewerte_umwelt_trasse(eingabe):
+    env = eingabe.get('environmental_route') if isinstance(eingabe.get('environmental_route'), dict) else {}
+    drivers = []
+    mitigation = [str(x) for x in env.get('mitigation_measures', []) if str(x).strip()]
+    score = 85
+
+    route_length = _float_or_none(env.get('route_length_km'))
+    if route_length is not None:
+        if route_length > 10:
+            score -= 20
+            drivers.append('Lange Trasse > 10 km')
+        elif route_length > 3:
+            score -= 10
+            drivers.append('Mittlere Trassenlaenge > 3 km')
+
+    crossings = env.get('crossings_count')
+    if crossings is not None:
+        try:
+            crossings_int = int(crossings)
+        except (TypeError, ValueError):
+            crossings_int = 0
+        if crossings_int >= 5:
+            score -= 20
+            drivers.append('Mehrere Querungen entlang der Trasse')
+        elif crossings_int >= 2:
+            score -= 10
+            drivers.append('Einzelne Querungen entlang der Trasse')
+
+    for flag, malus, text in (
+        ('protected_area_touch', 20, 'Beruehrung von Schutzgebieten'),
+        ('water_protection_area', 15, 'Wasserschutzthema moeglich'),
+        ('forest_crossing', 10, 'Waldquerung moeglich'),
+        ('third_party_land', 10, 'Drittrechte / Wegerechte relevant'),
+        ('noise_sensitive_area', 5, 'Sensibles Umfeld entlang der Trasse'),
+    ):
+        if env.get(flag):
+            score -= malus
+            drivers.append(text)
+
+    complexity = _safe_text(env.get('route_complexity'), 'unbekannt')
+    if complexity == 'hoch':
+        score -= 20
+        drivers.append('Trassenkomplexitaet hoch')
+    elif complexity == 'mittel':
+        score -= 10
+        drivers.append('Trassenkomplexitaet mittel')
+
+    score = _clamp_score(score)
+    if score >= 70:
+        level = 'niedrig'
+        summary = 'Umwelt- und Trassenrisiko im Pre-Check eher begrenzt.'
+    elif score >= 45:
+        level = 'mittel'
+        summary = 'Umwelt- oder Trassenthemen sollten vor Antragstellung vertieft werden.'
+    else:
+        level = 'hoch'
+        summary = 'Erhoehtes Umwelt-/Trassenrisiko. Diese Punkte koennen die Anschlussstrategie stark beeinflussen.'
+
+    return {
+        'risk_score': score,
+        'risk_level': level,
+        'drivers': drivers,
+        'mitigation': mitigation,
+        'summary': summary,
+    }
+
+
+def bewerte_stakeholder_konflikt(eingabe, projektprofil, speicher, umwelt, kosten):
+    stakeholder = eingabe.get('stakeholder_context') if isinstance(eingabe.get('stakeholder_context'), dict) else {}
+    nap = eingabe.get('netzanschlusspunkt') if isinstance(eingabe.get('netzanschlusspunkt'), dict) else {}
+    priority_focus = _safe_text(stakeholder.get('priority_focus'), 'balanced')
+
+    projektierer_score = 75
+    netz_score = 55
+    umsetzung_score = 70
+
+    if projektprofil.get('is_hybrid'):
+        netz_score += 10
+        projektierer_score += 5
+    if projektprofil.get('max_export_kw', 0) and projektprofil.get('total_installed_kw', 0):
+        if projektprofil['max_export_kw'] < projektprofil['total_installed_kw'] * 0.8:
+            netz_score += 10
+            projektierer_score += 5
+    if nap.get('own_transformer'):
+        netz_score += 10
+        umsetzung_score += 5
+    if nap.get('own_substation'):
+        netz_score += 15
+        projektierer_score -= 5
+    if speicher.get('grid_support_score', 0) >= 60:
+        netz_score += 15
+        projektierer_score += 5
+
+    umwelt_level = umwelt.get('risk_level')
+    if umwelt_level == 'hoch':
+        projektierer_score -= 20
+        umsetzung_score -= 25
+    elif umwelt_level == 'mittel':
+        projektierer_score -= 10
+        umsetzung_score -= 10
+
+    investition = float((kosten or {}).get('investition_gesamt_eur', 0))
+    if investition >= 1_500_000:
+        projektierer_score -= 15
+    elif investition >= 500_000:
+        projektierer_score -= 8
+
+    if priority_focus == 'kosten':
+        projektierer_score += 5
+        netz_score -= 5
+    elif priority_focus == 'netz':
+        netz_score += 5
+    elif priority_focus == 'genehmigung':
+        umsetzung_score += 5
+    elif priority_focus == 'zeit':
+        umsetzung_score += 5
+
+    netz_score = _clamp_score(netz_score)
+    projektierer_score = _clamp_score(projektierer_score)
+    umsetzung_score = _clamp_score(umsetzung_score)
+
+    spread = max(netz_score, projektierer_score, umsetzung_score) - min(netz_score, projektierer_score, umsetzung_score)
+    if spread >= 30:
+        level = 'hoch'
+    elif spread >= 15:
+        level = 'mittel'
+    else:
+        level = 'niedrig'
+
+    if level == 'hoch':
+        summary = 'Deutlicher Zielkonflikt zwischen Netzsicht, Projektsicht und Umsetzbarkeit. Varianten- und Argumentationsstrategie frueh vorbereiten.'
+    elif level == 'mittel':
+        summary = 'Erkennbarer Zielkonflikt zwischen den Stakeholder-Perspektiven. Abstimmungsvorbereitung empfohlen.'
+    else:
+        summary = 'Stakeholder-Perspektiven liegen im Pre-Check noch relativ nah beieinander.'
+
+    recommended_focus = (
+        'Kosten- und Trassenargumentation gegenueber dem VNB strukturieren.'
+        if projektierer_score < netz_score
+        else 'Netz- und Betriebsrobustheit als Kernargument ausarbeiten.'
+        if netz_score < projektierer_score
+        else 'Ausgewogene Anschlussstrategie mit klaren Annahmen und Variantenhinweisen vorbereiten.'
+    )
+
+    return {
+        'netzbetreiber_score': netz_score,
+        'projektierer_score': projektierer_score,
+        'umsetzung_score': umsetzung_score,
+        'konflikt_level': level,
+        'konflikt_summary': summary,
+        'recommended_focus': recommended_focus,
+    }
+
+
+def erzeuge_transparenzblock(eingabe, dq, speicher, umwelt, stakeholder, n1):
+    assumptions = [
+        'Vorpruefung auf Basis des eingegebenen Projekt- und Anschlussprofils; keine verbindliche Netzanschlusszusage.',
+        'Ohne verifizierte VNB-Daten werden Hybrid-, Speicher- und Trassenangaben konservativ als Annahmen behandelt.',
+    ]
+    disclaimers = [
+        'Finale technische und regulatorische Bewertung liegt beim zustaendigen Netzbetreiber.',
+        'Netzdienliche Speicher- oder Infrastrukturmassnahmen verbessern moeglicherweise die Abstimmungsfaehigkeit, begruenden aber keine Bevorzugung.',
+        'Umwelt- und Trassenhinweise sind Pre-Check-Diagnosen und keine formale Genehmigungspruefung.',
+    ]
+    confidence_notes = [f'Datenqualitaet {dq.get("klasse", "D")}: {dq.get("text", "")}']
+
+    if speicher.get('warnings'):
+        confidence_notes.extend(speicher['warnings'])
+    if umwelt.get('drivers'):
+        confidence_notes.append('Wesentliche Umwelt-/Trassentreiber: ' + '; '.join(umwelt['drivers']))
+    confidence_notes.append(stakeholder.get('konflikt_summary', ''))
+    n1_klasse = _safe_text(n1.get('n1_klasse'))
+    n1_konfidenz = n1.get('n1_konfidenz')
+    if n1_klasse:
+        if n1_konfidenz is None:
+            confidence_notes.append(f'N-1-Screening als {n1_klasse} klassifiziert.')
+        else:
+            confidence_notes.append(f'N-1-Screening als {n1_klasse} klassifiziert (Konfidenz {n1_konfidenz}).')
+    for annahme in (n1.get('detail_annahmen') or [])[:2]:
+        confidence_notes.append(f'N-1-Annahme: {annahme}')
+
+    if eingabe.get('project_components'):
+        assumptions.append('Die maximale Einspeise-/Bezugswirkung am Netzanschlusspunkt wurde gegenueber der installierten Gesamtleistung bevorzugt bewertet.')
+    if n1_klasse in ('N1-0', 'N1-1', 'N1-2'):
+        assumptions.append(
+            f'Die N-1-Aussage erreicht aktuell nur {n1_klasse}; fuer belastbare Reserveaussagen fehlen noch verifizierte Netz- oder Umspannwerksdaten.'
+        )
+
+    return {
+        'assumptions': assumptions,
+        'disclaimers': disclaimers,
+        'confidence_notes': [note for note in confidence_notes if note],
+    }
+
+
+def erzeuge_erweiterte_scores(speicher, umwelt, stakeholder):
+    stakeholder_fit = round((stakeholder['netzbetreiber_score'] + stakeholder['projektierer_score'] + stakeholder['umsetzung_score']) / 3)
+    return {
+        'netzdienlichkeit': int(speicher.get('grid_support_score', 0)),
+        'projektfit': int(stakeholder.get('projektierer_score', 0)),
+        'umwelt_trasse': int(umwelt.get('risk_score', 0)),
+        'stakeholder_fit': int(stakeholder_fit),
+    }
+
+
+# =============================================================================
 # FAZIT / ENTSCHEIDUNGSLOGIK (3 Ebenen)
 # =============================================================================
 
@@ -1060,6 +1601,7 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     topologie = eingabe.get('topologie', 'unbekannt')
     temperatur_c = _float_or(eingabe.get('temperatur_c'), 20)
     bestehende_einspeisung_mw = _float_or(eingabe.get('bestehende_einspeisung_mw'), 0)
+    projektprofil = normalisiere_projektprofil(eingabe, p_mw)
 
     spannungsebene = bestimme_spannungsebene(u_kv)
 
@@ -1071,8 +1613,14 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     sk_mva = _float_or(eingabe.get('sk_mva'), SK_DEFAULT[spannungsebene])
     rx_ratio = _float_or(eingabe.get('rx_ratio'), RX_RATIO_DEFAULT[spannungsebene])
     trafo_s_mva = _float_or(eingabe.get('trafo_s_mva'), TRAFO_DEFAULTS[spannungsebene]['s_mva'])
-    trafo_uk = _float_or(eingabe.get('trafo_uk_prozent'), TRAFO_DEFAULTS[spannungsebene]['uk_prozent'])
-    bestand_trafo_proz = _float_or(eingabe.get('bestand_trafo_auslastung'), 0)
+    trafo_uk = _float_or(
+        eingabe.get('trafo_uk_prozent', eingabe.get('uk_prozent')),
+        TRAFO_DEFAULTS[spannungsebene]['uk_prozent'],
+    )
+    bestand_trafo_proz = _float_or(
+        eingabe.get('bestand_trafo_auslastung', eingabe.get('bestand_auslastung_prozent')),
+        0,
+    )
 
     r_q, x_q = berechne_quellenimpedanz(u_kv, sk_mva, rx_ratio)
     r_t, x_t = berechne_trafoimpedanz(u_kv, trafo_s_mva, trafo_uk)
@@ -1105,6 +1653,7 @@ def berechne_netzanschluss(eingabe, dry_run=False):
         )
     else:
         n1_analyse = {'status': 'NICHT_BEWERTET', 'text': 'Kein N-1 Szenario verfuegbar.'}
+    n1 = konsolidiere_n1_ergebnis(n1, n1_analyse)
 
     # Scores
     scores = berechne_scores(thermisch, spannung, kurzschluss, n1, datenqualitaet, trafo)
@@ -1113,6 +1662,17 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     # Kosten & Wirtschaftlichkeit
     kosten = berechne_kosten(eingabe, spannungsebene, entfernung_km, parallele_systeme)
     wirtschaftlichkeit = berechne_wirtschaftlichkeit(eingabe, kosten, p_mw)
+    speicher_bewertung = bewerte_speicherprofil(eingabe, projektprofil)
+    route_environment = bewerte_umwelt_trasse(eingabe)
+    stakeholder_bewertung = bewerte_stakeholder_konflikt(
+        eingabe, projektprofil, speicher_bewertung, route_environment, kosten
+    )
+    transparenz = erzeuge_transparenzblock(
+        eingabe, datenqualitaet, speicher_bewertung, route_environment, stakeholder_bewertung, n1
+    )
+    erweiterte_scores = erzeuge_erweiterte_scores(
+        speicher_bewertung, route_environment, stakeholder_bewertung
+    )
 
     # NB-Check
     nb_check = pruefe_nb_schwellenwerte(eingabe, thermisch, spannung, kurzschluss)
@@ -1120,6 +1680,31 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     # Empfehlungen
     empfehlungen = erzeuge_empfehlungen(thermisch, spannung, kurzschluss, n1, trafo,
                                          nb_check, datenqualitaet, pqs, eingabe)
+    for empfehlung in n1.get('detail_empfehlungen', []):
+        _append_unique_text(empfehlungen, empfehlung)
+    if projektprofil.get('is_hybrid'):
+        _append_unique_text(empfehlungen, 'Hybridkonzept mit fixer oder dynamischer Begrenzung am Netzanschlusspunkt dokumentieren.')
+    if speicher_bewertung.get('relevant'):
+        _append_unique_text(empfehlungen, speicher_bewertung['disclaimer'])
+    if route_environment.get('risk_level') in ('mittel', 'hoch'):
+        _append_unique_text(empfehlungen, 'Trassen- und Umweltannahmen vor offiziellem Antrag mit einer Vorpruefung absichern.')
+    if n1.get('engpass_komponente') not in (None, 'keine') and n1.get('bewertung') in ('GELB', 'ORANGE', 'ROT'):
+        _append_unique_text(
+            empfehlungen,
+            f"N-1-Engpass {n1['engpass_komponente']} gezielt mit dem Netzbetreiber verifizieren und absichern.",
+        )
+    _append_unique_text(empfehlungen, stakeholder_bewertung['recommended_focus'])
+
+    warnungen.extend(speicher_bewertung.get('warnings', []))
+    if stakeholder_bewertung.get('konflikt_level') == 'hoch':
+        _append_unique_text(warnungen, 'Hoher Stakeholder-Zielkonflikt zwischen Netzsicht, Projektsicht und Umsetzbarkeit.')
+    if route_environment.get('risk_level') == 'hoch':
+        _append_unique_text(warnungen, 'Erhoehtes Umwelt-/Trassenrisiko kann die Anschlussstrategie dominieren.')
+    if n1.get('n1_klasse') in ('N1-0', 'N1-1', 'N1-2'):
+        _append_unique_text(
+            warnungen,
+            f"N-1-Aussage aktuell nur als {n1['n1_klasse']} klassifiziert; fuer belastbare Reserveaussagen sind verifizierte Netz- oder Umspannwerksdaten noetig.",
+        )
 
     result = {
         'status': 'OK',
@@ -1152,6 +1737,13 @@ def berechne_netzanschluss(eingabe, dry_run=False):
         'nb_check': nb_check,
         'datenqualitaet': datenqualitaet,
         'empfehlungen': empfehlungen,
+        'projektprofil': projektprofil,
+        'speicher_bewertung': speicher_bewertung,
+        'route_environment': route_environment,
+        'stakeholder_bewertung': stakeholder_bewertung,
+        'erweiterte_scores': erweiterte_scores,
+        'transparenz': transparenz,
+        'disclaimer': transparenz['disclaimers'],
         'engine_version': ENGINE_VERSION,
     }
     try:

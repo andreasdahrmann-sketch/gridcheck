@@ -93,6 +93,7 @@ def berechne_netzcheck(
         'details': {
             'fazit': fazit, 'scores': scores, 'thermisch': thermisch,
             'spannung': spannung, 'kurzschluss': kurzschluss, 'n1': n1,
+            'n1_analyse': result.get('n1_analyse', {}),
             'szenarien': result.get('szenarien', []),
             'kosten': result.get('kosten', {}),
             'wirtschaftlichkeit': result.get('wirtschaftlichkeit', {}),

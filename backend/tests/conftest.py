@@ -1,7 +1,66 @@
 ﻿"""
 Gemeinsame Test-Fixtures fuer GridCheck Engine.
 """
-import pytest
+import os
+
+from sqlalchemy import create_engine, text
+
+from tests.postgres_test_utils import (
+    ensure_postgres_database_exists,
+    get_test_database_url,
+    run_alembic_upgrade,
+)
+
+# API-Tests importieren `main` beim Sammeln; daher PostgreSQL-Test-URL vor allen
+# anderen Imports setzen und die Datenbank bei Bedarf anlegen.
+TEST_DATABASE_URL = get_test_database_url()
+ensure_postgres_database_exists(TEST_DATABASE_URL)
+os.environ["TEST_DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("JWT_SECRET", "pytest-gridcheck-access-secret-32-chars")
+os.environ.setdefault("JWT_REFRESH_SECRET", "pytest-gridcheck-refresh-secret-32")
+os.environ.setdefault("AUTO_CREATE_SCHEMA", "false")
+# Starlette TestClient nutzt Host "testserver"; TrustedHostMiddleware sonst 400.
+os.environ["TRUSTED_HOSTS"] = "localhost,127.0.0.1,testserver"
+
+import pytest  # noqa: E402
+
+from db.database import Base, engine, get_db  # noqa: E402
+from main import app  # noqa: E402
+
+
+def _purge_audit_chain_tables() -> None:
+    """Leert Audit-Chain-Tabellen inklusive Sequenzen fuer stabile Revisionsnummern."""
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                "TRUNCATE TABLE "
+                "ki_feedback_records, report_revision_records, revision_records "
+                "RESTART IDENTITY CASCADE"
+            )
+        )
+        conn.commit()
+
+
+@pytest.fixture(autouse=True)
+def _reset_fastapi_dependency_overrides():
+    """Auth/Billing-Tests setzen get_db-Overrides; global zuruecksetzen."""
+    app.dependency_overrides.pop(get_db, None)
+    yield
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_audit_chain_tables():
+    """Verhindert flaky Revision-Tests durch Daten aus vorherigen Tests."""
+    _purge_audit_chain_tables()
+    yield
+    _purge_audit_chain_tables()
+
+_bootstrap_engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True, connect_args={"connect_timeout": 10})
+run_alembic_upgrade(TEST_DATABASE_URL)
+_bootstrap_engine.dispose()
 
 
 @pytest.fixture
@@ -52,32 +111,30 @@ def basis_pv_stich():
 
 
 @pytest.fixture
-def isolierte_revisionen(tmp_path, monkeypatch):
-    """
-    Isoliert die Revisions-Datei in tmp_path, damit produktive
-    daten/revisionen.jsonl waehrend Tests NIE veraendert wird.
-
-    Patcht REVISIONS_PFAD modulglobal in engine.revision.
-    """
-    from engine import revision as rev_mod
-
-    tmp_file = tmp_path / "revisionen.jsonl"
-    monkeypatch.setattr(rev_mod, "REVISIONS_PFAD", str(tmp_file))
-    # Legacy-Pfad ebenfalls weg-patchen, falls referenziert
-    legacy = tmp_path / "revisionen.json"
-    if hasattr(rev_mod, "LEGACY_PFAD"):
-        monkeypatch.setattr(rev_mod, "LEGACY_PFAD", str(legacy))
-    return tmp_file
+def isolierte_revisionen():
+    _purge_audit_chain_tables()
+    yield
 
 
 @pytest.fixture
-def isolierte_ki_feedback(tmp_path, monkeypatch):
-    """
-    Isoliert die KI-Feedback-Datei in tmp_path, damit produktive
-    daten/ki_feedback.jsonl waehrend Tests NIE veraendert wird.
-    """
-    from engine import ki_feedback as ki_fb_mod
+def isolierte_ki_feedback():
+    _purge_audit_chain_tables()
+    yield
 
-    tmp_file = tmp_path / "ki_feedback.jsonl"
-    monkeypatch.setattr(ki_fb_mod, "KI_FEEDBACK_PFAD", str(tmp_file))
+
+@pytest.fixture
+def isolierte_report_revisionen():
+    _purge_audit_chain_tables()
+    yield
+
+
+@pytest.fixture
+def isolierte_ki_lerndaten(tmp_path, monkeypatch):
+    """
+    Isoliert Legacy-Lerndaten, damit der KI-Pfad nur explizit gesetzte Daten nutzt.
+    """
+    from engine import ki_modul as ki_mod
+
+    tmp_file = tmp_path / "ki_lerndaten.json"
+    monkeypatch.setattr(ki_mod, "KI_DATEN_PFAD", str(tmp_file))
     return tmp_file

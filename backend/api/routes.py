@@ -1,11 +1,14 @@
 # C:\Users\andre\gridcheck\backend\api\routes.py
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 
+from core.auth import get_current_user, require_csrf
 from core.config import settings
+from core.rate_limit import enforce_scoped_rate_limit
 from db.database import get_db
+from db.models import User
 from services.analysis_service import (
     get_audit_logs,
     get_latest_result,
@@ -61,31 +64,73 @@ class AnalyzeResponse(BaseModel):
 #  ENDPOINTS
 # ============================================================
 
-@router.post("/api/v1/analyze")
-def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
-    """Hauptendpoint — führt Netzanschluss-Analyse aus."""
-    return run_analysis_and_persist(db, req.model_dump(by_alias=False))
+
+def _run_persist_analysis(req: AnalyzeRequest, db: Session, current_user: User):
+    return run_analysis_and_persist(db, req.model_dump(by_alias=False), current_user)
+
+@router.post("/api/v1/analyze/persist")
+def analyze(
+    request: Request,
+    req: AnalyzeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf),
+):
+    """Persistente Analyse (legt Projekt/Check-Ergebnis in DB an).
+
+    Stateless Voll-Analyse liegt unter POST /api/v1/analyze (analyze_v2).
+    Dieser Pfad bleibt fuer das Legacy-/Projektliste-Frontend mit projektname.
+    """
+    enforce_scoped_rate_limit(
+        "analysis:persist",
+        request=request,
+        current_user=current_user,
+        user_limit=8,
+        ip_limit=30,
+        window_seconds=300,
+        message="Zu viele persistente Analysen",
+        hint="Bitte kurz warten, bevor Sie eine weitere Projekt-Analyse speichern.",
+    )
+    return _run_persist_analysis(req, db, current_user)
 
 
 # Aliase für Rückwärtskompatibilität
 @router.post("/api/v1/check")
-def check_alias(req: AnalyzeRequest, db: Session = Depends(get_db)):
-    return analyze(req, db)
+def check_alias(
+    request: Request,
+    req: AnalyzeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf),
+):
+    return analyze(request, req, db, current_user)
 
 @router.post("/api/v1/calculate")
-def calculate_alias(req: AnalyzeRequest, db: Session = Depends(get_db)):
-    return analyze(req, db)
+def calculate_alias(
+    request: Request,
+    req: AnalyzeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf),
+):
+    return analyze(request, req, db, current_user)
 
 
 @router.get("/api/v1/history")
-@router.get("/api/v1/projects")
-def list_projects(db: Session = Depends(get_db)):
-    return list_projects_summary(db)
+def list_projects_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return list_projects_summary(db, current_user)
 
 
 @router.get("/api/v1/result/{project_id}")
-def get_result(project_id: int, db: Session = Depends(get_db)):
-    result = get_latest_result(db, project_id)
+def get_result(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = get_latest_result(db, current_user, project_id)
     if not result:
         raise HTTPException(
             status_code=404,
@@ -99,8 +144,12 @@ def get_result(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/api/v1/audit/{project_id}")
-def get_audit(project_id: int, db: Session = Depends(get_db)):
-    logs = get_audit_logs(db, project_id)
+def get_audit(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    logs = get_audit_logs(db, current_user, project_id)
     if not logs:
         raise HTTPException(
             status_code=404,
@@ -118,7 +167,7 @@ if settings.enable_legacy_routes:
     router.add_api_route("/api/analyze", analyze, methods=["POST"])
     router.add_api_route("/api/check", check_alias, methods=["POST"])
     router.add_api_route("/api/calculate", calculate_alias, methods=["POST"])
-    router.add_api_route("/api/history", list_projects, methods=["GET"])
-    router.add_api_route("/api/projects", list_projects, methods=["GET"])
+    router.add_api_route("/api/history", list_projects_history, methods=["GET"])
+    router.add_api_route("/api/projects", list_projects_history, methods=["GET"])
     router.add_api_route("/api/result/{project_id}", get_result, methods=["GET"])
     router.add_api_route("/api/audit/{project_id}", get_audit, methods=["GET"])

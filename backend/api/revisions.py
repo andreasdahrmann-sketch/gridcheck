@@ -5,8 +5,11 @@ B.6 - Export-Endpoints (CSV/JSON/PDF)
 Externe Auditoren / Netzbetreiber koennen die Integritaet pruefen
 und audit-taugliche Exporte erzeugen.
 """
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
+
+from core.auth import require_admin_user
 from core.errors import AnalysisError
+from db.models import User
 from services.revisions_service import (
     count_revisions as svc_count_revisions,
     get_revision_by_hash as svc_get_revision_by_hash,
@@ -18,13 +21,13 @@ router = APIRouter(prefix="/revisions", tags=["revisions"])
 
 
 @router.get("/verify")
-def verify_chain():
+def verify_chain(_: User = Depends(require_admin_user)):
     """Prueft die komplette Hash-Chain auf Integritaet."""
     return verify_revisions_chain()
 
 
 @router.get("/count")
-def count_revisions():
+def count_revisions(_: User = Depends(require_admin_user)):
     """Schnelle Anzahl + letzte Revisionsnummer."""
     return svc_count_revisions()
 
@@ -32,13 +35,13 @@ def count_revisions():
 # --- B.6 Export-Endpoints (vor /{hash_value} platziert wegen Routing-Prioritaet) ---
 
 @router.get("/export/json")
-def export_revisions_json():
+def export_revisions_json(_: User = Depends(require_admin_user)):
     """Vollstaendiger JSON-Export mit Audit-Header."""
     return export_json()
 
 
 @router.get("/export/csv")
-def export_revisions_csv():
+def export_revisions_csv(_: User = Depends(require_admin_user)):
     """CSV-Export (Semikolon-getrennt, Excel-kompatibel)."""
     csv_text = export_csv()
     return Response(
@@ -49,7 +52,7 @@ def export_revisions_csv():
 
 
 @router.get("/export/pdf")
-def export_revisions_pdf():
+def export_revisions_pdf(_: User = Depends(require_admin_user)):
     """Audit-taugliches PDF (Querformat, Hash-Chain-Tabelle)."""
     pdf_bytes = export_pdf()
     return Response(
@@ -62,7 +65,7 @@ def export_revisions_pdf():
 # --- Catch-all (muss am Ende stehen) ---
 
 @router.get("/{hash_value}")
-def get_revision_by_hash(hash_value: str):
+def get_revision_by_hash(hash_value: str, _: User = Depends(require_admin_user)):
     """Holt einen Revisionseintrag per vollem SHA-256."""
     try:
         return svc_get_revision_by_hash(hash_value)

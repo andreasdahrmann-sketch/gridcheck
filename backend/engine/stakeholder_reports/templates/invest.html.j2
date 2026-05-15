@@ -18,6 +18,30 @@
   <h1>Investoren – Kurzreport</h1>
   <div class="muted">Version {{ report.report_version }} | Normstand {{ report.app_normstand }}</div>
   <div class="muted">Engine-Revision: {{ report.engine_revision_hash or "n/a" }}</div>
+  {% if report.report_revision_number or report.report_revision_uuid %}
+  <div class="muted">
+    Report-Revision: #{{ report.report_revision_number or "n/a" }} | UUID: {{ report.report_revision_uuid or "n/a" }}
+  </div>
+  {% endif %}
+  <div class="muted">Erzeugt: {{ report.report_generated_at or "n/a" }} | Audit-Hash: {{ report.audit_hash or "n/a" }}</div>
+  {% if report.report_verify_path %}
+  <div class="muted">Verify-Pfad: {{ report.report_verify_path }}</div>
+  {% endif %}
+  {% if report.source_analysis_run_id or report.source_revision_hash %}
+  <div class="muted">
+    Quelle: Analysis-Run {{ report.source_analysis_run_id or "n/a" }} | Source-Revision: {{ report.source_revision_hash or "n/a" }}
+  </div>
+  {% endif %}
+  {% if report.source_request_checksum or report.source_result_checksum %}
+  <div class="muted">
+    Source-Checksums: Request {{ report.source_request_checksum or "n/a" }} | Result {{ report.source_result_checksum or "n/a" }}
+  </div>
+  {% endif %}
+  <div class="muted">
+    Paket: {{ report.offer_id or "manual" }} | Package-Scope: {{ report.package_scope_label }} ({{ report.package_scope }})
+    | Report-Scope: {{ report.report_scope_label }} ({{ report.report_scope }})
+  </div>
+  <div class="muted">{{ report.scope_summary }}</div>
 
   <h2>Projektkern</h2>
   <ul>
@@ -31,7 +55,17 @@
     </li>
   </ul>
 
-  {% if report.kosten_indikation %}
+  <h2>Standortbewertung</h2>
+  <table>
+    <thead><tr><th>Block</th><th>Status</th><th>Hinweis</th></tr></thead>
+    <tbody>
+      {% for item in report.site_assessment %}
+      <tr><td>{{ item.label }}</td><td>{{ item.status }}</td><td>{{ item.detail }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if report.includes_cost_section and report.kosten_indikation %}
   <h2>Kosten-Indikation</h2>
   <p class="muted">Indikativ aus Engine-Kostenmodul; Bandbreiten/Annahmen siehe technischer Report.</p>
   <table>
@@ -42,6 +76,28 @@
       {% endfor %}
     </tbody>
   </table>
+  {% elif not report.includes_cost_section %}
+  <h2>Paketgrenze</h2>
+  <p>{{ report.scope_boundary_note }}</p>
+  {% endif %}
+
+  {% if report.cost_band %}
+  <h2>Kostenbandbreite</h2>
+  <ul>
+    <li>Niedrig: {{ report.cost_band.niedrig_eur }} EUR</li>
+    <li>Basis: {{ report.cost_band.basis_eur }} EUR</li>
+    <li>Hoch: {{ report.cost_band.hoch_eur }} EUR</li>
+    <li>Confidence: {{ report.cost_band.confidence_pct }}%</li>
+    <li>Quelle: {{ report.cost_band.source or "n/a" }}</li>
+  </ul>
+  {% if report.cost_band.assumptions %}
+  <p><strong>Annahmen</strong></p>
+  <ul>{% for item in report.cost_band.assumptions %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if report.cost_band.drivers %}
+  <p><strong>Risikotreiber</strong></p>
+  <ul>{% for item in report.cost_band.drivers %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% endif %}
   {% endif %}
 
   <h2>N-1 Status</h2>
@@ -49,6 +105,16 @@
     <li>{{ report.n1_status }}</li>
     <li>{{ report.n1_detail }}</li>
   </ul>
+
+  <h2>Risikoanalyse</h2>
+  <table>
+    <thead><tr><th>Achse</th><th>Level</th><th>Einordnung</th></tr></thead>
+    <tbody>
+      {% for item in report.risk_overview %}
+      <tr><td>{{ item.label }}</td><td>{{ item.status }}</td><td>{{ item.detail }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
 
   <h2>Auflagen</h2>
   {% if report.auflagen %}
@@ -64,6 +130,48 @@
   <p>Keine Maßnahmen gemeldet.</p>
   {% endif %}
 
+  {% if report.includes_strategy_section %}
+  <h2>Anschlussstrategie / Risiko</h2>
+  <ul>
+    <li><strong>Projektprofil:</strong> {{ report.projektprofil_summary or "n/a" }}</li>
+    <li><strong>Speicher / Flexibilität:</strong> {{ report.speicher_summary or "n/a" }}</li>
+    <li><strong>Umwelt / Trasse:</strong> {{ report.route_environment_summary or "n/a" }}</li>
+    <li><strong>Stakeholder-Zielkonflikt:</strong> {{ report.stakeholder_konflikt or "n/a" }}</li>
+    <li><strong>Empfohlener Fokus:</strong> {{ report.recommended_focus or "n/a" }}</li>
+  </ul>
+  {% endif %}
+
+  {% if report.includes_transparency_section %}
+  <h2>Transparenz / Confidence</h2>
+  {% if report.transparenz_hinweise %}
+  <ul>{% for h in report.transparenz_hinweise %}<li>{{ h }}</li>{% endfor %}</ul>
+  {% else %}
+  <p>Keine zusätzlichen Hinweise.</p>
+  {% endif %}
+  {% endif %}
+
+  <h2>Due-Diligence-orientierte Sicht</h2>
+  <table>
+    <thead><tr><th>Block</th><th>Status</th><th>Hinweis</th></tr></thead>
+    <tbody>
+      {% for item in report.due_diligence_checklist %}
+      <tr><td>{{ item.label }}</td><td>{{ item.status }}</td><td>{{ item.detail }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Portfolio- / Vergleichssicht</h2>
+  <ul>{% for item in report.portfolio_view %}<li>{{ item }}</li>{% endfor %}</ul>
+
+  <h2>Datenbasis & Sichtbarkeitsgrenze</h2>
+  <ul>{% for item in report.data_basis %}<li>{{ item }}</li>{% endfor %}</ul>
+  <p>{{ report.visibility_boundary_note }}</p>
+
+  {% if report.ops_followup_required %}
+  <h2>Professional Hinweis</h2>
+  <p>{{ report.operational_boundary_note }}</p>
+  {% endif %}
+
   <h2>Normen-Snapshot</h2>
   <table>
     <thead><tr><th>Norm</th><th>Titel</th><th>Stand</th><th>Kategorie</th></tr></thead>
@@ -75,5 +183,8 @@
   </table>
 
   <p class="muted">Vorläufige Analyse. Keine verbindliche Netzanschlusszusage.</p>
+  {% if report.disclaimers %}
+  <ul class="muted">{% for d in report.disclaimers %}<li>{{ d }}</li>{% endfor %}</ul>
+  {% endif %}
 </body>
 </html>

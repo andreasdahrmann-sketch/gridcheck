@@ -22,6 +22,14 @@ export interface Antrag {
   hat_blindleistung: boolean;
   hat_einspeisemanagement: boolean;
   gridcheck_score?: number;        // aus engine.ts
+  storage_operation_mode?: "market" | "hybrid" | "partial_grid_support" | "grid_support" | "unknown";
+  stakeholder_konflikt_level?: "niedrig" | "mittel" | "hoch";
+  route_risk_level?: "niedrig" | "mittel" | "hoch";
+  max_export_kw?: number;
+  max_import_kw?: number;
+  remote_control_ready?: boolean;
+  netzdienlichkeit_score_backend?: number;
+  stakeholder_fit_score_backend?: number;
 }
 
 export interface PrioResult {
@@ -50,6 +58,10 @@ export const GEWICHTE = {
 // 1. Netzdienlichkeit (0-100)
 // ============================================================
 function bewerteNetzdienlichkeit(a: Antrag): number {
+  if (typeof a.netzdienlichkeit_score_backend === "number") {
+    return Math.max(0, Math.min(100, Math.round(a.netzdienlichkeit_score_backend)));
+  }
+
   let score = 0;
 
   // Anlagentyp-Bonus
@@ -64,13 +76,18 @@ function bewerteNetzdienlichkeit(a: Antrag): number {
   score += typBonus[a.anlagentyp] ?? 5;
 
   // Speicher-Bonus
-  if (a.hat_speicher) score += 25;
+  if (a.hat_speicher) score += 20;
 
   // Blindleistungsfähigkeit
   if (a.hat_blindleistung) score += 15;
 
   // Einspeisemanagement (§14a EnWG / Redispatch 2.0)
   if (a.hat_einspeisemanagement) score += 15;
+
+  if (a.remote_control_ready) score += 10;
+  if (a.storage_operation_mode === "grid_support") score += 15;
+  if (a.storage_operation_mode === "partial_grid_support") score += 10;
+  if (a.storage_operation_mode === "hybrid") score += 5;
 
   // GridCheck-Score einfließen lassen (Machbarkeit = weniger Netzausbau)
   if (a.gridcheck_score !== undefined) {
@@ -119,6 +136,10 @@ function erkenneDopplung(a: Antrag, alle: Antrag[]): DopplungResult {
 // 4. Dringlichkeit (0-100)
 // ============================================================
 function bewerteDringlichkeit(a: Antrag): number {
+  if (typeof a.stakeholder_fit_score_backend === "number") {
+    return Math.max(0, Math.min(100, Math.round(a.stakeholder_fit_score_backend)));
+  }
+
   let score = 0;
 
   // Projektreife
@@ -173,9 +194,15 @@ export function priorisiereAntraege(antraege: Antrag[]): PrioResult[] {
 
     const hinweise: string[] = [];
     if (dp.erkannt) hinweise.push(`Mögliche Dopplung mit: ${dp.ids.join(', ')}`);
-    if (nd >= 70) hinweise.push('Hohe Netzdienlichkeit → bevorzugte Bearbeitung empfohlen');
+    if (nd >= 70) hinweise.push('Hohe technische/operative Attraktivität für die Vorqualifizierung');
     if (dr >= 80) hinweise.push('Hohe Dringlichkeit (Förderfrist / Baubereit)');
     if (wl <= 20) hinweise.push('Neuerer Antrag → niedrigere Wartelistenposition');
+    if (a.stakeholder_konflikt_level === "hoch") {
+      hinweise.push("Hoher Stakeholder-Zielkonflikt: Netzsicht und Projektsicht früh abstimmen");
+    }
+    if (a.route_risk_level === "hoch") {
+      hinweise.push("Erhöhtes Umwelt-/Trassenrisiko kann die Anschlussvariante beeinflussen");
+    }
 
     return {
       antrag_id: a.id,

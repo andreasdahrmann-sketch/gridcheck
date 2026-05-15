@@ -1,5 +1,5 @@
 ﻿"""
-Tests für engine/n1_analyse.py
+Tests fuer engine/n1_analyse.py
 Deckt ab:
   - Trafo-N-1 (verschiedene UW-Konfigurationen)
   - Leitung-N-1 (mit/ohne thermisch-Input)
@@ -8,9 +8,9 @@ Deckt ab:
   - Revisionssicherheit (Pflichtfelder, Versionierung)
   - Edgecases (None, leer, negativ)
 """
-import pytest
 from engine.n1_analyse import (
     analysiere_n1,
+    bewerte_abgang_n1,
     bewerte_trafo_n1,
     bewerte_leitung_n1,
     bewerte_spannung_n1,
@@ -98,7 +98,46 @@ class TestLeitungN1:
 
 
 # ======================================================================
-# 3. SPANNUNG-N-1
+# 3. ABGANG-N-1
+# ======================================================================
+class TestAbgangN1:
+    def test_keine_abgaenge_ist_nicht_geprueft(self):
+        r = bewerte_abgang_n1({}, 180.0)
+        assert r["bewertung"] == "NICHT_GEPRUEFT"
+
+    def test_alternative_reserve_reicht_ist_gruen(self):
+        r = bewerte_abgang_n1(
+            {
+                "umspannwerk": {
+                    "abgaenge": [
+                        {"label": "A1", "primary": True, "i_max_a": 630, "belastung_aktuell_a": 520},
+                        {"label": "A2", "i_max_a": 630, "belastung_aktuell_a": 300},
+                    ]
+                }
+            },
+            180.0,
+        )
+        assert r["bewertung"] == "GRUEN"
+        assert r["engpass_abgang_label"] == "A2"
+
+    def test_alternative_reserve_unzureichend_ist_rot(self):
+        r = bewerte_abgang_n1(
+            {
+                "umspannwerk": {
+                    "abgaenge": [
+                        {"label": "A1", "primary": True, "i_max_a": 630, "belastung_aktuell_a": 520},
+                        {"label": "A2", "i_max_a": 630, "belastung_aktuell_a": 520},
+                    ]
+                }
+            },
+            180.0,
+        )
+        assert r["bewertung"] == "ROT"
+        assert r["reserve_ratio"] < 0.8
+
+
+# ======================================================================
+# 4. SPANNUNG-N-1
 # ======================================================================
 class TestSpannungN1:
     def test_kein_input_ist_nicht_geprueft(self):
@@ -136,36 +175,44 @@ class TestSpannungN1:
 
 
 # ======================================================================
-# 4. N1-KLASSE + KONFIDENZ
+# 5. N1-KLASSE + KONFIDENZ
 # ======================================================================
 class TestN1Klasse:
     def test_alles_geprueft_ist_n1_3(self):
         r = bestimme_n1_klasse(
             {"bewertung": "GRUEN"}, {"bewertung": "GRUEN"},
-            {"bewertung": "GRUEN"}, {"bewertung": "GRUEN"},
+            {"bewertung": "GRUEN"}, {"bewertung": "GRUEN"}, {"bewertung": "GRUEN"},
         )
         assert r == "N1-3"
 
     def test_nur_topo_und_leitung_ist_n1_2(self):
         r = bestimme_n1_klasse(
             {"bewertung": "GRUEN"}, {"bewertung": "GRUEN"},
-            {"bewertung": "NICHT_GEPRUEFT"}, {"bewertung": "NICHT_GEPRUEFT"},
+            {"bewertung": "NICHT_GEPRUEFT"}, {"bewertung": "NICHT_GEPRUEFT"}, {"bewertung": "NICHT_GEPRUEFT"},
         )
         assert r == "N1-2"
 
     def test_nur_topo_ist_n1_1(self):
         r = bestimme_n1_klasse(
             {"bewertung": "GRUEN"}, {"bewertung": "NICHT_GEPRUEFT"},
-            {"bewertung": "NICHT_GEPRUEFT"}, {"bewertung": "NICHT_GEPRUEFT"},
+            {"bewertung": "NICHT_GEPRUEFT"}, {"bewertung": "NICHT_GEPRUEFT"}, {"bewertung": "NICHT_GEPRUEFT"},
         )
         assert r == "N1-1"
 
     def test_nichts_ist_n1_0(self):
         r = bestimme_n1_klasse(
             {"bewertung": "NICHT_GEPRUEFT"}, {"bewertung": "NICHT_GEPRUEFT"},
-            {"bewertung": "NICHT_GEPRUEFT"}, {"bewertung": "NICHT_GEPRUEFT"},
+            {"bewertung": "NICHT_GEPRUEFT"}, {"bewertung": "NICHT_GEPRUEFT"}, {"bewertung": "NICHT_GEPRUEFT"},
         )
         assert r == "N1-0"
+
+    def test_mit_dso_daten_ist_n1_4(self):
+        r = bestimme_n1_klasse(
+            {"bewertung": "GRUEN"}, {"bewertung": "GRUEN"},
+            {"bewertung": "GRUEN"}, {"bewertung": "GRUEN"}, {"bewertung": "GRUEN"},
+            dso_daten_vorhanden=True,
+        )
+        assert r == "N1-4"
 
     def test_konfidenz_n1_3_ohne_defaults(self):
         assert berechne_konfidenz("N1-3", 0) == 0.80
@@ -178,12 +225,12 @@ class TestN1Klasse:
 
 
 # ======================================================================
-# 5. AGGREGATION (analysiere_n1)
+# 6. AGGREGATION (analysiere_n1)
 # ======================================================================
 class TestAnalysiere:
     def test_minimal_eingabe_liefert_struktur(self):
         r = analysiere_n1({})
-        for key in ["n1_topologie", "n1_leitung", "n1_trafo", "n1_spannung",
+        for key in ["n1_topologie", "n1_leitung", "n1_abgang", "n1_trafo", "n1_spannung",
                     "gesamt", "annahmen", "berechnungs_version", "backend"]:
             assert key in r
 
@@ -195,7 +242,7 @@ class TestAnalysiere:
     def test_version_korrekt(self):
         r = analysiere_n1({})
         assert r["berechnungs_version"] == VERSION
-        assert r["backend"] == "heuristik_v1"
+        assert r["backend"] == "heuristik_v2_planer"
 
     def test_realistisches_szenario_pv_5mw_gut(self):
         eingabe = {
@@ -230,9 +277,54 @@ class TestAnalysiere:
         assert r["gesamt"]["bewertung"] == "ROT"
         assert r["gesamt"]["engpass_komponente"] == "leitung"
 
+    def test_abgangsreserve_und_verifizierte_daten_heben_klasse_auf_n1_4(self):
+        eingabe = {
+            "topologie": "ring",
+            "leistung_mw": 5.0,
+            "cos_phi": 0.95,
+            "nennspannung": 20.0,
+            "restkapazitaet_ms_mva": 10.0,
+            "n1_datengrundlage": "dso_verified",
+            "umspannwerk": {
+                "datenquelle": "dso_verified",
+                "trafos": [
+                    {"sn_mva": 40, "belastung_aktuell_mw": 10},
+                    {"sn_mva": 40, "belastung_aktuell_mw": 10},
+                ],
+                "abgaenge": [
+                    {"label": "A1", "primary": True, "i_max_a": 630, "belastung_aktuell_a": 520, "datenquelle": "dso_verified"},
+                    {"label": "A2", "i_max_a": 630, "belastung_aktuell_a": 250, "datenquelle": "dso_verified"},
+                ],
+            },
+        }
+        thermisch_n1 = {"auslastung_prozent": 70, "i_betrieb_a": 350, "i_max_a": 500}
+        spannung_n1 = {"delta_u_prozent": 3.5}
+        r = analysiere_n1(eingabe, thermisch_n1, spannung_n1)
+        assert r["gesamt"]["n1_klasse"] == "N1-4"
+        assert r["gesamt"]["dso_daten_vorhanden"] is True
+        assert "Abgangsreserve / Betriebsmittelpfad" in r["gesamt"]["nachweise_vorhanden"]
+
+    def test_n1_2_begruendet_unvollstaendige_nachweistiefe(self):
+        eingabe = {
+            "topologie": "ring",
+            "leistung_mw": 5.0,
+            "cos_phi": 0.95,
+            "nennspannung": 20.0,
+            "umspannwerk": {
+                "abgaenge": [
+                    {"label": "A1", "primary": True, "i_max_a": 630, "belastung_aktuell_a": 520},
+                    {"label": "A2", "i_max_a": 630, "belastung_aktuell_a": 300},
+                ],
+            },
+        }
+        r = analysiere_n1(eingabe, thermisch_n1=None, spannung_n1=None)
+        assert r["gesamt"]["n1_klasse"] == "N1-2"
+        assert "Topologie plus Leitungs- oder Abgangsreserve" in r["gesamt"]["stufenbegruendung"]
+        assert "Umspannwerks-Traforeserve" in r["gesamt"]["nachweise_fehlend"]
+
 
 # ======================================================================
-# 6. REVISIONSSICHERHEIT
+# 7. REVISIONSSICHERHEIT
 # ======================================================================
 class TestRevisionssicherheit:
     def test_annahmen_ist_liste(self):

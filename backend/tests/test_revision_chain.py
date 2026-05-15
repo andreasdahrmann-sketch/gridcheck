@@ -2,8 +2,8 @@
 B.5 - Engine-Tests fuer Revisionskette (revisionssicher / GoBD).
 """
 import json
-import pytest
-from engine import revision as rm
+from db.database import SessionLocal
+from db.models import RevisionRecord
 from engine.revision import (
     speichere_revision,
     lade_revisionen,
@@ -39,11 +39,10 @@ class TestAppendOnly:
 
     def test_jeder_eintrag_hat_pflichtfelder(self, isolierte_revisionen):
         speichere_revision(_dummy_daten(1), engine_version="test-1.0.0")
-        with open(rm.REVISIONS_PFAD, "r", encoding="utf-8") as f:
-            eintrag = json.loads(f.readline())
+        eintrag = lade_revisionen()[0]
         for key in ("revisionsnummer", "uuid", "timestamp", "hash",
                     "previous_hash", "schema_version", "engine_version", "daten"):
-            assert key in eintrag, f"Pflichtfeld fehlt in Datei: {key}"
+            assert key in eintrag, f"Pflichtfeld fehlt im Record: {key}"
 
 
 class TestHashChain:
@@ -68,12 +67,20 @@ class TestTamperingErkennung:
         speichere_revision(_dummy_daten(1), engine_version="test-1.0.0")
         speichere_revision(_dummy_daten(2), engine_version="test-1.0.0")
 
-        path = isolierte_revisionen
-        zeilen = path.read_text(encoding="utf-8").splitlines()
-        eintrag = json.loads(zeilen[0])
-        eintrag["daten"]["scores"]["gesamt"] = 99999  # Tampering
-        zeilen[0] = json.dumps(eintrag, ensure_ascii=False, separators=(",", ":"))
-        path.write_text("\n".join(zeilen) + "\n", encoding="utf-8")
+        db = SessionLocal()
+        try:
+            record = (
+                db.query(RevisionRecord)
+                .order_by(RevisionRecord.revisionsnummer.asc(), RevisionRecord.id.asc())
+                .first()
+            )
+            assert record is not None
+            eintrag = json.loads(record.data_json)
+            eintrag["scores"]["gesamt"] = 99999  # Tampering
+            record.data_json = json.dumps(eintrag, ensure_ascii=False, separators=(",", ":"))
+            db.commit()
+        finally:
+            db.close()
 
         res = pruefe_integritaet()
         assert res["ok"] is False
@@ -93,6 +100,5 @@ class TestDryRun:
 class TestSchemaVersion:
     def test_schema_version_im_eintrag(self, isolierte_revisionen):
         speichere_revision(_dummy_daten(1), engine_version="test-1.0.0")
-        with open(rm.REVISIONS_PFAD, "r", encoding="utf-8") as f:
-            eintrag = json.loads(f.readline())
+        eintrag = lade_revisionen()[0]
         assert eintrag["schema_version"] == SCHEMA_VERSION

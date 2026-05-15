@@ -1,0 +1,30 @@
+import type { ReportProfile } from "../types/report-profile";
+
+export const gridOperatorReportProfile: ReportProfile = {
+  stakeholderType: "grid_operator",
+  title: "Technische Vorprüfung Netzanschlussanfrage",
+  subtitle: "Prüffähigkeit, Eingangsdaten, Screening und offene Prüfpunkte",
+  tone: "formal_technical",
+  detailLevel: "expert",
+  tableDensity: "high",
+  includeExecutiveSummary: false,
+  includeTechnicalAppendix: true,
+  includeCostDetails: false,
+  includeAuditBlock: true,
+  includeDisclaimer: true,
+  sections: [
+    { id: "cover", title: "Deckblatt", required: true },
+    { id: "review_summary", title: "Prüfübersicht", required: true },
+    { id: "input_data", title: "Eingangsdaten", required: true },
+    { id: "data_completeness", title: "Datenvollständigkeit", required: true },
+    { id: "grid_technical_review", title: "Netztechnische Vorbewertung", required: true },
+    { id: "connection_variants", title: "Anschlussvarianten", required: true },
+    { id: "n1_screening", title: "N-1-Screening", required: true },
+    { id: "open_review_items", title: "Offene Prüfpunkte", required: true },
+    { id: "possible_grid_requirements", title: "Mögliche technische Auflagen", required: true },
+    { id: "review_note", title: "Prüfvermerk", required: true },
+    { id: "sources", title: "Quellen, Annahmen und Modellversion", required: true },
+    { id: "audit", title: "Revisionsdaten", required: true },
+    { id: "disclaimer", title: "Rechtlicher Hinweis", required: true },
+  ],
+};

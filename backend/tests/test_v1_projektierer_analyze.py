@@ -1,7 +1,6 @@
 ﻿"""Smoke-Tests fuer /api/v1/projektierer/analyze."""
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
 
 from main import app
@@ -23,6 +22,17 @@ def _payload(**overrides):
     }
     base.update(overrides)
     return base
+
+
+def _reset_rate_limit_state():
+    from core import rate_limit as rate_limit_mod
+
+    rate_limit_mod._MEM_BUCKETS.clear()
+    rate_limit_mod._REDIS_CLIENT = None
+
+
+def setup_function(function=None):
+    _reset_rate_limit_state()
 
 
 def test_happy_path_minimal():
@@ -71,12 +81,12 @@ def test_wirtschaftlichkeit_pv_5mw():
     assert w["fehler"] is None
 
 
-def test_optimizer_pending():
-    """Optimizer ist aktuell PENDING (Sprint 1 / Schritt 3)."""
+def test_optimizer_status_ok_or_pending():
+    """Optimizer liefert deterministische Engpass-Skizze (OK) oder UNKLAR ohne Kennzahlen."""
     r = client.post(URL, json=_payload())
     assert r.status_code == 200
     opt = r.json()["projektierer"]["optimizer"]
-    assert opt["status"] == "PENDING"
+    assert opt["status"] in ("OK", "UNKLAR")
 
 
 def test_validation_missing_required_fields():
@@ -90,3 +100,16 @@ def test_validation_negative_budget():
     """Negatives Budget -> 422 (ge=0 constraint)."""
     r = client.post(URL, json=_payload(budget_eur=-1))
     assert r.status_code == 422
+
+
+def test_route_is_rate_limited():
+    _reset_rate_limit_state()
+    for _ in range(6):
+        r = client.post(URL, json=_payload())
+        assert r.status_code == 200, r.text
+
+    limited = client.post(URL, json=_payload())
+    assert limited.status_code == 429
+    detail = limited.json()["detail"]
+    assert detail["code"] == "RATE_LIMITED"
+    assert detail["message"] == "Zu viele oeffentliche Projektierer-Analysen"

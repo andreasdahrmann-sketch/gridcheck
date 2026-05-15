@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, UploadFile
 from pydantic import BaseModel, Field
@@ -11,6 +12,13 @@ from core.auth import get_current_user, require_csrf
 from db.database import get_db
 from db.models import User
 from services import project_service
+from services.visibility_service import (
+    derive_stakeholder_path,
+    get_project_access_level,
+    parse_project_role_inputs,
+    sanitize_project_inputs,
+    sanitize_project_result,
+)
 
 router = APIRouter(prefix="/api/v1/projects", tags=["projects"])
 
@@ -23,6 +31,8 @@ class ProjectCreateRequest(BaseModel):
     typ: str = Field(..., min_length=1, max_length=50)
     leistung_kw: float = Field(..., gt=0)
     description: str | None = None
+    role_inputs: dict[str, Any] | None = None
+    role_results: dict[str, Any] | None = None
 
 
 class ProjectUpdateRequest(BaseModel):
@@ -31,6 +41,8 @@ class ProjectUpdateRequest(BaseModel):
     typ: str | None = None
     leistung_kw: float | None = Field(default=None, gt=0)
     description: str | None = None
+    role_inputs: dict[str, Any] | None = None
+    role_results: dict[str, Any] | None = None
 
 
 class ShareRequest(BaseModel):
@@ -45,12 +57,16 @@ class ProjectResponse(BaseModel):
     typ: str
     leistung_kw: float
     description: str | None
+    role_inputs: dict[str, Any]
+    role_results: dict[str, Any]
     owner_user_id: int | None
     created_at: datetime
     updated_at: datetime | None
 
-
-def _to_response(project) -> ProjectResponse:
+def _to_response(project, db: Session, current_user: User) -> ProjectResponse:
+    role_inputs = parse_project_role_inputs(project.role_inputs)
+    access_level = get_project_access_level(db, current_user, project)
+    stakeholder_path = derive_stakeholder_path(role_inputs, fallback_user_role=current_user.role)
     return ProjectResponse(
         id=project.id,
         name=project.name,
@@ -58,7 +74,13 @@ def _to_response(project) -> ProjectResponse:
         typ=project.typ,
         leistung_kw=project.leistung_kw,
         description=project.description,
-        owner_user_id=project.owner_user_id,
+        role_inputs=sanitize_project_inputs(role_inputs, access_level=access_level),
+        role_results=sanitize_project_result(
+            parse_project_role_inputs(project.role_results),
+            stakeholder_path=stakeholder_path,
+            access_level=access_level,
+        ),
+        owner_user_id=project.owner_user_id if access_level in {"admin", "owner", "editor"} else None,
         created_at=project.created_at,
         updated_at=project.updated_at,
     )
@@ -72,7 +94,7 @@ def create_project(
     _: None = Depends(require_csrf),
 ) -> ProjectResponse:
     project = project_service.create_project(db, current_user, **req.model_dump())
-    return _to_response(project)
+    return _to_response(project, db, current_user)
 
 
 @router.get("", response_model=list[ProjectResponse])
@@ -80,7 +102,7 @@ def list_projects(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[ProjectResponse]:
-    return [_to_response(p) for p in project_service.list_projects(db, current_user)]
+    return [_to_response(p, db, current_user) for p in project_service.list_projects(db, current_user)]
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
@@ -89,7 +111,7 @@ def get_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ProjectResponse:
-    return _to_response(project_service.get_project(db, current_user, project_id))
+    return _to_response(project_service.get_project(db, current_user, project_id), db, current_user)
 
 
 @router.patch("/{project_id}", response_model=ProjectResponse)
@@ -101,7 +123,7 @@ def update_project(
     _: None = Depends(require_csrf),
 ) -> ProjectResponse:
     project = project_service.update_project(db, current_user, project_id, req.model_dump(exclude_none=True))
-    return _to_response(project)
+    return _to_response(project, db, current_user)
 
 
 @router.delete("/{project_id}")

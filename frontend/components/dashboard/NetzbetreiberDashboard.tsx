@@ -1,179 +1,212 @@
 // src/components/dashboard/NetzbetreiberDashboard.tsx
-// Netzbetreiber-Dashboard: Antragsliste mit Priorisierung, Dopplungserkennung, Filterfunktion
+// Netzbetreiber-Dashboard: backendgetriebene Antragsliste mit Priorisierung
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
-import { priorisiereAntraege, type Antrag, type PrioResult } from '@/lib/priorisierung';
-import AntragDetailDrawer from '@/components/dashboard/AntragDetailDrawer';
-import type { Anlagentyp } from '@/types';
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { listProjects, type Project } from "@/lib/api/projects";
+import { priorisiereAntraege, type Antrag, type PrioResult } from "@/lib/priorisierung";
+import AntragDetailDrawer from "@/components/dashboard/AntragDetailDrawer";
+import type { Anlagentyp, Spannungsebene } from "@/types";
+import { cn } from "@/lib/utils";
+import { readUserPreferences } from "@/lib/user-preferences";
 
-// ============================================================
-// Demo-Daten (spÃ¤ter durch API/DB ersetzt)
-// ============================================================
-const DEMO_ANTRAEGE: Antrag[] = [
-  {
-    id: 'ANT-2025-001', antragsteller: 'Solar GmbH', plz: '80331', ort: 'MÃ¼nchen',
-    anlagentyp: 'solar', leistung_kw: 750, spannungsebene: 'MS',
-    eingangsdatum: '2025-01-15', foerderfrist: '2025-09-30',
-    baugenehmigung_vorhanden: true, projektreife: 'baubereit',
-    hat_speicher: true, hat_blindleistung: true, hat_einspeisemanagement: true,
-    gridcheck_score: 82,
-  },
-  {
-    id: 'ANT-2025-002', antragsteller: 'Wind Park Nord', plz: '24103', ort: 'Kiel',
-    anlagentyp: 'wind', leistung_kw: 3000, spannungsebene: 'MS',
-    eingangsdatum: '2025-02-01',
-    baugenehmigung_vorhanden: true, projektreife: 'genehmigt',
-    hat_speicher: false, hat_blindleistung: true, hat_einspeisemanagement: true,
-    gridcheck_score: 68,
-  },
-  {
-    id: 'ANT-2025-003', antragsteller: 'E-Charge AG', plz: '10115', ort: 'Berlin',
-    anlagentyp: 'ladepark', leistung_kw: 500, spannungsebene: 'NS',
-    eingangsdatum: '2025-03-10', foerderfrist: '2025-06-30',
-    baugenehmigung_vorhanden: false, projektreife: 'planung',
-    hat_speicher: true, hat_blindleistung: false, hat_einspeisemanagement: false,
-    gridcheck_score: 55,
-  },
-  {
-    id: 'ANT-2025-004', antragsteller: 'Batterie Werk SÃ¼d', plz: '70173', ort: 'Stuttgart',
-    anlagentyp: 'batterie', leistung_kw: 2000, spannungsebene: 'MS',
-    eingangsdatum: '2024-11-20',
-    baugenehmigung_vorhanden: true, projektreife: 'baubereit',
-    hat_speicher: true, hat_blindleistung: true, hat_einspeisemanagement: true,
-    gridcheck_score: 91,
-  },
-  {
-    id: 'ANT-2025-005', antragsteller: 'Solar GmbH', plz: '80331', ort: 'MÃ¼nchen',
-    anlagentyp: 'solar', leistung_kw: 780, spannungsebene: 'MS',
-    eingangsdatum: '2025-04-01',
-    baugenehmigung_vorhanden: false, projektreife: 'idee',
-    hat_speicher: false, hat_blindleistung: false, hat_einspeisemanagement: false,
-    gridcheck_score: 40,
-  },
-  {
-    id: 'ANT-2025-006', antragsteller: 'WP Service', plz: '50667', ort: 'KÃ¶ln',
-    anlagentyp: 'waermepumpe', leistung_kw: 150, spannungsebene: 'NS',
-    eingangsdatum: '2025-03-25',
-    baugenehmigung_vorhanden: true, projektreife: 'genehmigt',
-    hat_speicher: false, hat_blindleistung: false, hat_einspeisemanagement: true,
-    gridcheck_score: 72,
-  },
-];
-
-// ============================================================
-// Helper
-// ============================================================
 const TYPEN_LABEL: Record<Anlagentyp, string> = {
-  solar: 'â˜€ï¸ Solar', wind: 'ðŸŒ¬ï¸ Wind', batterie: 'ðŸ”‹ Batterie',
-  waermepumpe: 'â™¨ï¸ WP', ladepark: 'ðŸ”Œ Ladepark', sonstiges: 'âš¡ Sonstige',
+  solar: "Solar",
+  wind: "Wind",
+  batterie: "Batterie",
+  waermepumpe: "Waermepumpe",
+  ladepark: "Ladepark",
+  sonstiges: "Sonstige",
 };
 
 const REIFE_LABEL: Record<string, string> = {
-  idee: 'ðŸ’¡ Idee', planung: 'ðŸ“ Planung', genehmigt: 'âœ… Genehmigt', baubereit: 'ðŸ—ï¸ Baubereit',
+  idee: "Idee",
+  planung: "Planung",
+  genehmigt: "Genehmigt",
+  baubereit: "Baubereit",
 };
 
 function scoreColor(score: number): string {
-  if (score >= 70) return 'text-green-400';
-  if (score >= 50) return 'text-yellow-400';
-  if (score >= 30) return 'text-orange-400';
-  return 'text-red-400';
+  if (score >= 70) return "text-green-400";
+  if (score >= 50) return "text-yellow-400";
+  if (score >= 30) return "text-orange-400";
+  return "text-red-400";
 }
 
-
-function rangBadge(rang: number, total: number): string {
-  if (rang === 1) return 'ðŸ¥‡';
-  if (rang === 2) return 'ðŸ¥ˆ';
-  if (rang === 3) return 'ðŸ¥‰';
+function rangBadge(rang: number): string {
+  if (rang === 1) return "1";
+  if (rang === 2) return "2";
+  if (rang === 3) return "3";
   return `#${rang}`;
 }
 
-// ============================================================
-// Komponente
-// ============================================================
+function mapTyp(raw: string | undefined): Anlagentyp {
+  switch ((raw ?? "").toLowerCase()) {
+    case "solar":
+    case "pv":
+      return "solar";
+    case "wind":
+      return "wind";
+    case "batterie":
+    case "battery":
+    case "bess":
+      return "batterie";
+    case "waermepumpe":
+    case "heat_pump":
+      return "waermepumpe";
+    case "ladepark":
+    case "charging":
+      return "ladepark";
+    default:
+      return "sonstiges";
+  }
+}
+
+function mapSpannung(raw: unknown): Spannungsebene {
+  const value = String(raw ?? "MS").toUpperCase();
+  if (value === "NS" || value === "HS") return value;
+  return "MS";
+}
+
+function toAntrag(project: Project): Antrag {
+  const roleInputs = project.role_inputs ?? {};
+  const roleResults = project.role_results ?? {};
+  const stakeholder = roleResults.stakeholder_bewertung;
+  const storage = roleInputs.storage_profile;
+  const projectProfile = roleResults.projektprofil;
+  const routeEnv = roleResults.route_environment;
+
+  return {
+    id: `PRJ-${project.id}`,
+    antragsteller: roleInputs.antragsteller ?? project.name,
+    plz: roleInputs.plz ?? project.plz,
+    ort: roleInputs.ort,
+    anlagentyp: mapTyp(roleInputs.anlagentyp ?? project.typ),
+    leistung_kw: roleInputs.anschlussleistung_kw ?? project.leistung_kw,
+    spannungsebene: mapSpannung(roleInputs.spannungsebene),
+    eingangsdatum: project.created_at ?? new Date().toISOString().slice(0, 10),
+    foerderfrist: roleInputs.foerderfrist,
+    baugenehmigung_vorhanden: Boolean(roleInputs.baugenehmigung_vorhanden),
+    projektreife: roleInputs.projektreife ?? "idee",
+    hat_speicher: Boolean(storage?.has_storage),
+    hat_blindleistung: Boolean(storage?.reactive_power_capable),
+    hat_einspeisemanagement: Boolean(storage?.dynamic_export_limit || storage?.curtailment_ready),
+    gridcheck_score: typeof roleResults.score === "number" ? roleResults.score : undefined,
+    storage_operation_mode: storage?.operation_mode,
+    stakeholder_konflikt_level: stakeholder?.konflikt_level,
+    route_risk_level: routeEnv?.risk_level,
+    max_export_kw: projectProfile?.max_export_kw,
+    max_import_kw: projectProfile?.max_import_kw,
+    remote_control_ready: Boolean(storage?.remote_control_capable),
+    netzdienlichkeit_score_backend:
+      typeof roleResults.erweiterte_scores?.netzdienlichkeit === "number"
+        ? roleResults.erweiterte_scores.netzdienlichkeit
+        : undefined,
+    stakeholder_fit_score_backend:
+      typeof roleResults.erweiterte_scores?.stakeholder_fit === "number"
+        ? roleResults.erweiterte_scores.stakeholder_fit
+        : undefined,
+  };
+}
+
 export default function NetzbetreiberDashboard() {
-  const [filterTyp, setFilterTyp] = useState<string>('alle');
-  const [filterSE, setFilterSE] = useState<string>('alle');
-  const [suchtext, setSuchtext] = useState('');
-  const [sortBy, setSortBy] = useState<'rang' | 'datum' | 'leistung'>('rang');
+  const [filterTyp, setFilterTyp] = useState<string>("alle");
+  const [filterSE, setFilterSE] = useState<string>("alle");
+  const [suchtext, setSuchtext] = useState("");
+  const [sortBy, setSortBy] = useState<"rang" | "datum" | "leistung">("rang");
   const [selected, setSelected] = useState<{ antrag: Antrag; prio: PrioResult } | null>(null);
+  const [compactCards, setCompactCards] = useState(false);
 
-  // Priorisierung berechnen
-  const prioResults = useMemo(() => priorisiereAntraege(DEMO_ANTRAEGE), []);
+  const projectsQuery = useQuery({
+    queryKey: ["projects", "dashboard"],
+    queryFn: listProjects,
+  });
 
-  // ZusammenfÃ¼hren: Antrag + PrioResult
-  const combined = useMemo(() => {
-    return DEMO_ANTRAEGE.map(a => ({
-      antrag: a,
-      prio: prioResults.find(p => p.antrag_id === a.id)!,
-    }));
-  }, [prioResults]);
+  useEffect(() => {
+    setCompactCards(readUserPreferences().compactProjectCards);
+  }, []);
 
-  // Filtern
+  const antraege = useMemo(() => (projectsQuery.data ?? []).map(toAntrag), [projectsQuery.data]);
+  const prioResults = useMemo(() => priorisiereAntraege(antraege), [antraege]);
+  const combined = useMemo(
+    () =>
+      antraege.map((antrag) => ({
+        antrag,
+        prio: prioResults.find((item) => item.antrag_id === antrag.id) ?? {
+          antrag_id: antrag.id,
+          rang: 999,
+          gesamt_score: 0,
+          netzdienlichkeit_score: 0,
+          warteliste_score: 0,
+          dopplung_erkannt: false,
+          dopplung_ids: [],
+          dringlichkeit_score: 0,
+          hinweise: [],
+        },
+      })),
+    [antraege, prioResults]
+  );
+
   const filtered = useMemo(() => {
     let list = [...combined];
-
-    if (filterTyp !== 'alle') list = list.filter(c => c.antrag.anlagentyp === filterTyp);
-    if (filterSE !== 'alle') list = list.filter(c => c.antrag.spannungsebene === filterSE);
+    if (filterTyp !== "alle") list = list.filter((item) => item.antrag.anlagentyp === filterTyp);
+    if (filterSE !== "alle") list = list.filter((item) => item.antrag.spannungsebene === filterSE);
     if (suchtext.trim()) {
-      const s = suchtext.toLowerCase();
-      list = list.filter(c =>
-        c.antrag.id.toLowerCase().includes(s) ||
-        c.antrag.antragsteller.toLowerCase().includes(s) ||
-        c.antrag.plz.includes(s) ||
-        (c.antrag.ort?.toLowerCase().includes(s) ?? false)
+      const search = suchtext.toLowerCase();
+      list = list.filter((item) =>
+        item.antrag.id.toLowerCase().includes(search) ||
+        item.antrag.antragsteller.toLowerCase().includes(search) ||
+        item.antrag.plz.includes(search) ||
+        (item.antrag.ort?.toLowerCase().includes(search) ?? false)
       );
     }
-
-    // Sortieren
-    if (sortBy === 'rang') list.sort((a, b) => a.prio.rang - b.prio.rang);
-    else if (sortBy === 'datum') list.sort((a, b) => a.antrag.eingangsdatum.localeCompare(b.antrag.eingangsdatum));
-    else if (sortBy === 'leistung') list.sort((a, b) => b.antrag.leistung_kw - a.antrag.leistung_kw);
-
+    if (sortBy === "rang") list.sort((left, right) => left.prio.rang - right.prio.rang);
+    else if (sortBy === "datum") list.sort((left, right) => left.antrag.eingangsdatum.localeCompare(right.antrag.eingangsdatum));
+    else list.sort((left, right) => right.antrag.leistung_kw - left.antrag.leistung_kw);
     return list;
   }, [combined, filterTyp, filterSE, suchtext, sortBy]);
 
-  // Statistiken
-    const stats = useMemo(() => {
-    const total = DEMO_ANTRAEGE.length;
-    const dopplungen = prioResults.filter(p => p.dopplung_erkannt).length;
-    const hochPrio = prioResults.filter(p => p.dringlichkeit_score >= 60 && p.dringlichkeit_score < 80).length;
-    const kritisch = prioResults.filter(p => p.dringlichkeit_score >= 80).length;
-    const gesamtMW = DEMO_ANTRAEGE.reduce((s, a) => s + a.leistung_kw, 0) / 1000;
+  const stats = useMemo(() => {
+    const total = antraege.length;
+    const dopplungen = prioResults.filter((item) => item.dopplung_erkannt).length;
+    const hochPrio = prioResults.filter((item) => item.gesamt_score >= 60 && item.gesamt_score < 80).length;
+    const kritisch = prioResults.filter((item) => item.gesamt_score >= 80).length;
+    const gesamtMW = antraege.reduce((sum, antrag) => sum + antrag.leistung_kw, 0) / 1000;
     return { total, dopplungen, hochPrio, kritisch, gesamtMW };
-  }, [prioResults]);
+  }, [antraege, prioResults]);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">Netzbetreiber Dashboard</h2>
-          <p className="text-sm text-slate-400">Antragspriorisierung â€¢ Dopplungserkennung â€¢ NetzkapazitÃ¤tsmanagement</p>
+          <p className="text-sm text-slate-400">
+            Backendgetriebene Vorqualifizierung mit Hybrid-, Speicher- und Stakeholder-Kontext
+          </p>
         </div>
-        <Badge variant="outline" className="text-xs border-blue-500 text-blue-400">
-          {stats.total} AntrÃ¤ge aktiv
+        <Badge variant="outline" className="w-fit text-xs border-blue-500 text-blue-400">
+          {stats.total} Antraege aktiv
         </Badge>
       </div>
 
-      {/* KPI-Karten */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         <Card className="bg-slate-800/50 border-slate-700">
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-white">{stats.total}</p>
-            <p className="text-xs text-slate-400">AntrÃ¤ge gesamt</p>
+            <p className="text-xs text-slate-400">Antraege gesamt</p>
           </CardContent>
         </Card>
         <Card className="bg-slate-800/50 border-slate-700">
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-green-400">{stats.hochPrio}</p>
-            <p className="text-xs text-slate-400">Hohe PrioritÃ¤t</p>
+            <p className="text-xs text-slate-400">Hohe Prioritaet</p>
           </CardContent>
         </Card>
         <Card className="bg-slate-800/50 border-slate-700">
@@ -196,11 +229,10 @@ export default function NetzbetreiberDashboard() {
         </Card>
       </div>
 
-      {/* Filter-Leiste */}
       <Card className="bg-slate-800/50 border-slate-700">
         <CardContent className="p-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-[200px]">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_160px_130px_150px] xl:items-end">
+            <div className="min-w-0">
               <label className="text-xs text-slate-400 mb-1 block">Suche</label>
               <Input
                 placeholder="ID, Antragsteller, PLZ, Ort..."
@@ -209,27 +241,27 @@ export default function NetzbetreiberDashboard() {
                 className="bg-slate-900 border-slate-600 text-white"
               />
             </div>
-            <div className="w-[160px]">
+            <div className="min-w-0">
               <label className="text-xs text-slate-400 mb-1 block">Anlagentyp</label>
               <Select value={filterTyp} onValueChange={setFilterTyp}>
-                <SelectTrigger className="bg-slate-900 border-slate-600 text-white">
+                <SelectTrigger className="w-full bg-slate-900 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="alle">Alle Typen</SelectItem>
-                  <SelectItem value="solar">â˜€ï¸ Solar</SelectItem>
-                  <SelectItem value="wind">ðŸŒ¬ï¸ Wind</SelectItem>
-                  <SelectItem value="batterie">ðŸ”‹ Batterie</SelectItem>
-                  <SelectItem value="waermepumpe">â™¨ï¸ WP</SelectItem>
-                  <SelectItem value="ladepark">ðŸ”Œ Ladepark</SelectItem>
-                  <SelectItem value="sonstiges">âš¡ Sonstige</SelectItem>
+                  <SelectItem value="solar">Solar</SelectItem>
+                  <SelectItem value="wind">Wind</SelectItem>
+                  <SelectItem value="batterie">Batterie</SelectItem>
+                  <SelectItem value="waermepumpe">WP</SelectItem>
+                  <SelectItem value="ladepark">Ladepark</SelectItem>
+                  <SelectItem value="sonstiges">Sonstige</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-[130px]">
+            <div className="min-w-0">
               <label className="text-xs text-slate-400 mb-1 block">Spannungsebene</label>
               <Select value={filterSE} onValueChange={setFilterSE}>
-                <SelectTrigger className="bg-slate-900 border-slate-600 text-white">
+                <SelectTrigger className="w-full bg-slate-900 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -240,14 +272,14 @@ export default function NetzbetreiberDashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="w-[150px]">
+            <div className="min-w-0">
               <label className="text-xs text-slate-400 mb-1 block">Sortierung</label>
-              <Select value={sortBy} onValueChange={v => setSortBy(v as any)}>
-                <SelectTrigger className="bg-slate-900 border-slate-600 text-white">
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as "rang" | "datum" | "leistung")}>
+                <SelectTrigger className="w-full bg-slate-900 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="rang">PrioritÃ¤t</SelectItem>
+                  <SelectItem value="rang">Prioritaet</SelectItem>
                   <SelectItem value="datum">Eingangsdatum</SelectItem>
                   <SelectItem value="leistung">Leistung</SelectItem>
                 </SelectContent>
@@ -257,46 +289,74 @@ export default function NetzbetreiberDashboard() {
         </CardContent>
       </Card>
 
-      {/* Antragsliste */}
       <div className="space-y-3">
+        {projectsQuery.isLoading && (
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardContent className="p-8 text-center text-slate-400">Dashboard laedt Projekte...</CardContent>
+          </Card>
+        )}
+        {projectsQuery.isError && (
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardContent className="p-8 text-center text-rose-300">
+              Projekte konnten fuer das Dashboard nicht geladen werden.
+            </CardContent>
+          </Card>
+        )}
         {filtered.map(({ antrag: a, prio: p }) => (
-          <Card key={a.id} onClick={() => setSelected({ antrag: a, prio: p })} className={`bg-slate-800/60 border-slate-700 hover:border-slate-500 transition-colors cursor-pointer ${p.dopplung_erkannt ? 'border-l-4 border-l-red-500' : ''}`}>
-            <CardContent className="p-4">
-              <div className="flex flex-col md:flex-row md:items-center gap-4">
-
-                {/* Rang */}
-                <div className="flex-shrink-0 w-12 text-center">
-                  <span className="text-xl font-bold">{rangBadge(p.rang, filtered.length)}</span>
+          <Card
+            key={a.id}
+            onClick={() => setSelected({ antrag: a, prio: p })}
+            className={`cursor-pointer bg-slate-800/60 border-slate-700 transition-colors hover:border-slate-500 ${
+              p.dopplung_erkannt ? "border-l-4 border-l-red-500" : ""
+            }`}
+          >
+            <CardContent className={cn(compactCards ? "p-3" : "p-4")}>
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+                <div className="flex items-start gap-3 xl:w-16 xl:flex-col xl:items-center xl:text-center">
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-xl font-bold">
+                    {rangBadge(p.rang)}
+                  </span>
+                  <div className="xl:hidden">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">GridCheck</p>
+                    <p className={`text-lg font-bold ${scoreColor(a.gridcheck_score ?? 0)}`}>
+                      {a.gridcheck_score ?? "—"}
+                    </p>
+                  </div>
                 </div>
 
-                {/* Hauptinfo */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-sm text-blue-400">{a.id}</span>
                     <Badge variant="outline" className="text-xs">{TYPEN_LABEL[a.anlagentyp]}</Badge>
                     <Badge variant="outline" className="text-xs">{a.spannungsebene}</Badge>
+                    {a.hat_speicher && <Badge variant="outline" className="text-xs">Speicher</Badge>}
+                    {a.stakeholder_konflikt_level === "hoch" && <Badge variant="destructive" className="text-xs">Zielkonflikt hoch</Badge>}
                     {p.dopplung_erkannt && (
-                      <Badge variant="destructive" className="text-xs">âš ï¸ Dopplung</Badge>
+                      <Badge variant="destructive" className="text-xs">Dopplung</Badge>
                     )}
                   </div>
                   <p className="text-white font-medium mt-1">{a.antragsteller}</p>
                   <p className="text-xs text-slate-400">
-                    {a.plz} {a.ort} â€¢ {a.leistung_kw} kW â€¢ {REIFE_LABEL[a.projektreife]} â€¢ Eingang: {a.eingangsdatum}
+                    {a.plz} {a.ort} | {a.leistung_kw} kW | {REIFE_LABEL[a.projektreife]} | Eingang: {a.eingangsdatum}
                   </p>
                   {a.foerderfrist && (
-                    <p className="text-xs text-orange-400 mt-0.5">â° FÃ¶rderfrist: {a.foerderfrist}</p>
+                    <p className="text-xs text-orange-400 mt-0.5">Foerderfrist: {a.foerderfrist}</p>
+                  )}
+                  {(a.max_export_kw || a.max_import_kw) && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      NAP: Export {a.max_export_kw ?? 0} kW / Bezug {a.max_import_kw ?? 0} kW
+                    </p>
                   )}
                 </div>
 
-                {/* Scores */}
-                <div className="flex-shrink-0 w-[280px] space-y-1.5">
+                <div className="w-full rounded-2xl border border-white/10 bg-black/10 p-3 xl:w-[280px] xl:flex-shrink-0">
                   <div className="flex justify-between text-xs">
                     <span className="text-slate-400">Gesamt</span>
                     <span className={`font-bold ${scoreColor(p.gesamt_score)}`}>{p.gesamt_score}</span>
                   </div>
                   <Progress value={p.gesamt_score} className="h-2" />
 
-                  <div className="grid grid-cols-3 gap-2 mt-2">
+                  <div className="mt-3 grid grid-cols-3 gap-2">
                     <div className="text-center">
                       <p className="text-[10px] text-slate-500">Netzdienl.</p>
                       <p className={`text-xs font-bold ${scoreColor(p.netzdienlichkeit_score)}`}>{p.netzdienlichkeit_score}</p>
@@ -312,20 +372,16 @@ export default function NetzbetreiberDashboard() {
                   </div>
                 </div>
 
-                {/* GridCheck Score */}
-                <div className="flex-shrink-0 text-center w-16">
+                <div className="hidden w-16 flex-shrink-0 text-center xl:block">
                   <p className="text-[10px] text-slate-500">GridCheck</p>
-                  <p className={`text-lg font-bold ${scoreColor(a.gridcheck_score ?? 0)}`}>
-                    {a.gridcheck_score ?? 'â€”'}
-                  </p>
+                  <p className={`text-lg font-bold ${scoreColor(a.gridcheck_score ?? 0)}`}>{a.gridcheck_score ?? "—"}</p>
                 </div>
               </div>
 
-              {/* Hinweise */}
               {p.hinweise.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-slate-700">
                   {p.hinweise.map((h, i) => (
-                    <p key={i} className="text-xs text-slate-400">ðŸ’¡ {h}</p>
+                    <p key={i} className="text-xs text-slate-400">{h}</p>
                   ))}
                 </div>
               )}
@@ -333,24 +389,23 @@ export default function NetzbetreiberDashboard() {
           </Card>
         ))}
 
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !projectsQuery.isLoading && (
           <Card className="bg-slate-800/50 border-slate-700">
             <CardContent className="p-8 text-center text-slate-400">
-              Keine AntrÃ¤ge gefunden.
+              Keine Antraege gefunden.
             </CardContent>
           </Card>
         )}
       </div>
 
-      {/* Legende */}
       <Card className="bg-slate-800/30 border-slate-700">
         <CardContent className="p-4">
           <p className="text-xs text-slate-500 font-medium mb-2">Priorisierungslogik</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-slate-400">
-            <div><span className="text-green-400 font-bold">35%</span> Netzdienlichkeit (Speicher, Blindleistung, Typ)</div>
+            <div><span className="text-green-400 font-bold">35%</span> Netzdienlichkeit / operative Attraktivitaet</div>
             <div><span className="text-blue-400 font-bold">25%</span> Warteliste (FIFO-Prinzip)</div>
-            <div><span className="text-orange-400 font-bold">30%</span> Dringlichkeit (Projektreife, FÃ¶rderfrist)</div>
-            <div><span className="text-red-400 font-bold">âˆ’10%</span> Malus bei erkannter Dopplung</div>
+            <div><span className="text-orange-400 font-bold">30%</span> Dringlichkeit / Projektreife</div>
+            <div><span className="text-red-400 font-bold">−10%</span> Malus bei erkannter Dopplung</div>
           </div>
         </CardContent>
       </Card>

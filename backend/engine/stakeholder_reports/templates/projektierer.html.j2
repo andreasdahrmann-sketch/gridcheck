@@ -18,6 +18,32 @@
   <h1>ProjektiererReport</h1>
   <div class="muted">Version {{ report.report_version }} | Normstand {{ report.app_normstand }}</div>
   <div class="muted">Engine-Revision: {{ report.engine_revision_hash or "n/a" }}</div>
+  {% if report.report_revision_number or report.report_revision_uuid %}
+  <div class="muted">
+    Report-Revision: #{{ report.report_revision_number or "n/a" }} | UUID: {{ report.report_revision_uuid or "n/a" }}
+  </div>
+  {% endif %}
+  {% if report.report_generated_at or report.audit_hash %}
+  <div class="muted">Erzeugt: {{ report.report_generated_at or "n/a" }} | Audit-Hash: {{ report.audit_hash or "n/a" }}</div>
+  {% endif %}
+  {% if report.report_verify_path %}
+  <div class="muted">Verify-Pfad: {{ report.report_verify_path }}</div>
+  {% endif %}
+  {% if report.source_analysis_run_id or report.source_revision_hash %}
+  <div class="muted">
+    Quelle: Analysis-Run {{ report.source_analysis_run_id or "n/a" }} | Source-Revision: {{ report.source_revision_hash or "n/a" }}
+  </div>
+  {% endif %}
+  {% if report.source_request_checksum or report.source_result_checksum %}
+  <div class="muted">
+    Source-Checksums: Request {{ report.source_request_checksum or "n/a" }} | Result {{ report.source_result_checksum or "n/a" }}
+  </div>
+  {% endif %}
+  <div class="muted">
+    Paket: {{ report.offer_id or "manual" }} | Package-Scope: {{ report.package_scope_label }} ({{ report.package_scope }})
+    | Report-Scope: {{ report.report_scope_label }} ({{ report.report_scope }})
+  </div>
+  <div class="muted">{{ report.scope_summary }}</div>
 
   <h2>Projektkern</h2>
   <ul>
@@ -51,6 +77,34 @@
   <p>Keine Maßnahmen gemeldet.</p>
   {% endif %}
 
+  {% if report.includes_strategy_section %}
+  <h2>Anschlussstrategie</h2>
+  <ul>
+    <li><strong>Projektprofil:</strong> {{ report.projektprofil_summary or "n/a" }}</li>
+    <li><strong>Speicher / Flexibilität:</strong> {{ report.speicher_summary or "n/a" }}</li>
+    <li><strong>Umwelt / Trasse:</strong> {{ report.route_environment_summary or "n/a" }}</li>
+    <li><strong>Stakeholder-Zielkonflikt:</strong> {{ report.stakeholder_konflikt or "n/a" }}</li>
+    <li><strong>Empfohlener Fokus:</strong> {{ report.recommended_focus or "n/a" }}</li>
+  </ul>
+  {% else %}
+  <h2>Paketgrenze</h2>
+  <p>{{ report.scope_boundary_note }}</p>
+  {% endif %}
+
+  {% if report.includes_transparency_section %}
+  <h2>Transparenz / Confidence</h2>
+  {% if report.transparenz_hinweise %}
+  <ul>{% for h in report.transparenz_hinweise %}<li>{{ h }}</li>{% endfor %}</ul>
+  {% else %}
+  <p>Keine zusätzlichen Hinweise.</p>
+  {% endif %}
+  {% endif %}
+
+  {% if report.includes_visualization_note %}
+  <h2>Professional Hinweis</h2>
+  <p>{{ report.operational_boundary_note }}</p>
+  {% endif %}
+
   <h2>Normen-Snapshot</h2>
   <table>
     <thead><tr><th>Norm</th><th>Titel</th><th>Stand</th><th>Kategorie</th></tr></thead>
@@ -62,6 +116,9 @@
   </table>
 
   <p class="muted">Vorläufige Analyse. Keine verbindliche Netzanschlusszusage.</p>
+  {% if report.disclaimers %}
+  <ul class="muted">{% for d in report.disclaimers %}<li>{{ d }}</li>{% endfor %}</ul>
+  {% endif %}
 </body>
 </html>
 

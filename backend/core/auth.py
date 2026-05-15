@@ -1,13 +1,13 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import hashlib
 import hmac
-import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import bcrypt
 from fastapi import Cookie, Depends, Header, HTTPException
 import jwt
 from jwt import InvalidTokenError
@@ -19,6 +19,8 @@ from db.database import get_db
 from db.models import User
 
 security = HTTPBearer(auto_error=False)
+_BCRYPT_ROUNDS = 12
+_LEGACY_PBKDF2_ITERATIONS = 120_000
 
 
 def _b64url_encode(data: bytes) -> str:
@@ -30,21 +32,53 @@ def _b64url_decode(value: str) -> bytes:
     return base64.urlsafe_b64decode(value + padding)
 
 
-def hash_password(password: str) -> str:
-    salt = os.urandom(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120_000)
-    return f"{_b64url_encode(salt)}.{_b64url_encode(digest)}"
+def _is_bcrypt_hash(hashed_password: str) -> bool:
+    return hashed_password.startswith(("$2a$", "$2b$", "$2y$"))
 
 
-def verify_password(password: str, hashed_password: str) -> bool:
+def _verify_legacy_pbkdf2_password(password: str, hashed_password: str) -> bool:
     try:
         salt_b64, digest_b64 = hashed_password.split(".", 1)
         salt = _b64url_decode(salt_b64)
         expected = _b64url_decode(digest_b64)
     except Exception:
         return False
-    actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120_000)
+    actual = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        _LEGACY_PBKDF2_ITERATIONS,
+    )
     return hmac.compare_digest(expected, actual)
+
+
+def hash_password(password: str) -> str:
+    hashed = bcrypt.hashpw(
+        password.encode("utf-8"),
+        bcrypt.gensalt(rounds=_BCRYPT_ROUNDS),
+    )
+    return hashed.decode("utf-8")
+
+
+def verify_password(password: str, hashed_password: str) -> bool:
+    if not hashed_password:
+        return False
+    if _is_bcrypt_hash(hashed_password):
+        try:
+            return bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8"))
+        except ValueError:
+            return False
+    return _verify_legacy_pbkdf2_password(password, hashed_password)
+
+
+def password_hash_needs_upgrade(hashed_password: str) -> bool:
+    if not _is_bcrypt_hash(hashed_password):
+        return True
+    try:
+        rounds = int(hashed_password.split("$", 3)[2])
+    except (IndexError, ValueError):
+        return True
+    return rounds < _BCRYPT_ROUNDS
 
 
 def _jwt_secret(is_refresh: bool = False) -> str:
@@ -112,6 +146,19 @@ def get_current_user(
             detail={"code": "AUTH_USER_INVALID", "message": "Benutzer ungueltig", "hint": "Bitte erneut anmelden."},
         )
     return user
+
+
+def require_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "AUTH_FORBIDDEN",
+                "message": "Diese Funktion ist nur fuer interne Admin-Nutzer freigeschaltet.",
+                "hint": "Bitte mit einem Admin-Konto anmelden.",
+            },
+        )
+    return current_user
 
 
 def issue_csrf_token() -> str:

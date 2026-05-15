@@ -90,7 +90,7 @@ Die App ist kein Ampelspielzeug, sondern ein diagnostisches Entscheidungsunterst
 Bevorzugter Ziel-Stack:
 
 - Monorepo
-- pnpm
+- npm
 - Next.js App Router
 - React
 - Tailwind

@@ -10,6 +10,12 @@ from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from db.models import AuditLog, Project, ProjectFile, ProjectMember, User, make_checksum
+from services.visibility_service import (
+    StakeholderPath,
+    can_write_project,
+    get_project_access_level,
+    resolve_project_stakeholder_path,
+)
 _ALLOWED_UPLOAD_TYPES = {
     "application/pdf",
     "image/png",
@@ -19,6 +25,10 @@ _ALLOWED_UPLOAD_TYPES = {
 }
 
 from engine.revision import speichere_revision
+
+
+def _json_text(value: dict | None) -> str:
+    return json.dumps(value or {}, ensure_ascii=False, sort_keys=True)
 
 
 def _can_read(user: User, project: Project, db: Session) -> bool:
@@ -33,14 +43,7 @@ def _can_read(user: User, project: Project, db: Session) -> bool:
 
 
 def _can_write(user: User, project: Project, db: Session) -> bool:
-    if user.role == "admin" or project.owner_user_id == user.id:
-        return True
-    member = (
-        db.query(ProjectMember)
-        .filter(ProjectMember.project_id == project.id, ProjectMember.user_id == user.id)
-        .first()
-    )
-    return member is not None and member.project_role in {"editor", "owner"}
+    return can_write_project(get_project_access_level(db, user, project))
 
 
 def _project_not_found() -> HTTPException:
@@ -54,6 +57,17 @@ def _forbidden() -> HTTPException:
     return HTTPException(
         status_code=403,
         detail={"code": "PROJECT_FORBIDDEN", "message": "Kein Zugriff auf Projekt", "hint": "Bitte Berechtigung pruefen."},
+    )
+
+
+def _write_forbidden() -> HTTPException:
+    return HTTPException(
+        status_code=403,
+        detail={
+            "code": "PROJECT_WRITE_FORBIDDEN",
+            "message": "Projektgebundene Aenderungen sind nur fuer Owner, Editor oder Admin erlaubt.",
+            "hint": "Bitte mit Owner-, Editor- oder Admin-Rechten erneut versuchen.",
+        },
     )
 
 
@@ -72,22 +86,49 @@ def _append_audit_and_revision(db: Session, project: Project, user: User, action
         actor_user_id=user.id,
         action_type=action,
         project_id=project.id,
+        db=db,
     )
 
 
-def create_project(db: Session, user: User, *, name: str, plz: str, typ: str, leistung_kw: float, description: str | None) -> Project:
+def create_project(
+    db: Session,
+    user: User,
+    *,
+    name: str,
+    plz: str,
+    typ: str,
+    leistung_kw: float,
+    description: str | None,
+    role_inputs: dict | None = None,
+    role_results: dict | None = None,
+) -> Project:
     project = Project(
         name=name,
         plz=plz,
         typ=typ,
         leistung_kw=leistung_kw,
         description=description or "",
+        role_inputs=_json_text(role_inputs),
+        role_results=_json_text(role_results),
         owner_user_id=user.id,
     )
     db.add(project)
     db.flush()
     db.add(ProjectMember(project_id=project.id, user_id=user.id, project_role="owner"))
-    _append_audit_and_revision(db, project, user, "PROJECT_CREATED", {"name": name, "typ": typ, "leistung_kw": leistung_kw, "plz": plz})
+    _append_audit_and_revision(
+        db,
+        project,
+        user,
+        "PROJECT_CREATED",
+        {
+            "name": name,
+            "typ": typ,
+            "leistung_kw": leistung_kw,
+            "plz": plz,
+            "role_inputs": role_inputs or {},
+            "role_results": role_results or {},
+        },
+    )
     db.commit()
     db.refresh(project)
     return project
@@ -102,7 +143,7 @@ def list_projects(db: Session, user: User) -> list[Project]:
             (Project.owner_user_id == user.id) | (ProjectMember.user_id == user.id),
         )
         .distinct(Project.id)
-        .order_by(Project.updated_at.desc())
+        .order_by(Project.id, Project.updated_at.desc())
     )
     return query.all()
 
@@ -116,6 +157,21 @@ def get_project(db: Session, user: User, project_id: int) -> Project:
     return project
 
 
+def get_project_access_context(
+    db: Session,
+    user: User,
+    project_id: int,
+    *,
+    require_write: bool = False,
+) -> tuple[Project, str, StakeholderPath]:
+    project = get_project(db, user, project_id)
+    access_level = get_project_access_level(db, user, project)
+    if require_write and not can_write_project(access_level):
+        raise _write_forbidden()
+    stakeholder_path = resolve_project_stakeholder_path(project, fallback_user_role=user.role)
+    return project, access_level, stakeholder_path
+
+
 def update_project(db: Session, user: User, project_id: int, payload: dict) -> Project:
     project = get_project(db, user, project_id)
     if not _can_write(user, project, db):
@@ -123,6 +179,10 @@ def update_project(db: Session, user: User, project_id: int, payload: dict) -> P
     for key in ("name", "plz", "typ", "leistung_kw", "description"):
         if key in payload and payload[key] is not None:
             setattr(project, key, payload[key])
+    if "role_inputs" in payload and payload["role_inputs"] is not None:
+        project.role_inputs = _json_text(payload["role_inputs"])
+    if "role_results" in payload and payload["role_results"] is not None:
+        project.role_results = _json_text(payload["role_results"])
     project.updated_at = datetime.now(timezone.utc)
     _append_audit_and_revision(db, project, user, "PROJECT_UPDATED", payload)
     db.commit()

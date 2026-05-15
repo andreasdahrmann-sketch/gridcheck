@@ -2,26 +2,33 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-from db.models import Base, Project
+from db.models import Base, Project, User
 from services.stakeholder_service import run_netzbetreiber_check
+from tests.postgres_test_utils import build_isolated_postgres_session_factory
 
 
 @pytest.fixture
-def memory_db():
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(bind=engine)
-    Session = sessionmaker(bind=engine)
+def postgres_db():
+    _, Session, cleanup = build_isolated_postgres_session_factory(Base.metadata, label="netzbetreiber")
     session = Session()
     try:
         yield session
     finally:
         session.close()
+        cleanup()
 
 
-def test_netzbetreiber_projektname_mit_nb_prefix(memory_db):
+def test_netzbetreiber_projektname_mit_nb_prefix(postgres_db):
+    actor = User(
+        email="netzbetreiber@example.com",
+        password_hash="fixture-hash",
+        role="netzbetreiber",
+        is_active=True,
+    )
+    postgres_db.add(actor)
+    postgres_db.commit()
+    postgres_db.refresh(actor)
     req_data = {
         "projektname": "Solar Nord",
         "plz": "10115",
@@ -47,8 +54,9 @@ def test_netzbetreiber_projektname_mit_nb_prefix(memory_db):
         "aktenzeichen": "AZ-12345",
         "pruefvermerk": "",
     }
-    out = run_netzbetreiber_check(memory_db, req_data)
+    out = run_netzbetreiber_check(postgres_db, req_data, actor)
     pid = out["project_id"]
-    p = memory_db.get(Project, pid)
+    p = postgres_db.get(Project, pid)
     assert p is not None
     assert p.name == "[NB:AZ-12345] Solar Nord"
+    assert p.owner_user_id == actor.id

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>GridCheck Mobile Shell</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        min-height: 100svh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(1100px 560px at 18% -5%, rgba(238, 127, 45, 0.14), transparent 62%),
+          radial-gradient(920px 520px at 88% 8%, rgba(95, 208, 184, 0.11), transparent 64%),
+          linear-gradient(180deg, #061a1a 0%, #0a2323 100%);
+        color: #e7f3f0;
+      }
+
+      main {
+        width: min(100% - 32px, 560px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 28px;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 28px;
+      }
+
+      p {
+        line-height: 1.6;
+        color: rgba(231, 243, 240, 0.78);
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        color: #5fd0b8;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p style="margin-top: 0; font-size: 12px; letter-spacing: 0.24em; text-transform: uppercase; color: #5fd0b8;">
+        Native Shell
+      </p>
+      <h1>GridCheck wartet auf die PWA-URL.</h1>
+      <p>
+        Diese Fallback-Seite ist nur das lokale Startpaket fuer den Capacitor-Shell. Fuer reale Android- oder iOS-Builds
+        setze vor <code>npx cap sync</code> die Variable <code>CAPACITOR_SERVER_URL</code> auf eine erreichbare HTTPS-URL
+        der bestehenden Next.js/PWA-Bereitstellung.
+      </p>
+      <p style="margin-bottom: 0;">
+        Ohne Server-URL bleibt die Web/PWA-Laufbahn unangetastet, und der native Shell startet bewusst nur diese
+        Platzhalterseite statt eine halbfertige App zu laden.
+      </p>
+    </main>
+  </body>
+  </html>

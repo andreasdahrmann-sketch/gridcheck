@@ -8,7 +8,6 @@ import {
   type AntragStatus,
   type AuditEntry,
   STATUS_LABEL,
-  STATUS_COLOR,
   getMeta,
   getAuditTrail,
   setStatus,
@@ -152,6 +151,36 @@ export default function AntragDetailDrawer({ antrag, prio, onClose, onChanged }:
               <dd className="text-slate-200">{antrag.eingangsdatum}</dd>
               <dt className="text-slate-500">Standort</dt>
               <dd className="text-slate-200">{antrag.plz} {antrag.ort ?? ""}</dd>
+              {antrag.max_export_kw !== undefined && (
+                <>
+                  <dt className="text-slate-500">NAP Export</dt>
+                  <dd className="text-slate-200">{antrag.max_export_kw} kW</dd>
+                </>
+              )}
+              {antrag.max_import_kw !== undefined && (
+                <>
+                  <dt className="text-slate-500">NAP Bezug</dt>
+                  <dd className="text-slate-200">{antrag.max_import_kw} kW</dd>
+                </>
+              )}
+              {antrag.storage_operation_mode && (
+                <>
+                  <dt className="text-slate-500">Speicherbetrieb</dt>
+                  <dd className="text-slate-200">{antrag.storage_operation_mode}</dd>
+                </>
+              )}
+              {antrag.route_risk_level && (
+                <>
+                  <dt className="text-slate-500">Umwelt / Trasse</dt>
+                  <dd className="text-slate-200">{antrag.route_risk_level}</dd>
+                </>
+              )}
+              {antrag.stakeholder_konflikt_level && (
+                <>
+                  <dt className="text-slate-500">Stakeholder-Konflikt</dt>
+                  <dd className="text-slate-200">{antrag.stakeholder_konflikt_level}</dd>
+                </>
+              )}
               {antrag.gridcheck_score !== undefined && (
                 <>
                   <dt className="text-slate-500">GridCheck-Score</dt>
@@ -293,7 +322,7 @@ export default function AntragDetailDrawer({ antrag, prio, onClose, onChanged }:
                       {e.old_value === null && e.new_value !== null && (
                         <span>{e.new_value}</span>
                       )}
-                      {e.comment && <span className="italic"> "{e.comment}"</span>}
+                      {e.comment && <span className="italic"> &quot;{e.comment}&quot;</span>}
                     </div>
                     <div className="text-slate-600 mt-0.5">von {e.user} · hash {e.hash}</div>
                   </li>

@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
+from core.auth import get_current_user, require_csrf
 from db.database import get_db
+from db.models import User
 from services.stakeholder_service import (
     commit_endkunde_transaction,
     commit_projektierer_transaction,
@@ -18,6 +20,20 @@ from services.stakeholder_service import (
 )
 
 router = APIRouter(prefix="/stakeholder", tags=["Stakeholder"])
+
+
+def _require_stakeholder_access(current_user: User, *, allowed_roles: set[str], route_name: str) -> User:
+    normalized_role = str(current_user.role or "").strip().lower()
+    if normalized_role == "admin" or normalized_role in allowed_roles:
+        return current_user
+    raise HTTPException(
+        status_code=403,
+        detail={
+            "code": "STAKEHOLDER_FORBIDDEN",
+            "message": f"Der Stakeholder-Pfad {route_name} ist fuer diese Rolle nicht freigeschaltet.",
+            "hint": "Bitte ein Konto mit passender Stakeholder-Rolle verwenden.",
+        },
+    )
 
 
 # ============================================================
@@ -65,8 +81,18 @@ def _grobkosten(leistung_kw: float, spannung_kv: float, score: float) -> tuple:
 
 
 @router.post("/endkunde", response_model=EndkundeResponse)
-def check_endkunde(req: EndkundeRequest, db: Session = Depends(get_db)):
-    service_data = run_endkunde_check(db, req.model_dump())
+def check_endkunde(
+    req: EndkundeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf),
+):
+    actor = _require_stakeholder_access(
+        current_user,
+        allowed_roles={"endkunde", "projektierer", "netzbetreiber"},
+        route_name="endkunde",
+    )
+    service_data = run_endkunde_check(db, req.model_dump(), actor)
     project_id = service_data["project_id"]
     result = service_data["result"]
     spannung_kv = float(req.spannungsebene)
@@ -93,6 +119,7 @@ def check_endkunde(req: EndkundeRequest, db: Session = Depends(get_db)):
 
     commit_endkunde_transaction(
         db,
+        actor=actor,
         project_id=project_id,
         req_data=req.model_dump(),
         tendenz=tendenz,
@@ -203,13 +230,24 @@ def _massnahmen(result: dict, req: ProjektiererRequest) -> List[str]:
 
 
 @router.post("/projektierer", response_model=ProjektiererResponse)
-def check_projektierer(req: ProjektiererRequest, db: Session = Depends(get_db)):
-    service_data = run_projektierer_check(db, req.model_dump())
+def check_projektierer(
+    req: ProjektiererRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf),
+):
+    actor = _require_stakeholder_access(
+        current_user,
+        allowed_roles={"projektierer", "netzbetreiber"},
+        route_name="projektierer",
+    )
+    service_data = run_projektierer_check(db, req.model_dump(), actor)
     project_id = service_data["project_id"]
     result = service_data["result"]
 
     commit_projektierer_transaction(
         db,
+        actor=actor,
         project_id=project_id,
         req_data=req.model_dump(),
         result=result,
@@ -259,8 +297,18 @@ class NetzbetreiberResponse(ProjektiererResponse):
 
 
 @router.post("/netzbetreiber", response_model=NetzbetreiberResponse)
-def check_netzbetreiber(req: NetzbetreiberRequest, db: Session = Depends(get_db)):
-    service_data = run_netzbetreiber_check(db, req.model_dump())
+def check_netzbetreiber(
+    req: NetzbetreiberRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf),
+):
+    actor = _require_stakeholder_access(
+        current_user,
+        allowed_roles={"netzbetreiber"},
+        route_name="netzbetreiber",
+    )
+    service_data = run_netzbetreiber_check(db, req.model_dump(), actor)
     project_id = service_data["project_id"]
     result = service_data["result"]
     audit_id = service_data["audit_id"]

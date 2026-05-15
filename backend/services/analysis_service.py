@@ -3,10 +3,24 @@ from __future__ import annotations
 import json
 from typing import Any, Optional
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from db.models import AuditLog, CheckResult, Project, make_checksum
+from db.models import AuditLog, CheckResult, Project, ProjectMember, User, make_checksum
 from engine import berechne_netzcheck
+from services.billing_service import (
+    enforce_package_rights,
+    ensure_analysis_allowed,
+    package_access_context,
+    persist_completed_analysis_run,
+)
+from services.visibility_service import (
+    can_view_project_audit,
+    derive_stakeholder_path,
+    get_project_access_level,
+    sanitize_analysis_result,
+    sanitize_audit_detail,
+)
 
 
 def resolve_cable_key(leitungstyp: str, querschnitt: str) -> str:
@@ -27,7 +41,14 @@ def resolve_cable_key(leitungstyp: str, querschnitt: str) -> str:
     return "NAYY 150"
 
 
-def run_analysis_and_persist(db: Session, req_data: dict[str, Any]) -> dict[str, Any]:
+def run_analysis_and_persist(db: Session, req_data: dict[str, Any], user: User) -> dict[str, Any]:
+    ensure_analysis_allowed(db, user)
+    access_context = package_access_context(
+        db,
+        user,
+        requested_offer_id=str(req_data.get("requested_offer_id")) if req_data.get("requested_offer_id") else None,
+    )
+    req_data = enforce_package_rights(req_data, access_context)
     cable_key = resolve_cable_key(req_data["leitungstyp"], req_data["querschnitt_mm2"])
     spannung_kv = float(req_data["spannungsebene"])
     bestehende_kw = (req_data.get("vorbelastung_mw") or 0) * 1000.0
@@ -54,9 +75,11 @@ def run_analysis_and_persist(db: Session, req_data: dict[str, Any]) -> dict[str,
         bestehende_einspeisung_kw=bestehende_kw,
         leitungstyp=cable_key,
         leitungslaenge_km=req_data["leitungslaenge_km"],
+        owner_user_id=user.id,
     )
     db.add(project)
     db.flush()
+    db.add(ProjectMember(project_id=project.id, user_id=user.id, project_role="owner"))
 
     check = CheckResult(
         project_id=project.id,
@@ -80,12 +103,32 @@ def run_analysis_and_persist(db: Session, req_data: dict[str, Any]) -> dict[str,
     )
     db.add(audit)
     db.commit()
+    persist_completed_analysis_run(
+        db,
+        user,
+        request_payload=req_data,
+        result_payload=result,
+        source="legacy_persist",
+        project_id=project.id,
+        access_context=access_context,
+    )
 
     return {"project_id": project.id, **result}
 
 
-def list_projects_summary(db: Session) -> list[dict[str, Any]]:
-    projects = db.query(Project).order_by(Project.created_at.desc()).limit(50).all()
+def list_projects_summary(db: Session, user: User) -> list[dict[str, Any]]:
+    projects = (
+        db.query(Project)
+        .outerjoin(ProjectMember, ProjectMember.project_id == Project.id)
+        .filter(
+            Project.deleted_at.is_(None),
+            (Project.owner_user_id == user.id) | (ProjectMember.user_id == user.id),
+        )
+        .distinct(Project.id)
+        .order_by(Project.id, Project.created_at.desc())
+        .limit(50)
+        .all()
+    )
     return [
         {
             "id": p.id,
@@ -99,7 +142,39 @@ def list_projects_summary(db: Session) -> list[dict[str, Any]]:
     ]
 
 
-def get_latest_result(db: Session, project_id: int) -> Optional[dict[str, Any]]:
+def _get_accessible_project(db: Session, user: User, project_id: int) -> Project | None:
+    from services import project_service
+
+    try:
+        return project_service.get_project(db, user, project_id)
+    except Exception:
+        return None
+
+
+def _parse_project_role_inputs(project: Project) -> dict[str, Any]:
+    if not project.role_inputs:
+        return {}
+    try:
+        payload = json.loads(project.role_inputs)
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _parse_check_details(check: CheckResult) -> dict[str, Any]:
+    if not check.details:
+        return {}
+    try:
+        payload = json.loads(check.details)
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def get_latest_result(db: Session, user: User, project_id: int) -> Optional[dict[str, Any]]:
+    project = _get_accessible_project(db, user, project_id)
+    if not project:
+        return None
     check = (
         db.query(CheckResult)
         .filter(CheckResult.project_id == project_id)
@@ -108,6 +183,11 @@ def get_latest_result(db: Session, project_id: int) -> Optional[dict[str, Any]]:
     )
     if not check:
         return None
+    access_level = get_project_access_level(db, user, project)
+    stakeholder_path = derive_stakeholder_path(
+        _parse_project_role_inputs(project),
+        fallback_user_role=user.role,
+    )
     return {
         "project_id": check.project_id,
         "score": check.score,
@@ -117,11 +197,33 @@ def get_latest_result(db: Session, project_id: int) -> Optional[dict[str, Any]]:
         "n1_ok": check.n1_ok,
         "netzebene": check.netzebene,
         "empfehlung": check.empfehlung,
-        "details": json.loads(check.details) if check.details else {},
+        "details": sanitize_analysis_result(
+            _parse_check_details(check),
+            stakeholder_path=stakeholder_path,
+        ),
+        "visibility_scope": stakeholder_path,
+        "viewer_access_level": access_level,
     }
 
 
-def get_audit_logs(db: Session, project_id: int) -> list[dict[str, Any]]:
+def get_audit_logs(db: Session, user: User, project_id: int) -> list[dict[str, Any]]:
+    project = _get_accessible_project(db, user, project_id)
+    if not project:
+        return []
+    access_level = get_project_access_level(db, user, project)
+    if not can_view_project_audit(access_level):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "AUDIT_FORBIDDEN",
+                "message": "Audit-Trail ist nur fuer interne Bearbeiter oder Projektverantwortliche sichtbar.",
+                "hint": "Bitte mit Owner-, Editor- oder Admin-Rechten erneut versuchen.",
+            },
+        )
+    stakeholder_path = derive_stakeholder_path(
+        _parse_project_role_inputs(project),
+        fallback_user_role=user.role,
+    )
     logs = (
         db.query(AuditLog)
         .filter(AuditLog.project_id == project_id)
@@ -133,7 +235,11 @@ def get_audit_logs(db: Session, project_id: int) -> list[dict[str, Any]]:
             "id": l.id,
             "timestamp": str(l.timestamp),
             "action": l.action,
-            "detail": l.detail,
+            "detail": sanitize_audit_detail(
+                l.detail,
+                stakeholder_path=stakeholder_path,
+                access_level=access_level,
+            ),
             "checksum": l.checksum,
         }
         for l in logs
