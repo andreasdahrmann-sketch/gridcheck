@@ -1,5 +1,6 @@
 import type { GridCheckInput, GridCheckResult } from "@/types";
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
+import { bearerAuthHeaders } from "@/lib/api/session";
 
 export type ProjectRoleInputs = Partial<GridCheckInput> & {
   kundentyp?: string;
@@ -32,12 +33,20 @@ async function parse<T>(res: Response): Promise<T> {
 }
 
 export async function listProjects() {
-  const res = await fetch(BASE, { credentials: "include", cache: "no-store" });
+  const res = await fetch(BASE, {
+    credentials: "include",
+    cache: "no-store",
+    headers: { ...bearerAuthHeaders() },
+  });
   return parse<Project[]>(res);
 }
 
 export async function getProject(projectId: number) {
-  const res = await fetch(`${BASE}/${projectId}`, { credentials: "include", cache: "no-store" });
+  const res = await fetch(`${BASE}/${projectId}`, {
+    credentials: "include",
+    cache: "no-store",
+    headers: { ...bearerAuthHeaders() },
+  });
   return parse<Project>(res);
 }
 
@@ -56,7 +65,11 @@ export async function createProject(
   const res = await fetch(BASE, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...bearerAuthHeaders(),
+      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+    },
     body: JSON.stringify(payload),
   });
   return parse<Project>(res);
@@ -67,7 +80,11 @@ export async function updateProject(projectId: number, payload: Partial<Project>
   const res = await fetch(`${BASE}/${projectId}`, {
     method: "PATCH",
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...bearerAuthHeaders(),
+      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+    },
     body: JSON.stringify(payload),
   });
   return parse<Project>(res);
@@ -78,7 +95,7 @@ export async function deleteProject(projectId: number) {
   const res = await fetch(`${BASE}/${projectId}`, {
     method: "DELETE",
     credentials: "include",
-    headers: { ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
+    headers: { ...bearerAuthHeaders(), ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
   });
   return parse<{ status: string }>(res);
 }
@@ -88,7 +105,11 @@ export async function shareProject(projectId: number, target_user_id: number, pr
   const res = await fetch(`${BASE}/${projectId}/share`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...bearerAuthHeaders(),
+      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+    },
     body: JSON.stringify({ target_user_id, project_role }),
   });
   return parse<{ status: string }>(res);

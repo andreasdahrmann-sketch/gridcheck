@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { register } from "@/lib/api/auth";
+import { getPasswordPolicyChecks, isPasswordPolicySatisfied } from "@/lib/password-policy";
 import { getPurchaseIntentProfile, normalizePurchaseIntent } from "@/lib/purchase-intents";
 
 const cardClass = "rounded-[28px] border border-white/10 bg-bg-card/80 p-6 shadow-[0_12px_42px_rgba(0,0,0,0.18)]";
@@ -32,13 +33,14 @@ function RegisterPageContent() {
   const loginHref = `/login?intent=${encodeURIComponent(intent)}&next=${encodeURIComponent(nextTarget)}`;
   const [role, setRole] = useState(intent === "vnb-pilot" ? "netzbetreiber" : "projektierer");
 
-  const passwordChecks = useMemo(
+  const passwordChecks = useMemo(() => getPasswordPolicyChecks(password), [password]);
+  const formChecks = useMemo(
     () => [
-      { label: "Mindestens 8 Zeichen", ok: password.length >= 8 },
+      ...passwordChecks,
       { label: "E-Mail angegeben", ok: email.trim().length > 0 },
       { label: "Rolle ausgewaehlt", ok: role.trim().length > 0 },
     ],
-    [email, password, role]
+    [email, passwordChecks, role]
   );
 
   async function onSubmit(e: FormEvent) {
@@ -46,8 +48,10 @@ function RegisterPageContent() {
     setError(null);
     setMessage(null);
 
-    if (!email.trim() || password.length < 8) {
-      setError("Bitte E-Mail angeben und ein Passwort mit mindestens 8 Zeichen verwenden.");
+    if (!email.trim() || !isPasswordPolicySatisfied(password)) {
+      setError(
+        "Bitte E-Mail angeben und ein Passwort mit mindestens 12 Zeichen sowie Gross-/Kleinbuchstaben, Zahl und Sonderzeichen verwenden."
+      );
       return;
     }
 
@@ -190,7 +194,7 @@ function RegisterPageContent() {
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   className={fieldClass}
-                  placeholder="Mindestens 8 Zeichen"
+                  placeholder="Mindestens 12 Zeichen, komplex"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -214,7 +218,7 @@ function RegisterPageContent() {
               <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
                 <p className="text-sm font-medium text-white">Pruefung</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                  {passwordChecks.map((check) => (
+                  {formChecks.map((check) => (
                     <div
                       key={check.label}
                       className={`rounded-xl border px-3 py-2 text-sm ${

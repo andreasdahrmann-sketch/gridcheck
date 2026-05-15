@@ -41,6 +41,26 @@ def _purge_audit_chain_tables() -> None:
             )
         )
         conn.commit()
+    engine.dispose()
+
+
+def _test_touches_audit_chain(request: pytest.FixtureRequest) -> bool:
+    nodeid = request.node.nodeid.replace("\\", "/")
+    audit_markers = (
+        "revision",
+        "revisions_",
+        "ki_feedback",
+        "stakeholder_reports",
+        "projektierer_report",
+        "site_markers",
+        "analyze_v2_route",
+    )
+    if any(token in nodeid for token in audit_markers):
+        return True
+    return any(
+        name in request.fixturenames
+        for name in ("isolierte_revisionen", "isolierte_ki_feedback", "isolierte_report_revisionen", "chain_mit_3")
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -52,9 +72,10 @@ def _reset_fastapi_dependency_overrides():
 
 
 @pytest.fixture(autouse=True)
-def _isolated_audit_chain_tables():
-    """Revision-/Report-/KI-Feedback-Tabellen vor jedem Test leeren (keine Cross-Test-Pollution)."""
-    _purge_audit_chain_tables()
+def _isolated_audit_chain_tables(request: pytest.FixtureRequest):
+    """Revision-/Report-/KI-Feedback-Tabellen vor Revision-bezogenen Tests leeren."""
+    if _test_touches_audit_chain(request):
+        _purge_audit_chain_tables()
     yield
 
 

@@ -46,6 +46,9 @@ def chain_mit_3(isolierte_revisionen):
             {"input": {"i": i}, "result": {"score": i * 10}},
             engine_version="test-1.0",
         )
+    from db.database import engine
+
+    engine.dispose()
     return True
 
 

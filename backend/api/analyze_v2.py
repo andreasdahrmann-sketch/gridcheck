@@ -28,6 +28,7 @@ from services.billing_service import (
     persist_completed_analysis_run,
     persist_failed_analysis_run,
 )
+from services.conversion_tracking_service import track_analysis_completed
 from services.visibility_service import derive_stakeholder_path, sanitize_analysis_result
 from services.v1_analysis_service import run_v1_analysis
 
@@ -360,6 +361,15 @@ def analyze_v2(
         project_id=project_id,
         access_context=access_context,
     )
+    track_analysis_completed(
+        db,
+        current_user,
+        analysis_run_id=run.id,
+        project_id=project_id,
+        offer_id=access_context.get("offer_id"),
+        source=source,
+    )
+    db.commit()
     response_payload = {
         **result,
         "history": {"analysis_run_id": run.id},

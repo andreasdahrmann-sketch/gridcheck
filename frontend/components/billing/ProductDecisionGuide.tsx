@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
+import { trackConversionEvent } from "@/lib/api/analytics";
 import {
   DECISION_GUIDE_CARDS,
   PRODUCT_FAQS,
@@ -21,6 +23,14 @@ export default function ProductDecisionGuide({
   compact?: boolean;
 }) {
   const nextStep = getNextStepGuidance(currentOfferId, currentPackageScope);
+
+  useEffect(() => {
+    void trackConversionEvent("page_view_product", {
+      surface: compact ? "compact" : "full",
+      current_offer_id: currentOfferId ?? null,
+      current_package_scope: currentPackageScope ?? null,
+    });
+  }, [compact, currentOfferId, currentPackageScope]);
 
   return (
     <section className="space-y-4 rounded-[28px] border border-white/10 bg-white/5 p-5">

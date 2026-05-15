@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import BillingAndHistoryPanel from "@/components/settings/BillingAndHistoryPanel";
 import { logout } from "@/lib/api/auth";
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
+import { bearerAuthHeaders } from "@/lib/api/session";
 import {
   DEFAULT_USER_PREFERENCES,
   readUserPreferences,
@@ -84,7 +85,11 @@ export default function SettingsPage() {
   const meQuery = useQuery<Me>({
     queryKey: ["me"],
     queryFn: async () => {
-      const res = await fetch("/api/backend/api/v1/users/me", { credentials: "include", cache: "no-store" });
+      const res = await fetch("/api/backend/api/v1/users/me", {
+        credentials: "include",
+        cache: "no-store",
+        headers: { ...bearerAuthHeaders() },
+      });
       if (!res.ok) {
         throw new Error("not-authorized");
       }

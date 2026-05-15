@@ -39,6 +39,7 @@ from engine.stakeholder_reports.renderer import (
 )
 from engine.stakeholder_reports.vnb import build_vnb_report
 from services import project_service
+from services.conversion_tracking_service import track_report_exported
 from services.billing_service import (
     enforce_package_rights,
     package_access_context,
@@ -500,6 +501,14 @@ def _export_stakeholder_report(
         report_type=report_type,
         db=db,
         revision_uuid=revision_uuid,
+    )
+    track_report_exported(
+        db,
+        current_user,
+        report_type=report_type,
+        output_format=out_fmt,
+        report_revision_uuid=str(rev.get("uuid") or revision_uuid),
+        analysis_run_id=report.get("source_analysis_run_id"),
     )
     db.commit()
     final_report = (

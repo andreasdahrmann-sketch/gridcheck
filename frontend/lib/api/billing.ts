@@ -1,4 +1,5 @@
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
+import { bearerAuthHeaders } from "@/lib/api/session";
 
 export type BillingOffer = {
   offer_id: string;
@@ -198,6 +199,7 @@ export async function getBillingStatus() {
   const res = await fetch(`${BILLING_BASE}/status`, {
     credentials: "include",
     cache: "no-store",
+    headers: { ...bearerAuthHeaders() },
   });
   return parse<BillingStatus>(res);
 }

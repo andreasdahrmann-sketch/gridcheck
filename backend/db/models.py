@@ -97,6 +97,7 @@ class User(Base):
     uploaded_files = relationship("ProjectFile", back_populates="uploader")
     analysis_runs = relationship("AnalysisRun", back_populates="user")
     billing_events = relationship("BillingEvent", back_populates="user")
+    conversion_events = relationship("ConversionEvent", back_populates="user")
     billing_entitlements = relationship("BillingEntitlement", foreign_keys="BillingEntitlement.user_id", back_populates="user")
 
 
@@ -202,6 +203,22 @@ class BillingEvent(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="billing_events")
+
+
+class ConversionEvent(Base):
+    __tablename__ = "conversion_events"
+    __table_args__ = (
+        Index("ix_conversion_events_user_created", "user_id", "created_at"),
+        Index("ix_conversion_events_name_created", "event_name", "created_at"),
+    )
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    event_name = Column(String, nullable=False, index=True)
+    session_id = Column(String, nullable=True, index=True)
+    properties_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User", back_populates="conversion_events")
 
 
 class BillingEntitlement(Base):

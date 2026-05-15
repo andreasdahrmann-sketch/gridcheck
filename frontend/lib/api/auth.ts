@@ -1,4 +1,5 @@
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
+import { bearerAuthHeaders, extractApiErrorMessage, setAccessToken } from "@/lib/api/session";
 
 export type AuthUser = {
   id: number;
@@ -16,11 +17,11 @@ type TokenResponse = {
 const BASE = "/api/backend/api/v1/auth";
 
 async function parse<T>(res: Response): Promise<T> {
+  const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body?.detail?.message ?? "API request failed");
+    throw new Error(extractApiErrorMessage(body, "API request failed"));
   }
-  return res.json() as Promise<T>;
+  return body as T;
 }
 
 export async function register(payload: { email: string; password: string; role?: string; full_name?: string }) {
@@ -40,13 +41,16 @@ export async function login(payload: { email: string; password: string }) {
     credentials: "include",
     body: JSON.stringify(payload),
   });
-  return parse<TokenResponse>(res);
+  const tokens = await parse<TokenResponse>(res);
+  setAccessToken(tokens.access_token);
+  return tokens;
 }
 
 export async function me() {
   const res = await fetch(`${BASE}/me`, {
     credentials: "include",
     cache: "no-store",
+    headers: { ...bearerAuthHeaders() },
   });
   return parse<AuthUser>(res);
 }
@@ -56,7 +60,9 @@ export async function logout() {
   const res = await fetch(`${BASE}/logout`, {
     method: "POST",
     credentials: "include",
-    headers: { ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
+    headers: { ...(csrf ? { "X-CSRF-Token": csrf } : {}), ...bearerAuthHeaders() },
   });
-  return parse<{ status: string }>(res);
+  const result = await parse<{ status: string }>(res);
+  setAccessToken(null);
+  return result;
 }

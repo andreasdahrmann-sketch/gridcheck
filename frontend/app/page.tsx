@@ -50,30 +50,34 @@ const PUBLIC_OFFERS = [
 
 const ROLE_CARDS = [
   {
-    title: "Projektierer",
+    title: "Projektentwickler",
+    subtitle: "Projektierer",
     status: "Aktiv",
     href: "/projektierer",
-    description: "Aktiver Pfad fuer Vorqualifizierung, Variantenvergleich, Kosten-/Trassenklaerung und VNB-/Invest-Vorbereitung.",
+    description:
+      "Aktiver Pfad fuer Vorqualifizierung, Variantenvergleich, Kosten-/Trassenklaerung und PDF-Export im Projektierer-Report.",
     cta: "Projektierer-Modul oeffnen",
     active: true,
   },
   {
-    title: "VNB",
-    status: "Aktiv",
-    href: "/vnb",
-    description: "Aktiver Pfad fuer strukturierte Anfragepruefung, technische Vorpruefung, Auflagen und Audit-/Prozesssicht.",
-    cta: "VNB-Modul oeffnen",
-    active: true,
+    title: "Netzbetreiber",
+    subtitle: "VNB",
+    status: "Coming soon",
+    description:
+      "Strukturierte Anfragepruefung, technische Vorpruefung, Auflagen und Audit-/Prozesssicht — Rollout folgt.",
+    cta: "Demnaechst verfuegbar",
+    active: false,
   },
   {
-    title: "Invest",
-    status: "Aktiv",
-    href: "/invest",
-    description: "Aktiver Pfad fuer Standortbewertung, Risikoanalyse, Kostenbandbreite und Due-Diligence-orientierte Outputs.",
-    cta: "Invest-Modul oeffnen",
-    active: true,
+    title: "Investor",
+    subtitle: "Invest",
+    status: "Coming soon",
+    description:
+      "Standortbewertung, Risikoanalyse, Kostenbandbreite und Due-Diligence-orientierte Outputs — Rollout folgt.",
+    cta: "Demnaechst verfuegbar",
+    active: false,
   },
-];
+] as const;
 
 export default function Home() {
   const [tab, setTab] = useState<"check" | "dashboard">("check");
@@ -162,7 +166,7 @@ export default function Home() {
 
           <div className="mt-8 grid gap-4 lg:grid-cols-3">
             {[
-              "Die MVP-Rollenpfade /projektierer, /vnb und /invest sind aktiv und fuehren in differenzierte Nutzerfluesse.",
+              "Der Projektierer-Pfad ist aktiv; VNB- und Investor-Module folgen als Coming soon.",
               "3 Checks kostenlos pro Nutzer, danach serverseitige Paywall.",
               "Oeffentlich sichtbare Pay-per-Use-Pakete fuer konkrete Vorhaben.",
               "Invest blendet tiefe Netzdaten bewusst aus; VNB und Projektierer behalten technische Tiefensicht nach Rollenlogik.",
@@ -182,7 +186,7 @@ export default function Home() {
               {ROLE_CARDS.map((item) => (
                 <Link
                   key={item.title}
-                  href={item.href}
+                  href={"href" in item ? item.href : "/projektierer"}
                   className={`rounded-[24px] border p-5 transition ${
                     item.active
                       ? "border-brand-cyan/30 bg-brand-cyan/10 hover:bg-brand-cyan/15"

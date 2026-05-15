@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from core.config import settings
 from db.models import AnalysisRun, BillingEntitlement, BillingEvent, Project, User, make_checksum
+from services.conversion_tracking_service import track_checkout_completed, track_checkout_started
 
 PAID_ACCESS_STATUSES = {"active", "trialing", "past_due"}
 SUBSCRIPTION_ANALYSIS_ACCESS_STATUSES = {"active", "trialing"}
@@ -1589,6 +1590,12 @@ def create_checkout_session(db: Session, user: User, offer_id: str = "pro_lizenz
         provider_customer_id=customer_id,
         provider_subscription_id=session_dict.get("subscription"),
     )
+    track_checkout_started(
+        db,
+        user,
+        offer_id=str(offer["offer_id"]),
+        checkout_session_id=str(session_dict.get("id") or "") or None,
+    )
     db.commit()
     return {
         "url": str(checkout_url),
@@ -1866,6 +1873,15 @@ def _sync_checkout_session_completion(
                 status="ops_pending",
             )
         synced = True
+
+    if synced:
+        track_checkout_completed(
+            db,
+            user,
+            offer_id=offer_id or None,
+            checkout_session_id=checkout_session_id,
+            payment_status=payment_status or None,
+        )
 
     return {
         "session_id": checkout_session_id,

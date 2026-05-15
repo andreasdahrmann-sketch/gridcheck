@@ -59,6 +59,8 @@ backups/
 _QUARANTAENE*/
 backend/uploads/
 backend/backups/
+backend/daten/*.jsonl
+backend/daten/datenquellen_snapshots.jsonl
 backend/gridcheck.db*
 docs/last_test_run.txt
 _pytest_out.txt
