@@ -47,3 +47,21 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+_backup_*/
+backups/
+backup_*/
+_milestone_backups/
+backups/
+*.bak_*
+*.bak-*
+*.OLD
+_QUARANTAENE*/
+backend/uploads/
+backend/backups/
+backend/gridcheck.db*
+docs/last_test_run.txt
+_pytest_out.txt
+_revisions_out*.txt
+pytest_tranche1_out.txt
+report/
