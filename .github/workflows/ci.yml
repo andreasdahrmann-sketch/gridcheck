@@ -79,6 +79,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Verify frontend toolchain
+        run: npm run verify:toolchain
+
       - name: Lint frontend
         run: npm run lint
 

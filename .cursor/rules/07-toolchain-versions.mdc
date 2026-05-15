@@ -1,0 +1,47 @@
+---
+description: Toolchain-Matrix vor Versionsänderungen prüfen (Node 20, Next 14)
+alwaysApply: true
+---
+
+# Toolchain compatibility matrix (binding)
+
+**Prinzip:** Versionssprünge gehören vorher gegen eine feste Matrix geprüft, nicht blind installiert.
+
+## Incident (never repeat blindly)
+
+Vercel build with **Node 24 + Next 15.3.3** → `MODULE_NOT_FOUND`, broken deploy. Cause: major jumps outside the pinned matrix without migration.
+
+## Before ANY change to
+
+- `package.json` / `package-lock.json` (frontend or backend)
+- major/minor bumps of framework runtimes (`next`, `react`, `eslint-config-next`, Python stack)
+
+### Required agent workflow
+
+1. **Read** pinned versions: `frontend/package.json`, lockfile, `frontend/.nvmrc`, `engines`, backend `requirements.txt` if touched.
+2. **Verify** against matrix:
+
+| Component | Allowed | Forbidden without explicit migration project |
+|-----------|---------|-----------------------------------------------|
+| Node | **20.x LTS** (`.nvmrc`, `engines`) | 22, 24+ (breaks Next 14 on Vercel) |
+| Next.js | **14.2.x** line | 15.x (`npm install next@15`) |
+| React | **18.x** with Next 14 | 19.x with Next 14 |
+| eslint-config-next | same **minor** as `next` | drift from `next` version |
+| Python backend | **3.11+** | downgrade below 3.11 |
+
+3. **Run** (from `frontend/`): `npm run verify:toolchain` — must pass (`scripts/verify-toolchain.mjs`, also `prebuild`).
+4. **Lockfile:** if `package-lock.json` changes, confirm `npm ci` would succeed (no orphan deps).
+
+### Forbidden without explicit user request + documented compatibility check
+
+- `npm install next@15`, `npm update next` across major, or `--save-exact` major bumps
+- Raising Node in `.nvmrc`, `engines`, or Vercel project settings past 20.x
+- Blind `npm update` / `npm install latest` on framework packages
+
+### Vercel (production)
+
+- Root Directory: **`frontend`**
+- Node version: **20**
+- Install command: **`npm ci`** — lockfile must stay in sync with `package.json`
+
+If matrix check fails: **stop**, report mismatch, propose minimal fix or ask for an approved migration task — do not install and hope.

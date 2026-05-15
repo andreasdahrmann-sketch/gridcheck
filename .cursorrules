@@ -23,6 +23,9 @@
 
 # === ENDE HARDE REGELN ===
 
+# Toolchain: Versionssprünge nur nach Matrix-Check (siehe .cursor/rules/07-toolchain-versions.mdc)
+# Vor package.json / Lockfile / Major-Deps: npm run verify:toolchain in frontend/ — Node 20, Next 14.x
+
 ---
 description: Arbeitsweise und Architekturregeln für die Pre Gridcheck App
 alwaysApply: true
