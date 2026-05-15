@@ -23,6 +23,10 @@ __pycache__/
 .env.prod.example
 
 # Backups & Temp
+backup_workspace.tsx
+build-error.txt
+frontend/node_modules.old_*
+frontend/node_modules.broken_*
 *.bak
 *.bak.*
 *_backup
