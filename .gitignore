@@ -1,9 +1,49 @@
+# Dependencies
 node_modules/
+frontend/node_modules/
+
+# Next.js
 .next/
+frontend/.next/
+out/
+
+# Python
 venv/
+backend/venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment
 .env
 .env.local
-backend/uploads/
-*.node
+.env.production
+.env.prod.example
+
+# Backups & Temp
+*.bak
+*.bak.*
+*_backup
+*.broken_backup
+_archive/
+_milestone_backups/
+docs/SESSION_STATE.md.bak*
+engine_state*.txt
+kontext_*.txt
+nextcfg_*.txt
+context.cmd
+session-context.ps1
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
