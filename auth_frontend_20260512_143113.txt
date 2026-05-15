@@ -1,0 +1,183 @@
+﻿
+========== frontend\app\login\page.tsx ==========
+"use client";
+
+import { FormEvent, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Header } from "@/components/Header";
+import { login } from "@/lib/api/auth";
+import { getPurchaseIntentProfile, normalizePurchaseIntent } from "@/lib/purchase-intents";
+
+export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const intent = normalizePurchaseIntent(searchParams.get("intent"));
+  const intentProfile = getPurchaseIntentProfile(intent);
+  const nextTarget = searchParams.get("next") || (intent === "upgrade" || intent === "pro" ? "/settings" : "/projects");
+  const registerHref = `/register?intent=${encodeURIComponent(intent)}&next=${encodeURIComponent(nextTarget)}`;
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await login({ email, password });
+      window.location.href = nextTarget;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login fehlgeschlagen");
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-bg text-white">
+      <Header />
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
+          <section className="space-y-6">
+            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
+              <div className="inline-flex rounded-full border border-brand-cyan/20 bg-brand-cyan/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-brand-cyan">
+                Konto-Zugang
+              </div>
+              <h1 className="mt-4 text-3xl font-semibold text-white">Login fuer gespeicherte Checks, Projekte und Upgrade-Pfade</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-text-muted">
+                Nach dem Login werden Analysen Ihrem Konto, Ihrer History und Ihren Projekten revisionssicher zugeordnet.
+                So bleibt klar, welcher Run mit welchem Paket und welchem Scope erstellt wurde.
+              </p>
+            </div>
+
+            <div className="rounded-[24px] border border-brand-cyan/20 bg-brand-cyan/10 p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-white">
+                  {intentProfile.badge}
+                </span>
+                <span className="text-sm font-semibold text-white">{intentProfile.label}</span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-white/90">{intentProfile.summary}</p>
+              <p className="mt-2 text-xs leading-5 text-text-muted">Naechster Schritt nach Login: {intentProfile.nextStep}</p>
+              {(intent === "professional" || intent === "express" || intent === "vnb-pilot") ? (
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <Link
+                    href={`/contact?intent=${encodeURIComponent(intent)}`}
+                    className="inline-flex items-center justify-center rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/5"
+                  >
+                    Anfrage oeffnen
+                  </Link>
+                  <Link
+                    href="/settings"
+                    className="inline-flex items-center justify-center rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/5"
+                  >
+                    Tarife ansehen
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-text-dim">Free Einstieg</p>
+                <p className="mt-2 text-sm text-white">Bis zu 3 kostenlose Checks fuer den ersten Produktfit.</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-text-dim">Revisionssichere History</p>
+                <p className="mt-2 text-sm text-white">Runs, Paketkontext und Revisionen bleiben im Konto nachvollziehbar.</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-text-dim">Klare Kaufpfade</p>
+                <p className="mt-2 text-sm text-white">Self-Serve, Pro, Professional, Express und VNB Pilot bleiben getrennt.</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[28px] border border-white/10 bg-bg-card/80 p-6 shadow-[0_12px_42px_rgba(0,0,0,0.18)]">
+            <h2 className="text-2xl font-semibold text-white">Login</h2>
+            <p className="mt-2 text-sm leading-6 text-text-muted">
+              Nutzen Sie Ihr Konto fuer Projekte, Analyse-History und den passenden Upgrade- oder Servicepfad.
+            </p>
+            <form onSubmit={onSubmit} className="mt-6 space-y-3">
+              <input className="w-full rounded-xl bg-bg-elev p-3" placeholder="E-Mail" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input className="w-full rounded-xl bg-bg-elev p-3" placeholder="Passwort" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              {error ? <p className="text-sm text-red-400">{error}</p> : null}
+              <button className="w-full rounded-xl bg-brand-orange p-3 font-semibold">Einloggen</button>
+            </form>
+            <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-text-muted">
+              Nach erfolgreichem Login geht es weiter zu{" "}
+              <span className="font-medium text-white">{nextTarget === "/settings" ? "Tarif & Analyse-History" : "Ihren Projekten"}</span>.
+            </div>
+            <p className="mt-4 text-sm text-text-muted">
+              Noch kein Konto?{" "}
+              <Link className="text-brand-cyan" href={registerHref}>
+                Registrieren
+              </Link>
+            </p>
+          </section>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+========== frontend\lib\api\auth.ts ==========
+import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
+
+export type AuthUser = {
+  id: number;
+  email: string;
+  role: string;
+  full_name?: string | null;
+};
+
+type TokenResponse = {
+  access_token: string;
+  refresh_token?: string;
+  token_type: string;
+};
+
+const BASE = "/api/backend/api/v1/auth";
+
+async function parse<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.detail?.message ?? "API request failed");
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function register(payload: { email: string; password: string; role?: string; full_name?: string }) {
+  const res = await fetch(`${BASE}/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+  return parse<AuthUser>(res);
+}
+
+export async function login(payload: { email: string; password: string }) {
+  const res = await fetch(`${BASE}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+  return parse<TokenResponse>(res);
+}
+
+export async function me() {
+  const res = await fetch(`${BASE}/me`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  return parse<AuthUser>(res);
+}
+
+export async function logout() {
+  const csrf = getCsrfTokenFromCookie();
+  const res = await fetch(`${BASE}/logout`, {
+    method: "POST",
+    credentials: "include",
+    headers: { ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
+  });
+  return parse<{ status: string }>(res);
+}

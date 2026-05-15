@@ -51,13 +51,6 @@ def _reset_fastapi_dependency_overrides():
     app.dependency_overrides.clear()
 
 
-@pytest.fixture(autouse=True)
-def _isolated_audit_chain_tables():
-    """Verhindert flaky Revision-Tests durch Daten aus vorherigen Tests."""
-    _purge_audit_chain_tables()
-    yield
-    _purge_audit_chain_tables()
-
 _bootstrap_engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True, connect_args={"connect_timeout": 10})
 run_alembic_upgrade(TEST_DATABASE_URL)
 _bootstrap_engine.dispose()
@@ -114,18 +107,21 @@ def basis_pv_stich():
 def isolierte_revisionen():
     _purge_audit_chain_tables()
     yield
+    _purge_audit_chain_tables()
 
 
 @pytest.fixture
 def isolierte_ki_feedback():
     _purge_audit_chain_tables()
     yield
+    _purge_audit_chain_tables()
 
 
 @pytest.fixture
 def isolierte_report_revisionen():
     _purge_audit_chain_tables()
     yield
+    _purge_audit_chain_tables()
 
 
 @pytest.fixture

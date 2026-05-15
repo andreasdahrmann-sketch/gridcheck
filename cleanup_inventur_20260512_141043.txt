@@ -1,0 +1,137 @@
+﻿=== CLEANUP-INVENTUR 20260512_141043 (NUR LESEN) ===
+
+--- KATEGORIE A: .cursorrules.bak_* im Root ---
+
+Name                                                 SizeKB LastWriteTime      
+----                                                 ------ -------------      
+.cursorrules.bak_20260503_180635                        9,1 03.05.2026 13:26:54
+.cursorrules.bak_after_consolidation_20260503_211549     10 03.05.2026 21:15:42
+.cursorrules.bak_pre_optionC_20260510_111100             10 10.05.2026 11:06:27
+
+
+
+
+--- KATEGORIE B: main.py.bak_* in backend/ ---
+
+Name                                 SizeKB LastWriteTime      
+----                                 ------ -------------      
+main.py.bak_20260501_192100             0,8 29.04.2026 18:25:50
+main.py.bak_20260501_194403             0,8 29.04.2026 18:25:50
+main.py.bak_20260503_125619             0,9 02.05.2026 18:18:56
+main.py.bak_geo_20260506_192156         1,2 06.05.2026 19:14:02
+main.py.bak_v1projektierer_ $ ts          1 03.05.2026 12:56:19
+main.py.bak_v1router_20260503_215207      1 03.05.2026 12:56:19
+
+
+
+
+--- KATEGORIE C: gridcheck.db.bak* / .old / .LOCAL_BACKUP in backend/ ---
+
+Name                                          SizeKB LastWriteTime      
+----                                          ------ -------------      
+gridcheck.db.bak_20260501_192100                  28 01.05.2026 18:21:05
+gridcheck.db.bak_20260501_194403                  28 01.05.2026 18:21:05
+gridcheck.db.LOCAL_BACKUP                         76 29.04.2026 18:25:50
+gridcheck.db.old_20260501_200956                  16 01.05.2026 19:57:37
+gridcheck_test_archive.db.old_20260501_200956    124 29.04.2026 21:04:18
+main.py.bak_20260501_192100                      0,8 29.04.2026 18:25:50
+main.py.bak_20260501_194403                      0,8 29.04.2026 18:25:50
+main.py.bak_20260503_125619                      0,9 02.05.2026 18:18:56
+main.py.bak_geo_20260506_192156                  1,2 06.05.2026 19:14:02
+main.py.bak_v1projektierer_ $ ts                   1 03.05.2026 12:56:19
+main.py.bak_v1router_20260503_215207               1 03.05.2026 12:56:19
+requirements.txt.old                             0,1 29.04.2026 18:25:50
+
+
+
+
+--- KATEGORIE D: _backup_*-Ordner im Root (mit Größe) ---
+
+Name                                         SizeMB LastWrite          
+----                                         ------ ---------          
+backup_20260503_175847                        560,9 03.05.2026 17:58:47
+_backups                                        0,3 29.04.2026 18:18:16
+_backup_20260501_195832_models_ok                75 01.05.2026 19:58:44
+_backup_20260501_201235_M1_baseline_ok           75 01.05.2026 20:12:47
+_backup_20260502_195536_pre_v2_consolidation    0,5 02.05.2026 19:55:37
+_backup_20260503_140932_M_dashboard_restored      0 03.05.2026 14:09:32
+_milestone_backups                              3,2 10.05.2026 17:16:55
+
+
+
+
+--- KATEGORIE E: Backup-Ordner in backend/ ---
+
+Name                          SizeMB LastWrite          
+----                          ------ ---------          
+backups                          1,4 10.05.2026 17:40:10
+backup_pre_ci_20260506_215010      0 06.05.2026 21:50:10
+_OLD_BACKUP                      0,1 29.04.2026 18:25:50
+_QUARANTAENE_2025-11-24          0,1 29.04.2026 18:25:50
+
+
+
+
+--- KATEGORIE F: rules_dump_* / __pycache__ im Root ---
+
+Name                       SizeMB LastWrite          
+----                       ------ ---------          
+rules_dump_20260503_221138      0 03.05.2026 22:11:38
+__pycache__                     0 03.05.2026 22:06:09
+
+
+
+
+--- KATEGORIE G: Lose Output-/Test-Dateien im Root ---
+
+Name                  SizeKB LastWriteTime      
+----                  ------ -------------      
+berechnung_output.txt   79,9 29.04.2026 20:20:34
+main_output.txt          1,7 29.04.2026 20:20:34
+models_output.txt        2,3 29.04.2026 21:11:14
+routes_output.txt         13 29.04.2026 20:20:34
+test_response.json      19,7 29.04.2026 20:02:05
+tree_output.txt        332,3 29.04.2026 20:16:11
+_struktur.txt           85,6 11.05.2026 19:34:33
+
+
+
+
+--- KATEGORIE H: Git-Status der Backup-Dateien ---
+(Sind die .bak/_backup* in .gitignore oder eingecheckt?)
+
+.cursor/rules_backup_20260501_183834/00-gridcheck.mdc
+.cursor/rules_backup_20260501_183834/01-backend.mdc
+.cursor/rules_backup_20260501_183834/02-frontend.mdc
+.cursor/rules_backup_20260501_183834/03-elektrotechnik.mdc
+.cursor/rules_backup_20260501_183834/04-deployment.mdc
+.cursor/rules_backup_20260501_183834/05-workflow.mdc
+_backup_20260501_195832_models_ok/__init__.py
+_backup_20260501_195832_models_ok/api/__init__.py
+_backup_20260501_195832_models_ok/api/routes.py
+_backup_20260501_195832_models_ok/api/routes.py.bak_20260501_194403
+_backup_20260501_195832_models_ok/audit/__init__.py
+_backup_20260501_195832_models_ok/constants.py
+_backup_20260501_195832_models_ok/daten/ki_lerndaten.json
+_backup_20260501_195832_models_ok/daten/revisionen.json
+_backup_20260501_195832_models_ok/db/__init__.py
+_backup_20260501_195832_models_ok/db/database.py
+_backup_20260501_195832_models_ok/db/models.py
+_backup_20260501_195832_models_ok/db/models.py.bak_20260501_194403
+_backup_20260501_195832_models_ok/engine/__init__.py
+_backup_20260501_195832_models_ok/engine/berechnung.py
+_backup_20260501_195832_models_ok/engine/ki_modul.py
+_backup_20260501_195832_models_ok/engine/pdf_report.py
+_backup_20260501_195832_models_ok/engine/revision.py
+_backup_20260501_195832_models_ok/export_projects.py
+_backup_20260501_195832_models_ok/gridcheck.db.bak_20260501_192100
+_backup_20260501_195832_models_ok/gridcheck.db.bak_20260501_194403
+_backup_20260501_195832_models_ok/main.py
+_backup_20260501_195832_models_ok/main.py.bak_20260501_192100
+_backup_20260501_195832_models_ok/main.py.bak_20260501_194403
+_backup_20260501_195832_models_ok/openapi_dump.json
+
+
+
+--- GESAMTGRÖSSE potentielles Cleanup ---
+Geschätztes Volumen Root-Cleanup: 717.5 MB

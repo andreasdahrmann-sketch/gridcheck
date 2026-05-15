@@ -1,0 +1,181 @@
+﻿=== generation_assets ===
+                                              Table "public.generation_assets"
+         Column         |            Type             | Collation | Nullable |                    Default                    
+------------------------+-----------------------------+-----------+----------+-----------------------------------------------
+ id                     | integer                     |           | not null | nextval('generation_assets_id_seq'::regclass)
+ source_name            | character varying           |           | not null | 
+ source_url             | text                        |           |          | 
+ source_license         | character varying           |           |          | 
+ source_imported_at     | timestamp without time zone |           |          | 
+ source_updated_at      | timestamp without time zone |           |          | 
+ source_raw_hash        | character varying           |           | not null | 
+ source_normalized_hash | character varying           |           | not null | 
+ source_parser_version  | character varying           |           | not null | 
+ confidence_score       | integer                     |           | not null | 
+ confidence_technical   | integer                     |           | not null | 
+ confidence_geometric   | integer                     |           | not null | 
+ confidence_commercial  | integer                     |           | not null | 
+ validation_status      | character varying           |           | not null | 
+ data_class             | character varying           |           | not null | 
+ external_id            | character varying           |           |          | 
+ energy_carrier         | character varying           |           | not null | 
+ capacity_kw            | double precision            |           |          | 
+ plz                    | character varying(5)        |           |          | 
+ status                 | character varying           |           |          | 
+ properties_json        | text                        |           | not null | 
+ created_at             | timestamp without time zone |           |          | 
+Indexes:
+    "generation_assets_pkey" PRIMARY KEY, btree (id)
+    "ix_generation_assets_id" btree (id)
+
+
+=== system_signals ===
+                                              Table "public.system_signals"
+         Column         |            Type             | Collation | Nullable |                  Default                   
+------------------------+-----------------------------+-----------+----------+--------------------------------------------
+ id                     | integer                     |           | not null | nextval('system_signals_id_seq'::regclass)
+ source_name            | character varying           |           | not null | 
+ source_url             | text                        |           |          | 
+ source_license         | character varying           |           |          | 
+ source_imported_at     | timestamp without time zone |           |          | 
+ source_updated_at      | timestamp without time zone |           |          | 
+ source_raw_hash        | character varying           |           | not null | 
+ source_normalized_hash | character varying           |           | not null | 
+ source_parser_version  | character varying           |           | not null | 
+ confidence_score       | integer                     |           | not null | 
+ confidence_technical   | integer                     |           | not null | 
+ confidence_geometric   | integer                     |           | not null | 
+ confidence_commercial  | integer                     |           | not null | 
+ validation_status      | character varying           |           | not null | 
+ data_class             | character varying           |           | not null | 
+ signal_type            | character varying           |           | not null | 
+ signal_value           | double precision            |           |          | 
+ signal_unit            | character varying           |           |          | 
+ region                 | character varying           |           |          | 
+ measured_at            | timestamp without time zone |           |          | 
+ properties_json        | text                        |           | not null | 
+ created_at             | timestamp without time zone |           |          | 
+Indexes:
+    "system_signals_pkey" PRIMARY KEY, btree (id)
+    "ix_system_signals_id" btree (id)
+
+
+=== weather_resource ===
+                                              Table "public.weather_resource"
+         Column         |            Type             | Collation | Nullable |                   Default                    
+------------------------+-----------------------------+-----------+----------+----------------------------------------------
+ id                     | integer                     |           | not null | nextval('weather_resource_id_seq'::regclass)
+ source_name            | character varying           |           | not null | 
+ source_url             | text                        |           |          | 
+ source_license         | character varying           |           |          | 
+ source_imported_at     | timestamp without time zone |           |          | 
+ source_updated_at      | timestamp without time zone |           |          | 
+ source_raw_hash        | character varying           |           | not null | 
+ source_normalized_hash | character varying           |           | not null | 
+ source_parser_version  | character varying           |           | not null | 
+ confidence_score       | integer                     |           | not null | 
+ confidence_technical   | integer                     |           | not null | 
+ confidence_geometric   | integer                     |           | not null | 
+ confidence_commercial  | integer                     |           | not null | 
+ validation_status      | character varying           |           | not null | 
+ data_class             | character varying           |           | not null | 
+ station_id             | character varying           |           |          | 
+ region                 | character varying           |           |          | 
+ measured_at            | timestamp without time zone |           |          | 
+ temperature_c          | double precision            |           |          | 
+ wind_ms                | double precision            |           |          | 
+ irradiation_wm2        | double precision            |           |          | 
+ properties_json        | text                        |           | not null | 
+ created_at             | timestamp without time zone |           |          | 
+Indexes:
+    "weather_resource_pkey" PRIMARY KEY, btree (id)
+    "ix_weather_resource_id" btree (id)
+
+
+=== ground_risk ===
+                                              Table "public.ground_risk"
+         Column         |            Type             | Collation | Nullable |                 Default                 
+------------------------+-----------------------------+-----------+----------+-----------------------------------------
+ id                     | integer                     |           | not null | nextval('ground_risk_id_seq'::regclass)
+ source_name            | character varying           |           | not null | 
+ source_url             | text                        |           |          | 
+ source_license         | character varying           |           |          | 
+ source_imported_at     | timestamp without time zone |           |          | 
+ source_updated_at      | timestamp without time zone |           |          | 
+ source_raw_hash        | character varying           |           | not null | 
+ source_normalized_hash | character varying           |           | not null | 
+ source_parser_version  | character varying           |           | not null | 
+ confidence_score       | integer                     |           | not null | 
+ confidence_technical   | integer                     |           | not null | 
+ confidence_geometric   | integer                     |           | not null | 
+ confidence_commercial  | integer                     |           | not null | 
+ validation_status      | character varying           |           | not null | 
+ data_class             | character varying           |           | not null | 
+ region                 | character varying           |           |          | 
+ soil_class             | character varying           |           |          | 
+ groundwater_level_m    | double precision            |           |          | 
+ excavation_risk_score  | double precision            |           |          | 
+ properties_json        | text                        |           | not null | 
+ created_at             | timestamp without time zone |           |          | 
+Indexes:
+    "ground_risk_pkey" PRIMARY KEY, btree (id)
+    "ix_ground_risk_id" btree (id)
+
+
+=== cost_indices ===
+                                              Table "public.cost_indices"
+         Column         |            Type             | Collation | Nullable |                 Default                  
+------------------------+-----------------------------+-----------+----------+------------------------------------------
+ id                     | integer                     |           | not null | nextval('cost_indices_id_seq'::regclass)
+ source_name            | character varying           |           | not null | 
+ source_url             | text                        |           |          | 
+ source_license         | character varying           |           |          | 
+ source_imported_at     | timestamp without time zone |           |          | 
+ source_updated_at      | timestamp without time zone |           |          | 
+ source_raw_hash        | character varying           |           | not null | 
+ source_normalized_hash | character varying           |           | not null | 
+ source_parser_version  | character varying           |           | not null | 
+ confidence_score       | integer                     |           | not null | 
+ confidence_technical   | integer                     |           | not null | 
+ confidence_geometric   | integer                     |           | not null | 
+ confidence_commercial  | integer                     |           | not null | 
+ validation_status      | character varying           |           | not null | 
+ data_class             | character varying           |           | not null | 
+ index_type             | character varying           |           | not null | 
+ region                 | character varying           |           |          | 
+ index_value            | double precision            |           |          | 
+ index_unit             | character varying           |           |          | 
+ valid_from             | timestamp without time zone |           |          | 
+ properties_json        | text                        |           | not null | 
+ created_at             | timestamp without time zone |           |          | 
+Indexes:
+    "cost_indices_pkey" PRIMARY KEY, btree (id)
+    "ix_cost_indices_id" btree (id)
+
+
+=== gridcheck_result_audit ===
+                                              Table "public.gridcheck_result_audit"
+        Column         |            Type             | Collation | Nullable |                      Default                       
+-----------------------+-----------------------------+-----------+----------+----------------------------------------------------
+ id                    | integer                     |           | not null | nextval('gridcheck_result_audit_id_seq'::regclass)
+ project_id            | integer                     |           |          | 
+ model_version         | character varying           |           | not null | 
+ scoring_version       | character varying           |           | not null | 
+ norm_version          | character varying           |           | not null | 
+ app_version           | character varying           |           | not null | 
+ inputs_json           | text                        |           | not null | 
+ assumptions_json      | text                        |           | not null | 
+ warnings_json         | text                        |           | not null | 
+ score_components_json | text                        |           | not null | 
+ sources_json          | text                        |           | not null | 
+ result_json           | text                        |           | not null | 
+ result_hash           | character varying           |           | not null | 
+ created_at            | timestamp without time zone |           |          | 
+Indexes:
+    "gridcheck_result_audit_pkey" PRIMARY KEY, btree (id)
+    "ix_gridcheck_result_audit_id" btree (id)
+    "ix_gridcheck_result_audit_project_id" btree (project_id)
+Foreign-key constraints:
+    "gridcheck_result_audit_project_id_fkey" FOREIGN KEY (project_id) REFERENCES projects(id)
+
+

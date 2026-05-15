@@ -1,0 +1,326 @@
+{
+  "zeitpunkt": "2026-05-02T18:53:45",
+  "testfall": "MS_PV_5MW_Topologie_unbekannt_N1_PreScreen",
+  "eingabe": {
+    "anlagentyp": "PV",
+    "p_kw": 5000,
+    "leistung_mw": 5.0,
+    "plz": "00000",
+    "nennspannung": 20,
+    "leitungstyp": "NA2XS2Y240",
+    "entfernung_km": 10,
+    "anschlussart": "Einspeisung",
+    "cos_phi": 0.95,
+    "parallele_systeme": 2,
+    "redundanz": true,
+    "bestehende_einspeisung_mw": 0
+  },
+  "erwartung": {
+    "topologie": "unbekannt",
+    "n1_sicher": false,
+    "topologie_n1": false,
+    "bewertung": "ROT",
+    "entscheidung": "C"
+  },
+  "ergebnis": {
+    "status": "OK",
+    "eingabe": {
+      "anlagentyp": "PV",
+      "p_kw": 5000,
+      "leistung_mw": 5.0,
+      "plz": "00000",
+      "nennspannung": 20,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 2,
+      "redundanz": true,
+      "bestehende_einspeisung_mw": 0
+    },
+    "warnungen": [],
+    "pqs": {
+      "p_mw": 5.0,
+      "q_mvar": 1.6434,
+      "s_mva": 5.2632,
+      "cos_phi": 0.95
+    },
+    "impedanz": {
+      "r_q": 0.88752,
+      "x_q": 1.33128,
+      "r_t": 0.192,
+      "x_t": 1.91038,
+      "r_l": 0.385,
+      "x_l": 0.525,
+      "r_ges": 1.46452,
+      "x_ges": 3.76666,
+      "z_ges": 4.04135
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 76.0,
+      "i_max_a": 530,
+      "auslastung_prozent": 14.3,
+      "parallele_systeme": 2,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "trafo": {
+      "trafo_s_mva": 25.0,
+      "anlage_s_mva": 5.2632,
+      "bestand_s_mva": 0.0,
+      "gesamt_s_mva": 5.2632,
+      "auslastung_prozent": 21.1,
+      "bewertung": "GRUEN",
+      "text": "Trafo unkritisch. Genuegend Reserve."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.378,
+      "delta_u_v": 675.6,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.46452,
+      "x_ges_ohm": 3.76666,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "kurzschluss": {
+      "ik_max_ka": 3.14,
+      "ik_min_ka": 2.71,
+      "sk_mva": 250,
+      "sk_sn_ratio": 47.5,
+      "sk_bewertung": "GRUEN",
+      "sk_text": "Kurzschlussniveau ausreichend.",
+      "rueckwirkung_ratio": 0.0211,
+      "rw_bewertung": "GELB",
+      "rw_text": "Netzrueckwirkungen: Hinweis beachten.",
+      "bewertung": "GELB",
+      "text": "Kurzschlussniveau ausreichend. Netzrueckwirkungen: Hinweis beachten.",
+      "schutzpruefung_noetig": false
+    },
+    "n1": {
+      "n1_sicher": false,
+      "n1_auslastung_prozent": 28.6,
+      "leitung_n1": true,
+      "trafo_n1": true,
+      "topologie": "unbekannt",
+      "topologie_n1": false,
+      "topologie_text": "Topologie unbekannt: N-1 nicht bewertbar.",
+      "parallele_systeme": 2,
+      "redundanz": true,
+      "bewertung": "ROT",
+      "text": "N-1 Pre-Screen: Topologie unbekannt: N-1 nicht bewertbar.",
+      "hinweis": "Dies ist ein Pre-Screen. Topologische N-1-Pruefung erfordert vollstaendiges Netzmodell."
+    },
+    "szenarien": [
+      {
+        "name": "Max. Einspeisung",
+        "beschreibung": "Volle Leistung, minimale Netzlast — kritischster Fall fuer Spannungsanhebung.",
+        "p_mw": 5.0,
+        "q_mvar": 1.6434,
+        "s_mva": 5.2632,
+        "thermisch": {
+          "i_betrieb_gesamt_a": 151.9,
+          "i_pro_system_a": 76.0,
+          "i_max_a": 530,
+          "auslastung_prozent": 14.3,
+          "parallele_systeme": 2,
+          "s_mva": 5.2632,
+          "bewertung": "GRUEN",
+          "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+          "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+        },
+        "spannung": {
+          "delta_u_prozent": 3.378,
+          "delta_u_v": 675.6,
+          "richtung": "Anhebung",
+          "vorzeichen": "positiv",
+          "spannungsebene": "MS",
+          "r_ges_ohm": 1.46452,
+          "x_ges_ohm": 3.76666,
+          "bewertung": "ORANGE",
+          "text": "Spannungsanhebung grenzwertig."
+        },
+        "trafo": {
+          "trafo_s_mva": 25.0,
+          "anlage_s_mva": 5.2632,
+          "bestand_s_mva": 0.0,
+          "gesamt_s_mva": 5.2632,
+          "auslastung_prozent": 21.1,
+          "bewertung": "GRUEN",
+          "text": "Trafo unkritisch. Genuegend Reserve."
+        }
+      },
+      {
+        "name": "Typischer Betrieb",
+        "beschreibung": "Typischer Betriebspunkt bei 70% Nennleistung.",
+        "p_mw": 3.5,
+        "q_mvar": 1.1504,
+        "s_mva": 3.6842,
+        "thermisch": {
+          "i_betrieb_gesamt_a": 106.4,
+          "i_pro_system_a": 53.2,
+          "i_max_a": 530,
+          "auslastung_prozent": 10.0,
+          "parallele_systeme": 2,
+          "s_mva": 3.6842,
+          "bewertung": "GRUEN",
+          "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+          "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+        },
+        "spannung": {
+          "delta_u_prozent": 2.365,
+          "delta_u_v": 472.9,
+          "richtung": "Anhebung",
+          "vorzeichen": "positiv",
+          "spannungsebene": "MS",
+          "r_ges_ohm": 1.46452,
+          "x_ges_ohm": 3.76666,
+          "bewertung": "GELB",
+          "text": "Spannungsanhebung akzeptabel, Reserve eingeschraenkt."
+        },
+        "trafo": {
+          "trafo_s_mva": 25.0,
+          "anlage_s_mva": 3.6842,
+          "bestand_s_mva": 0.0,
+          "gesamt_s_mva": 3.6842,
+          "auslastung_prozent": 14.7,
+          "bewertung": "GRUEN",
+          "text": "Trafo unkritisch. Genuegend Reserve."
+        }
+      },
+      {
+        "name": "Teillast",
+        "beschreibung": "Teillastbetrieb bei 40% — fuer Normalbetriebsbewertung.",
+        "p_mw": 2.0,
+        "q_mvar": 0.6574,
+        "s_mva": 2.1053,
+        "thermisch": {
+          "i_betrieb_gesamt_a": 60.8,
+          "i_pro_system_a": 30.4,
+          "i_max_a": 530,
+          "auslastung_prozent": 5.7,
+          "parallele_systeme": 2,
+          "s_mva": 2.1053,
+          "bewertung": "GRUEN",
+          "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+          "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+        },
+        "spannung": {
+          "delta_u_prozent": 1.351,
+          "delta_u_v": 270.3,
+          "richtung": "Anhebung",
+          "vorzeichen": "positiv",
+          "spannungsebene": "MS",
+          "r_ges_ohm": 1.46452,
+          "x_ges_ohm": 3.76666,
+          "bewertung": "GRUEN",
+          "text": "Spannungsanhebung unkritisch."
+        },
+        "trafo": {
+          "trafo_s_mva": 25.0,
+          "anlage_s_mva": 2.1053,
+          "bestand_s_mva": 0.0,
+          "gesamt_s_mva": 2.1053,
+          "auslastung_prozent": 8.4,
+          "bewertung": "GRUEN",
+          "text": "Trafo unkritisch. Genuegend Reserve."
+        }
+      },
+      {
+        "name": "N-1 Stoerungsfall",
+        "beschreibung": "Volle Leistung auf 1 von 2 Systemen.",
+        "p_mw": 5.0,
+        "q_mvar": 1.6434,
+        "s_mva": 5.2632,
+        "thermisch": {
+          "i_betrieb_gesamt_a": 151.9,
+          "i_pro_system_a": 151.9,
+          "i_max_a": 530,
+          "auslastung_prozent": 28.7,
+          "parallele_systeme": 1,
+          "s_mva": 5.2632,
+          "bewertung": "GRUEN",
+          "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+          "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+        },
+        "spannung": {
+          "delta_u_prozent": 6.756,
+          "delta_u_v": 1351.3,
+          "richtung": "Anhebung",
+          "vorzeichen": "positiv",
+          "spannungsebene": "MS",
+          "r_ges_ohm": 2.92904,
+          "x_ges_ohm": 7.53331,
+          "bewertung": "ROT",
+          "text": "Spannungsanhebung ueberschreitet zulaessigen Bereich!"
+        },
+        "trafo": {
+          "trafo_s_mva": 25.0,
+          "anlage_s_mva": 5.2632,
+          "bestand_s_mva": 0.0,
+          "gesamt_s_mva": 5.2632,
+          "auslastung_prozent": 21.1,
+          "bewertung": "GRUEN",
+          "text": "Trafo unkritisch. Genuegend Reserve."
+        }
+      }
+    ],
+    "scores": {
+      "kapazitaet": 95,
+      "spannung": 35,
+      "kurzschluss": 65,
+      "versorgungssicherheit": 10,
+      "datenqualitaet": 39,
+      "gesamt": 56,
+      "harte_verstoesse": [
+        "N-1-Kriterium nicht erfuellt -> Score-Cap 65"
+      ]
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt -> Score-Cap 65",
+      "farbe": "ROT"
+    },
+    "kosten": {
+      "kosten_trasse_eur": 4900000,
+      "kosten_station_eur": 205000,
+      "kosten_genehmigung_eur": 15000,
+      "kosten_planung_eur": 512000,
+      "kosten_bkz_eur": 0,
+      "investition_gesamt_eur": 5632000,
+      "betriebskosten_pa_eur": 0,
+      "konfidenz_prozent": 40,
+      "quelle": "Referenzwerte"
+    },
+    "wirtschaftlichkeit": null,
+    "nb_check": {
+      "pruefungen": [],
+      "flags": [],
+      "alle_erfuellt": true,
+      "bewertung": "GELB"
+    },
+    "datenqualitaet": {
+      "score": 39,
+      "klasse": "D",
+      "text": "Ueberwiegend Heuristik/Defaults. Nur grober Vorcheck.",
+      "felder_mit_daten": 5,
+      "felder_gesamt": 13,
+      "referenz_anteil_prozent": 54,
+      "belastbar": false,
+      "warnung": "Ergebnis nur eingeschraenkt belastbar"
+    },
+    "empfehlungen": [
+      "Blindleistungskompensation pruefen (cos phi optimieren).",
+      "Anschluss nur mit aktivierter Blindleistungsregelung plausibel.",
+      "Redundanten Anschluss einplanen fuer N-1 Sicherheit.",
+      "Auch mit Redundanz kritisch: Netzverstaerkung erforderlich.",
+      "Datenqualitaet D: Vor Antragstellung reale Netzdaten beim VNB anfordern."
+    ]
+  },
+  "test_ok": true
+}

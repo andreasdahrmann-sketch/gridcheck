@@ -1,0 +1,4363 @@
+[
+  {
+    "eingabe": {
+      "anlagentyp": "PV",
+      "p_kw": 500,
+      "plz": "10115",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NAYY150",
+      "entfernung_km": 1.0,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 0.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 270,
+      "auslastung_prozent": 5.6,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.297,
+      "delta_u_v": 59.4,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.28552,
+      "x_ges_ohm": 3.32166,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "n1_auslastung_prozent": 5.6,
+      "leitung_n1": false,
+      "trafo_n1": true,
+      "topologie": "radial",
+      "topologie_n1": false,
+      "topologie_text": "Radial/Stich: keine echte N-1 moeglich.",
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "bewertung": "ROT",
+      "text": "N-1 Pre-Screen: Radial/Stich: keine echte N-1 moeglich.",
+      "hinweis": "Dies ist ein Pre-Screen. Topologische N-1-Pruefung erfordert vollstaendiges Netzmodell."
+    },
+    "fazit": {
+      "entscheidung": "A",
+      "text": "PLAUSIBEL: Netzanschluss grundsaetzlich realisierbar.",
+      "detail": "Gesamtscore 77/100. Standardverfahren beim VNB einleiten.",
+      "farbe": "GRUEN"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20Â°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T20:24:12.257059+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20Â°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T20:24:12.322945+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20Â°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T20:25:58.777425+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20Â°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T20:25:58.827848+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:08:17.765242+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:08:17.809045+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:08:46.946017+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:08:47.002229+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:13:31.962229+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:13:32.689977+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "anlagentyp": "pv",
+      "p_kw": 500.0,
+      "plz": "10115",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NAYY150",
+      "entfernung_km": 1.0,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 0.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 270,
+      "auslastung_prozent": 5.6,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.297,
+      "delta_u_v": 59.4,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.28552,
+      "x_ges_ohm": 3.32166,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 5.6,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 2.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 0.5,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 0.526,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:18:18.926630+00:00",
+        "eingangsdaten_hash": "afe88a9c3053e3dc7cfa3f09fe8294710a5af50adad4b6920eb24c3deb5f501c"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:18:19.139554+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:18:19.186390+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "anlagentyp": "pv",
+      "p_kw": 500.0,
+      "plz": "10115",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NAYY150",
+      "entfernung_km": 1.0,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 0.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 270,
+      "auslastung_prozent": 5.6,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.297,
+      "delta_u_v": 59.4,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.28552,
+      "x_ges_ohm": 3.32166,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 5.6,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 2.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 0.5,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 0.526,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:18:40.211026+00:00",
+        "eingangsdaten_hash": "afe88a9c3053e3dc7cfa3f09fe8294710a5af50adad4b6920eb24c3deb5f501c"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "anlagentyp": "pv",
+      "p_kw": 500.0,
+      "plz": "10115",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NAYY150",
+      "entfernung_km": 1.0,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 0.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 270,
+      "auslastung_prozent": 5.6,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.297,
+      "delta_u_v": 59.4,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.28552,
+      "x_ges_ohm": 3.32166,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 5.6,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 2.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 0.5,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 0.526,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:18:54.326895+00:00",
+        "eingangsdaten_hash": "afe88a9c3053e3dc7cfa3f09fe8294710a5af50adad4b6920eb24c3deb5f501c"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:18:54.548659+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:18:54.600425+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "anlagentyp": "pv",
+      "p_kw": 500.0,
+      "plz": "10115",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NAYY150",
+      "entfernung_km": 1.0,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 0.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 270,
+      "auslastung_prozent": 5.6,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.297,
+      "delta_u_v": 59.4,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.28552,
+      "x_ges_ohm": 3.32166,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 5.6,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 2.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 0.5,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 0.526,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:22:16.414590+00:00",
+        "eingangsdaten_hash": "afe88a9c3053e3dc7cfa3f09fe8294710a5af50adad4b6920eb24c3deb5f501c"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:22:16.605885+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:22:16.665484+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "anlagentyp": "pv",
+      "p_kw": 500.0,
+      "plz": "10115",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NAYY150",
+      "entfernung_km": 1.0,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 0.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 270,
+      "auslastung_prozent": 5.6,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.297,
+      "delta_u_v": 59.4,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.28552,
+      "x_ges_ohm": 3.32166,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 5.6,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 2.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 0.5,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 0.526,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:23:24.968277+00:00",
+        "eingangsdaten_hash": "afe88a9c3053e3dc7cfa3f09fe8294710a5af50adad4b6920eb24c3deb5f501c"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:23:25.201189+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:23:25.304096+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "anlagentyp": "pv",
+      "p_kw": 500.0,
+      "plz": "10115",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NAYY150",
+      "entfernung_km": 1.0,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 0.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 270,
+      "auslastung_prozent": 5.6,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.297,
+      "delta_u_v": 59.4,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.28552,
+      "x_ges_ohm": 3.32166,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 5.6,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 2.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 0.5,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 0.526,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:25:12.969756+00:00",
+        "eingangsdaten_hash": "afe88a9c3053e3dc7cfa3f09fe8294710a5af50adad4b6920eb24c3deb5f501c"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:25:13.208819+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:25:13.268602+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "anlagentyp": "pv",
+      "p_kw": 500.0,
+      "plz": "10115",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NAYY150",
+      "entfernung_km": 1.0,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 0.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 270,
+      "auslastung_prozent": 5.6,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.297,
+      "delta_u_v": 59.4,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.28552,
+      "x_ges_ohm": 3.32166,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 5.6,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 2.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 0.5,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 0.526,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:28:30.102846+00:00",
+        "eingangsdaten_hash": "afe88a9c3053e3dc7cfa3f09fe8294710a5af50adad4b6920eb24c3deb5f501c"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:28:30.295935+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:28:30.364031+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "anlagentyp": "pv",
+      "p_kw": 500.0,
+      "plz": "10115",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NAYY150",
+      "entfernung_km": 1.0,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 0.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 270,
+      "auslastung_prozent": 5.6,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.297,
+      "delta_u_v": 59.4,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.28552,
+      "x_ges_ohm": 3.32166,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 5.6,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 2.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 0.5,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 0.526,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:29:32.642977+00:00",
+        "eingangsdaten_hash": "afe88a9c3053e3dc7cfa3f09fe8294710a5af50adad4b6920eb24c3deb5f501c"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:29:32.866986+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 2.5,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.03,
+      "delta_u_v": 605.9,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.27202,
+      "x_ges_ohm": 3.50416,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-06T21:29:32.932461+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 5000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 4.075,
+      "delta_u_v": 815.0,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-07T15:56:39.457083+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 5000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 4.075,
+      "delta_u_v": 815.0,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-07T16:11:55.632054+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 5000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 4.075,
+      "delta_u_v": 815.0,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-07T16:11:55.823968+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 5000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 4.075,
+      "delta_u_v": 815.0,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-07T16:11:55.937350+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 5000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 4.075,
+      "delta_u_v": 815.0,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-07T16:11:56.059662+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 50.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 50000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 1519.3,
+      "i_pro_system_a": 1519.3,
+      "i_max_a": 530,
+      "auslastung_prozent": 286.7,
+      "parallele_systeme": 1,
+      "s_mva": 52.6316,
+      "bewertung": "ROT",
+      "text": "Thermische Ueberlastung! Leitung nicht ausreichend dimensioniert.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 40.751,
+      "delta_u_v": 8150.3,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ROT",
+      "text": "Spannungsanhebung ueberschreitet zulaessigen Bereich!"
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 286.7,
+      "trafo_n1": false,
+      "trafo_text": "Trafo-Auslastung 210.5% (kein N-1 Spielraum).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 50.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 52.632,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-07T16:14:12.489805+00:00",
+        "eingangsdaten_hash": "cc2109d9872c4f720d9a817a65cc95388f4b3bf633677225901fb9c4148c5f2e"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Leitungsueberlastung > 100%; Trafoueberlastung > 100%; Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35; Spannung kritisch -> Score-Cap 35; Leitung thermisch kritisch -> Score-Cap 35; Trafo thermisch kritisch -> Score-Cap 35; Kurzschlusskriterium kritisch -> Score-Cap 30",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 50.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 50000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 1519.3,
+      "i_pro_system_a": 1519.3,
+      "i_max_a": 530,
+      "auslastung_prozent": 286.7,
+      "parallele_systeme": 1,
+      "s_mva": 52.6316,
+      "bewertung": "ROT",
+      "text": "Thermische Ueberlastung! Leitung nicht ausreichend dimensioniert.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 40.751,
+      "delta_u_v": 8150.3,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ROT",
+      "text": "Spannungsanhebung ueberschreitet zulaessigen Bereich!"
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 286.7,
+      "trafo_n1": false,
+      "trafo_text": "Trafo-Auslastung 210.5% (kein N-1 Spielraum).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 50.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 52.632,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-07T16:17:10.008803+00:00",
+        "eingangsdaten_hash": "cc2109d9872c4f720d9a817a65cc95388f4b3bf633677225901fb9c4148c5f2e"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Leitungsueberlastung > 100%; Trafoueberlastung > 100%; Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35; Spannung kritisch -> Score-Cap 35; Leitung thermisch kritisch -> Score-Cap 35; Trafo thermisch kritisch -> Score-Cap 35; Kurzschlusskriterium kritisch -> Score-Cap 30",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 50.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 50000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 1519.3,
+      "i_pro_system_a": 1519.3,
+      "i_max_a": 530,
+      "auslastung_prozent": 286.7,
+      "parallele_systeme": 1,
+      "s_mva": 52.6316,
+      "bewertung": "ROT",
+      "text": "Thermische Ueberlastung! Leitung nicht ausreichend dimensioniert.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 40.751,
+      "delta_u_v": 8150.3,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ROT",
+      "text": "Spannungsanhebung ueberschreitet zulaessigen Bereich!"
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 286.7,
+      "trafo_n1": false,
+      "trafo_text": "Trafo-Auslastung 210.5% (kein N-1 Spielraum).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 50.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 52.632,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-07T16:21:51.451177+00:00",
+        "eingangsdaten_hash": "cc2109d9872c4f720d9a817a65cc95388f4b3bf633677225901fb9c4148c5f2e"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Leitungsueberlastung > 100%; Trafoueberlastung > 100%; Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35; Spannung kritisch -> Score-Cap 35; Leitung thermisch kritisch -> Score-Cap 35; Trafo thermisch kritisch -> Score-Cap 35; Kurzschlusskriterium kritisch -> Score-Cap 30",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "anlagentyp": "pv",
+      "p_kw": 500.0,
+      "plz": "10115",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NAYY150",
+      "entfernung_km": 1.0,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 0.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 270,
+      "auslastung_prozent": 5.6,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.297,
+      "delta_u_v": 59.4,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.28552,
+      "x_ges_ohm": 3.32166,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 5.6,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 2.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 0.5,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 0.526,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-10T09:43:16.671930+00:00",
+        "eingangsdaten_hash": "afe88a9c3053e3dc7cfa3f09fe8294710a5af50adad4b6920eb24c3deb5f501c"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": null,
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": null,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 4.075,
+      "delta_u_v": 815.0,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-10T14:44:06.185227+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "anlagentyp": "pv",
+      "p_kw": 500.0,
+      "plz": "10115",
+      "leistung_mw": 0.5,
+      "nennspannung": 20.0,
+      "leitungstyp": "NAYY150",
+      "entfernung_km": 1.0,
+      "anschlussart": "Einspeisung",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "bestehende_einspeisung_mw": 0.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 15.2,
+      "i_pro_system_a": 15.2,
+      "i_max_a": 270,
+      "auslastung_prozent": 5.6,
+      "parallele_systeme": 1,
+      "s_mva": 0.5263,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 0.297,
+      "delta_u_v": 59.4,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.28552,
+      "x_ges_ohm": 3.32166,
+      "bewertung": "GRUEN",
+      "text": "Spannungsanhebung unkritisch."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 5.6,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 2.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 0.5,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 0.526,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-10T14:44:07.718492+00:00",
+        "eingangsdaten_hash": "afe88a9c3053e3dc7cfa3f09fe8294710a5af50adad4b6920eb24c3deb5f501c"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 5000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 4.075,
+      "delta_u_v": 815.0,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-10T14:44:08.046963+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 5000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 4.075,
+      "delta_u_v": 815.0,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-10T14:44:09.043678+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 5000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 4.075,
+      "delta_u_v": 815.0,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-10T14:44:09.109651+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 10.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "00000",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": false,
+      "p_kw": 5000.0,
+      "bestehende_einspeisung_mw": 0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 4.075,
+      "delta_u_v": 815.0,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.84952,
+      "x_ges_ohm": 4.29166,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": false,
+      "leitung_text": "Keine Leitungsredundanz.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": false,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-10T14:44:09.174000+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  },
+  {
+    "eingabe": {
+      "nennspannung": 20.0,
+      "leistung_mw": 5.0,
+      "leitungstyp": "NA2XS2Y240",
+      "entfernung_km": 5.0,
+      "anschlussart": "Einspeisung",
+      "anlagentyp": "PV",
+      "plz": "30159",
+      "cos_phi": 0.95,
+      "parallele_systeme": 1,
+      "redundanz": true,
+      "p_kw": 5000.0,
+      "bestehende_einspeisung_mw": 0.0,
+      "sk_mva": null,
+      "trafo_s_mva": null,
+      "uk_prozent": null,
+      "bestand_auslastung_prozent": 0,
+      "temperatur_c": 20.0
+    },
+    "thermisch": {
+      "i_betrieb_gesamt_a": 151.9,
+      "i_pro_system_a": 151.9,
+      "i_max_a": 530,
+      "auslastung_prozent": 28.7,
+      "parallele_systeme": 1,
+      "s_mva": 5.2632,
+      "bewertung": "GRUEN",
+      "text": "Thermisch unkritisch. Genuegend Reserve vorhanden.",
+      "hinweis_verlegeart": "Thermische Bewertung basiert auf konservativer Standardannahme (Erdverlegung, 20°C)."
+    },
+    "spannung": {
+      "delta_u_prozent": 3.378,
+      "delta_u_v": 675.6,
+      "richtung": "Anhebung",
+      "vorzeichen": "positiv",
+      "spannungsebene": "MS",
+      "delta_u_hartgrenze_pct": 3.0,
+      "ms_norm_tar": "VDE-AR-N 4110:2023-09",
+      "r_ges_ohm": 1.46452,
+      "x_ges_ohm": 3.76666,
+      "bewertung": "ORANGE",
+      "text": "Spannungsanhebung grenzwertig."
+    },
+    "n1": {
+      "n1_sicher": false,
+      "bewertung": "ROT",
+      "topologie": "unbekannt",
+      "topologie_text": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+      "leitung_n1": true,
+      "leitung_text": "Redundanz vorhanden, aber kein Parallelsystem modelliert.",
+      "n1_auslastung_prozent": 28.7,
+      "trafo_n1": true,
+      "trafo_text": "Trafo-Auslastung 21.1% (N-1 ok).",
+      "redundanz": true,
+      "parallele_systeme": 1,
+      "stakeholder": {
+        "topologie": "unbekannt",
+        "n1_sicher": false,
+        "bewertung": "ROT",
+        "konfidenz": "hoch",
+        "begruendung_technisch": "Topologie unbekannt. Ohne Kenntnis der Netzstruktur ist keine belastbare N-1-Bewertung moeglich.",
+        "begruendung_klartext": "Wir wissen nicht, wie die Anlage ans Netz angebunden ist. Daher koennen wir nicht zusichern, dass bei einem Fehler die Versorgung erhalten bleibt.",
+        "norm_referenz": [
+          "VDE-AR-N 4110"
+        ],
+        "annahmen": [
+          "cos phi = 0.95 zur Berechnung der Scheinleistung S = P / cos phi"
+        ],
+        "empfehlungen": [
+          "Beim Netzbetreiber Topologie und Restkapazitaet erfragen",
+          "Bestaetigung der Anschlussart (Stich/Ring/Doppelstich) einholen"
+        ],
+        "kennzahlen": {
+          "leistung_mw": 5.0,
+          "cos_phi": 0.95,
+          "scheinleistung_mva": 5.263,
+          "restkapazitaet_ms_mva": null,
+          "restkapazitaet_bekannt": false
+        },
+        "berechnungs_version": "n1-ms-1.0.0",
+        "zeitstempel_utc": "2026-05-10T14:48:19.677649+00:00",
+        "eingangsdaten_hash": "99510e837bb78e9b7c05e6bfd71996ed86ddfbe42f5f597e97a3f89d245eb330"
+      }
+    },
+    "fazit": {
+      "entscheidung": "C",
+      "text": "KRITISCH: Netzanschluss in dieser Konfiguration nicht plausibel.",
+      "detail": "Harte Verstoesse: Spannungsaenderung > 3.0% (Hartgrenze fuer MS); N-1-Kriterium nicht erfuellt (kritisch) -> Score-Cap 35",
+      "farbe": "ROT"
+    }
+  }
+]

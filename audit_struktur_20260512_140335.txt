@@ -1,0 +1,324 @@
+﻿=== STRUKTUR-AUDIT 20260512_140335 ===
+PWD: C:\Users\andre\gridcheck
+
+--- Top-Level (Ebene 1) ---
+
+Mode   LastWriteTime       Name                                                
+----   -------------       ----                                                
+d----- 03.05.2026 21:18:49 .cursor                                             
+d--h-- 10.05.2026 18:30:16 .git                                                
+d----- 07.05.2026 22:14:48 .github                                             
+d----- 10.05.2026 17:58:38 backend                                             
+d----- 07.05.2026 18:23:47 backups                                             
+d----- 03.05.2026 17:58:47 backup_20260503_175847                              
+d----- 10.05.2026 18:10:01 docs                                                
+d----- 02.05.2026 18:49:14 engine                                              
+d----- 10.05.2026 23:19:26 frontend                                            
+d----- 19.04.2026 13:17:30 rules                                               
+d----- 03.05.2026 22:11:38 rules_dump_20260503_221138                          
+d----- 20.04.2026 21:49:32 skills                                              
+d----- 03.05.2026 21:52:07 tests                                               
+d----- 29.04.2026 18:18:16 _backups                                            
+d----- 01.05.2026 19:58:44 _backup_20260501_195832_models_ok                   
+d----- 01.05.2026 20:12:47 _backup_20260501_201235_M1_baseline_ok              
+d----- 02.05.2026 19:55:37 _backup_20260502_195536_pre_v2_consolidation        
+d----- 03.05.2026 14:09:32 _backup_20260503_140932_M_dashboard_restored        
+d----- 10.05.2026 17:16:55 _milestone_backups                                  
+d----- 03.05.2026 22:06:09 __pycache__                                         
+-a---- 12.05.2026 13:40:14 .cursorrules                                        
+-a---- 03.05.2026 13:26:54 .cursorrules.bak_20260503_180635                    
+-a---- 03.05.2026 21:15:42 .cursorrules.bak_after_consolidation_20260503_211549
+-a---- 10.05.2026 11:06:27 .cursorrules.bak_pre_optionC_20260510_111100        
+-a---- 12.05.2026 13:40:12 .gitignore                                          
+-a---- 12.05.2026 14:03:21 audit_auth_20260512_135818.txt                      
+-a---- 12.05.2026 14:03:35 audit_struktur_20260512_140335.txt                  
+-a---- 10.05.2026 11:17:30 backend_startup.log                                 
+-a---- 05.05.2026 23:21:27 backup_M_wirtschaftlichkeit_20260505_232123.zip     
+-a---- 29.04.2026 20:20:34 berechnung_output.txt                               
+-a---- 21.04.2026 15:43:56 cleanup.ps1                                         
+-a---- 12.05.2026 13:40:14 context.cmd                                         
+-a---- 12.05.2026 13:40:12 DECISIONS.md                                        
+-a---- 07.05.2026 21:59:36 docker-compose.yml                                  
+-a---- 10.05.2026 23:48:50 Gridcheck-Kontext-BUNDLE.txt                        
+-a---- 12.05.2026 13:50:16 Ideen.md                                            
+-a---- 03.05.2026 21:52:07 main.py                                             
+-a---- 29.04.2026 20:20:34 main_output.txt                                     
+-a---- 29.04.2026 21:11:14 models_output.txt                                   
+-a---- 21.04.2026 15:50:09 package.json                                        
+-a---- 12.05.2026 13:40:12 PROJECT_RULES.md                                    
+-a---- 12.05.2026 13:40:14 Read-ProjectContext.ps1                             
+-a---- 12.05.2026 13:46:56 README.md                                           
+-a---- 02.05.2026 13:19:54 ROADMAP.md                                          
+-a---- 29.04.2026 20:20:34 routes_output.txt                                   
+-a---- 02.05.2026 13:41:02 session-context.ps1                                 
+-a---- 03.05.2026 22:22:16 SESSION_PROMPT.md                                   
+-a---- 12.05.2026 13:46:56 Start-Local.cmd                                     
+-a---- 12.05.2026 13:46:56 Start-Local.ps1                                     
+-a---- 29.04.2026 20:02:05 test_response.json                                  
+-a---- 29.04.2026 20:16:11 tree_output.txt                                     
+-a---- 12.05.2026 13:40:12 Verify-Finalization.cmd                             
+-a---- 12.05.2026 13:46:56 Verify-Finalization.ps1                             
+-a---- 05.05.2026 07:10:08 WIEDEREINSTIEG.md                                   
+-a---- 11.05.2026 19:34:33 _struktur.txt                                       
+
+
+
+
+--- Ebene 2 (ohne node_modules/.venv/.git) ---
+
+[.cursor]
+rules
+rules_backup_20260501_183834
+skills
+
+[.github]
+workflows
+
+[backend]
+.pytest_cache
+.ruff_cache
+alembic
+api
+assets
+audit
+backups
+backup_pre_ci_20260506_215010
+compliance
+core
+daten
+db
+economics
+engine
+geo
+pricing
+roles
+scripts
+services
+testberichte
+tests
+venv
+_OLD_BACKUP
+_QUARANTAENE_2025-11-24
+__pycache__
+.env
+.env.example
+.env.prod.example
+.env.staging.example
+.pytest_gridcheck.db
+.tmp_utf8_test.txt
+alembic.ini
+audit_smoke.pdf
+constants.py
+export_projects.py
+gridcheck.db
+gridcheck.db.bak_20260501_192100
+gridcheck.db.bak_20260501_194403
+gridcheck.db.LOCAL_BACKUP
+gridcheck.db.old_20260501_200956
+gridcheck_test_archive.db.old_20260501_200956
+main.py
+main.py.bak_20260501_192100
+main.py.bak_20260501_194403
+main.py.bak_20260503_125619
+main.py.bak_geo_20260506_192156
+main.py.bak_v1projektierer_ $ ts
+main.py.bak_v1router_20260503_215207
+openapi_dump.json
+projects_test_export.json
+pytest.ini
+report_4.pdf
+requirements.txt
+requirements.txt.old
+smoke_n1.py
+__init__.py
+
+[backups]
+MEILENSTEIN_optimizer_v1_20260507_182347
+MEILENSTEIN_v1_projektierer_GREEN_20260507_181308
+milestone_v1_projektierer_20260503_220557
+NetzbetreiberDashboard_20260503_173526.tsx
+
+[backup_20260503_175847]
+frontend
+
+[docs]
+architecture
+data
+product
+roadmap
+_archive
+ARCHITEKTUR.md
+monetarisierungspakete.md
+PROJECT_STATUS.md
+PROJEKTPLAN.md
+railway-deployment.md
+SESSION_STATE.md
+SESSION_STATE.md.bak_20260503_171929
+SESSION_STATE.md.bak_20260506_063745
+ui-guidelines.md
+WORKFLOW.md
+ZUSAMMENFASSUNG_v3.md
+
+[engine]
+core
+mappers
+skills
+validators
+berechnung.py
+decision-engine.js
+evaluate.js
+skill-loader.js
+
+[frontend]
+.next
+app
+components
+lib
+node_modules
+types
+_archive
+.env.example
+.env.local
+.gitignore
+next-env.d.ts
+next.config.mjs
+package-lock.json
+package.json
+postcss.config.mjs
+tailwind.config.ts
+tsconfig.json
+tsconfig.tsbuildinfo
+_audit_openapi.json
+
+[rules]
+input-validation.rules.json
+
+[rules_dump_20260503_221138]
+00-gridcheck.mdc.txt
+01-backend.mdc.txt
+02-frontend.mdc.txt
+03-elektrotechnik.mdc.txt
+04-deployment.mdc.txt
+05-workflow.mdc.txt
+06-arbeitsweise-gridcheck.mdc.txt
+cursorrules_root.txt
+
+[skills]
+examples
+grid-check-skill.js
+input-validation.skill.md
+
+[tests]
+test-evaluate.js
+test-netzdiagnose.js
+test-validator.js
+test.js
+test_v1_projektierer_analyze.py
+
+[_backups]
+cleanup-20260421-154424.log
+M1-baseline-20260420-221454.zip
+M1-baseline-20260421-154437.zip
+milestone-M0.5-20260421-163520.zip
+milestone-snapshot-20260421-163644.zip
+test-evaluate.js
+test-netzdiagnose.js
+test-validator.js
+test.js
+
+[_backup_20260501_195832_models_ok]
+api
+audit
+daten
+db
+engine
+services
+venv
+_OLD_BACKUP
+_QUARANTAENE_2025-11-24
+__pycache__
+.env
+constants.py
+export_projects.py
+gridcheck.db
+gridcheck.db.bak_20260501_192100
+gridcheck.db.bak_20260501_194403
+gridcheck.db.LOCAL_BACKUP
+gridcheck_test_archive.db
+main.py
+main.py.bak_20260501_192100
+main.py.bak_20260501_194403
+openapi_dump.json
+projects_test_export.json
+requirements.txt
+requirements.txt.old
+__init__.py
+
+[_backup_20260501_201235_M1_baseline_ok]
+api
+audit
+daten
+db
+engine
+services
+venv
+_OLD_BACKUP
+_QUARANTAENE_2025-11-24
+__pycache__
+.env
+constants.py
+export_projects.py
+gridcheck.db
+gridcheck.db.bak_20260501_192100
+gridcheck.db.bak_20260501_194403
+gridcheck.db.LOCAL_BACKUP
+gridcheck.db.old_20260501_200956
+gridcheck_test_archive.db.old_20260501_200956
+main.py
+main.py.bak_20260501_192100
+main.py.bak_20260501_194403
+openapi_dump.json
+projects_test_export.json
+requirements.txt
+requirements.txt.old
+__init__.py
+
+[_backup_20260502_195536_pre_v2_consolidation]
+api
+engine
+frontend_components
+frontend_lib
+types
+
+[_backup_20260503_140932_M_dashboard_restored]
+NetzbetreiberDashboard.tsx
+page.tsx
+SESSION_STATE.md
+
+[_milestone_backups]
+PRE_PDF1a_20260510_171654
+
+--- Wichtige Config-Dateien (Root) ---
+audit_auth_20260512_135818.txt
+audit_struktur_20260512_140335.txt
+berechnung_output.txt
+DECISIONS.md
+docker-compose.yml
+Gridcheck-Kontext-BUNDLE.txt
+Ideen.md
+main_output.txt
+models_output.txt
+package.json
+PROJECT_RULES.md
+README.md
+ROADMAP.md
+routes_output.txt
+SESSION_PROMPT.md
+test_response.json
+tree_output.txt
+WIEDEREINSTIEG.md
+_struktur.txt
+
+--- Python-Dateien gesamt (Anzahl) ---
+Python: 9020
+TS/TSX: 131

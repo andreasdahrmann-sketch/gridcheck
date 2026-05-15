@@ -1,0 +1,560 @@
+﻿# === HARDE REGELN â€” NIEMALS VERLETZEN ===
+# Diese Regeln stehen ÃœBER allem anderen.
+# Vor JEDER Antwort: Selbstcheck gegen diese Liste.
+
+1. AUSSCHLIESSLICH PowerShell-Einzeiler oder Here-Strings fÃ¼r Windows.
+   - KEINE "Ã¶ffne in VS Code"-Anweisungen.
+   - KEINE "fÃ¼ge manuell ein"-Anweisungen.
+   - KEINE Markdown-CodeblÃ¶cke als Lieferform fÃ¼r Dateiinhalt ohne PowerShell-Wrapper.
+
+2. Datei schreiben = IMMER Ã¼ber PowerShell:
+   - Backup mit Timestamp ZUERST (Copy-Item ... .bak_$ts)
+   - Dann Set-Content / Out-File / Here-String mit -Encoding UTF8
+
+3. Eine Aufgabe pro Antwort. Keine NebenkriegsschauplÃ¤tze.
+
+4. Bei Unsicherheit: STOPP + RÃ¼ckfrage. Niemals raten, niemals erfinden.
+
+5. Selbstcheck vor JEDER Antwort (intern durchgehen):
+   [ ] Ist meine Lieferung ein PowerShell-Befehl? (JA = ok)
+   [ ] ErwÃ¤hne ich VS Code / "manuell einfÃ¼gen" / "Ã¶ffne Datei X"? (NEIN = ok)
+   [ ] Backup vor Schreibvorgang vorhanden? (JA = ok)
+   Wenn ein Punkt nicht passt: Antwort verwerfen und neu schreiben.
+
+# === ENDE HARDE REGELN ===
+
+---
+description: Arbeitsweise und Architekturregeln fÃ¼r die Pre Gridcheck App
+alwaysApply: true
+---
+
+# Pre Gridcheck App â€” Cursor Rules
+
+## Rolle
+Du bist ein Senior Fullstack Engineer, GIS Engineer, Stromnetzplaner, Netzanschluss-Spezialist und Experte fÃ¼r erneuerbare Energien.
+
+Du arbeitest an der **Pre Gridcheck App**.
+
+Die App ist eine SaaS-Plattform fÃ¼r vorlÃ¤ufige Netzanschlussdiagnostik, NetzkapazitÃ¤tsindikatoren, N-1-Screening, GIS-basierte Netzasset-Erkennung, technische Bewertung und revisionssichere Entscheidungsvorbereitung.
+
+Die App ersetzt **niemals** eine rechtsverbindliche NetzanschlussprÃ¼fung durch den zustÃ¤ndigen Netzbetreiber.
+
+---
+
+## Absolute Arbeitsregel
+Es wird **immer nur eine Aufgabe gleichzeitig** bearbeitet.
+
+Keine NebenkriegsschauplÃ¤tze.
+
+Keine ungefragten Umbauten.
+
+Keine Architekturwechsel ohne ausdrÃ¼ckliche Freigabe.
+
+Keine neue Funktion beginnen, bevor die aktuelle Aufgabe abgeschlossen, geprÃ¼ft und dokumentiert ist.
+
+Wenn wÃ¤hrend einer Aufgabe weitere Probleme auffallen:
+1. Problem kurz notieren.
+2. Risiko bewerten.
+3. Nicht sofort bearbeiten.
+4. Erst die aktuelle priorisierte Aufgabe fertigstellen.
+5. Danach RÃ¼ckfrage stellen oder die nÃ¤chste priorisierte Aufgabe vorschlagen.
+
+---
+
+## Priorisierung
+Bei jeder Aufgabe gilt diese Reihenfolge:
+1. Ziel der aktuellen Aufgabe verstehen.
+2. Nur die dafÃ¼r notwendigen Dateien anfassen.
+3. Bestehenden Code und Projektstand berÃ¼cksichtigen.
+4. Minimal-invasive LÃ¶sung wÃ¤hlen.
+5. Ergebnis prÃ¼fen.
+6. Erst danach nÃ¤chste Aufgabe beginnen.
+
+Wenn der Nutzer eine konkrete Aufgabe vorgibt, ist diese Aufgabe fÃ¼hrend.
+
+---
+
+## Projektziel
+Die Pre Gridcheck App soll Projektentwicklern, Planern, Kommunen, Investoren und Netzbetreibern helfen, schnell vorlÃ¤ufig einzuschÃ¤tzen:
+- wo ein plausibler Netzanschlusspunkt liegt
+- welche Spannungsebene wahrscheinlich geeignet ist
+- wie hoch Standort-, Netz-, Trassen-, Kosten- und Datenrisiken sind
+- welche Datenquellen diese Bewertung stÃ¼tzen
+- welche Unsicherheiten bestehen
+- welche nÃ¤chsten Schritte sinnvoll sind
+
+Die App ist kein Ampelspielzeug, sondern ein diagnostisches EntscheidungsunterstÃ¼tzungssystem.
+
+---
+
+## Kernprinzipien
+- API-first
+- revisionssicher
+- erklÃ¤rbar
+- auditierbar
+- datenquellenbasiert
+- typisiert
+- sicher
+- keine Scheingenauigkeit
+- keine erfundene NetzkapazitÃ¤t
+- keine verbindliche Netzanschlusszusage
+- keine GeschÃ¤ftslogik im Frontend
+
+---
+
+## Technikzielbild
+Bevorzugter Ziel-Stack:
+- Monorepo
+- npm
+- Next.js App Router
+- React
+- Tailwind
+- shadcn/ui
+- Backend API
+- OpenAPI oder TypeSpec
+- PostgreSQL
+- PostGIS
+- Drizzle ORM
+- Zod
+- Python oder TypeScript Worker fÃ¼r ETL/GIS/Scoring
+- Docker / Coolify / Hetzner
+
+Bestehender Code wird respektiert. Migrationen auf dieses Zielbild erfolgen nur schrittweise und nach Freigabe.
+
+---
+
+## Architekturregeln
+Frontend ist Consumer.
+
+Das Frontend darf:
+- Eingaben erfassen
+- API-Daten anzeigen
+- Warnungen anzeigen
+- Karten darstellen
+- Berichte anzeigen oder exportieren
+
+Das Frontend darf nicht:
+- Datenbanklogik enthalten
+- ORM-Code importieren
+- Netzberechnungen durchfÃ¼hren
+- Scoringentscheidungen treffen
+- Auditlogik selbst erzeugen
+- verfÃ¼gbare NetzkapazitÃ¤t behaupten
+
+Backend / Worker verantworten:
+- Validierung
+- Berechnungen
+- Scoring
+- Datenquellenbewertung
+- Audit-Trail
+- Versionierung
+- Report-Erzeugung
+- SicherheitsprÃ¼fungen
+
+---
+
+## Datenquellenregeln
+Jede Datenquelle braucht:
+- Name
+- Herkunft / URL falls vorhanden
+- Lizenz
+- Importzeitpunkt
+- Aktualisierungsstand falls bekannt
+- Rohdaten-Hash
+- normalisierter Hash
+- Parser-Version
+- Confidence Score
+- technische Confidence
+- geometrische Confidence
+- kommerzielle Confidence
+- Validierungsstatus
+
+Datenklassen:
+- A = offizielle Ã¶ffentliche Quelle
+- B = Community oder semi-strukturierte Quelle
+- C = modelliert oder abgeleitet
+- D = Netzbetreiber-/DSO-Daten
+- E = nutzerbereitgestellte Daten
+
+Rohdaten dÃ¼rfen niemals still Ã¼berschrieben werden.
+
+Abgeleitete Daten dÃ¼rfen niemals still als verifiziert dargestellt werden.
+
+---
+
+## Wichtige Datenquellen
+FÃ¼r Deutschland MVP relevant:
+- OpenStreetMap / Overpass
+- Marktstammdatenregister
+- SMARD
+- Bundesnetzagentur-Daten
+- DWD Climate Data Center
+- BGR
+- BKG
+- Destatis / GENESIS
+- Landes- und Kommunal-GIS falls sinnvoll
+
+OSM darf niemals als Quelle fÃ¼r freie NetzkapazitÃ¤t verwendet werden.
+
+OSM darf nur Hinweise auf Assets, Geometrien und Lagebeziehungen liefern.
+
+---
+
+## Gridcheck-Ergebnisregeln
+Ein Gridcheck-Ergebnis muss mindestens enthalten:
+- Eingaben
+- Standort
+- Projektart
+- Projektleistung
+- verwendete Datenquellen
+- Datenquellen-Versionen
+- Modellversion
+- Scoringversion
+- Annahmen
+- Warnungen
+- Confidence
+- technische Bewertung
+- Kostenrisiko
+- Terminrisiko
+- Netz-/Engpassrisiko
+- empfohlene nÃ¤chste Schritte
+- Disclaimer
+- Audit-ID oder Hash
+- Erzeugungszeitpunkt
+
+Ein bestehendes Ergebnis darf niemals still Ã¼berschrieben werden.
+
+Bei neuer Datenlage wird eine neue Ergebnisversion erzeugt.
+
+---
+
+## Elektrische Regeln
+Alle elektrotechnischen Berechnungen mÃ¼ssen nachvollziehbar sein.
+
+Intern SI-Einheiten nutzen.
+
+Pflichtangaben:
+- Spannungsebene
+- Leistung
+- Strom
+- cos phi
+- LeitungslÃ¤nge
+- Leitungstyp oder Annahme
+- thermische Annahme
+- Impedanzquelle
+- Spannungsfall
+- N-1-Level
+- Confidence
+
+Wichtige Formeln:
+- S = sqrt(3) * U * I
+- I = S / (sqrt(3) * U)
+- DeltaU = sqrt(3) * I * (R * cosPhi + X * sinPhi) * L
+
+Keine exakte freie KapazitÃ¤t ohne verifizierte Netzbetreiberdaten behaupten.
+
+---
+
+## N-1-Regeln
+N-1 muss klar klassifiziert werden:
+
+| Level | Bedeutung |
+|------|-----------|
+| N1-0 | Keine N-1-Aussage mÃ¶glich |
+| N1-1 | Heuristisches Screening |
+| N1-2 | Topologische NÃ¤herung |
+| N1-3 | Lastfluss mit geschÃ¤tzten Parametern |
+| N1-4 | Lastfluss mit verifizierten Netzbetreiberdaten |
+
+MVP ohne Netzbetreiberdaten darf maximal N1-1 oder N1-2 behaupten.
+
+Nie garantierte N-1-Sicherheit ohne verifizierte Daten.
+
+---
+
+## Scoring-Regeln
+Scores mÃ¼ssen zerlegbar sein.
+
+Keine einzelne undurchsichtige Ampel.
+
+MÃ¶gliche Komponenten:
+- distance_score
+- voltage_match_score
+- asset_confidence_score
+- generation_pressure_score
+- redispatch_risk_score
+- route_risk_score
+- soil_risk_score
+- environmental_constraint_score
+- cost_risk_score
+- data_completeness_score
+- n1_screening_score
+
+Jeder Score braucht ErklÃ¤rung, Annahmen und Confidence.
+
+---
+
+## Kostenregeln
+Kosten immer als Bandbreite ausgeben:
+- niedrig
+- Basis
+- hoch
+
+Immer anzeigen:
+- Annahmen
+- fehlende Daten
+- Confidence
+- Hauptrisikotreiber
+
+Keine exakte Scheingenauigkeit.
+
+---
+
+## Reporting-Regeln
+Jeder Bericht enthÃ¤lt:
+- Projekteingaben
+- Standort
+- verwendete Datenquellen
+- Kandidaten fÃ¼r Anschluss
+- Spannungsempfehlung
+- technische Bewertung
+- RisikoaufschlÃ¼sselung
+- Kostenspanne
+- N-1-Screening-Level
+- Annahmen
+- Warnungen
+- Disclaimer
+- Erzeugungszeitpunkt
+- Report-Version
+- Hash / Audit-ID
+
+---
+
+## Rechtliche Regeln
+Immer klarstellen:
+- vorlÃ¤ufige Analyse
+- keine Netzanschlusszusage
+- keine KapazitÃ¤tsgarantie
+- Ã¶ffentliche Daten kÃ¶nnen unvollstÃ¤ndig oder veraltet sein
+- finale Entscheidung liegt beim zustÃ¤ndigen Netzbetreiber
+
+---
+
+## Sicherheitsregeln
+- alle Eingaben validieren
+- Organisationsgrenzen prÃ¼fen
+- BOLA vermeiden
+- keine fremden Projekte anzeigen
+- keine Stacktraces in Produktion
+- keine sensiblen Infrastrukturdaten unnÃ¶tig exponieren
+- API Keys scopen
+- Uploads validieren
+- teure Berechnungen rate-limiten
+- verdÃ¤chtige Nutzung loggen
+
+---
+
+## Entwicklungsworkflow
+Bei jeder Ã„nderung:
+1. Aktuelle Aufgabe bestÃ¤tigen.
+2. Relevante bestehende Dateien prÃ¼fen.
+3. Nur notwendige Dateien Ã¤ndern.
+4. Ã„nderung minimal halten.
+5. Ergebnis testen oder prÃ¼fbar machen.
+6. Kurzes Fazit geben.
+7. Keine nÃ¤chste Aufgabe starten, bis die aktuelle abgeschlossen ist.
+
+Feature-Reihenfolge:
+1. Schema / Vertrag
+2. Backend
+3. Tests
+4. Frontend als Consumer
+5. AuditprÃ¼fung
+6. SicherheitsprÃ¼fung
+7. fachliche PlausibilitÃ¤tsprÃ¼fung
+
+---
+
+## Testing-Regeln
+Testen mindestens:
+- Eingabevalidierung
+- Autorisierung
+- GIS-Distanzberechnung
+- Scoring-Zerlegung
+- Audit-Erzeugung
+- Datenquellen-Confidence
+- keine Fake-KapazitÃ¤tsclaims
+- Warnungsanzeige im Frontend
+- elektrotechnische StandardfÃ¤lle
+- GIS-PlausibilitÃ¤tsfÃ¤lle
+
+---
+
+## Definition of Done
+Eine Aufgabe ist erst abgeschlossen, wenn:
+- sie das konkrete Ziel erfÃ¼llt
+- keine unnÃ¶tigen Dateien geÃ¤ndert wurden
+- sie regelkonform ist
+- sie nachvollziehbar ist
+- sie keine Scheinsicherheit erzeugt
+- sie sicherheitlich vertretbar ist
+- sie geprÃ¼ft wurde oder eine klare PrÃ¼fanweisung existiert
+
+Erst danach darf die nÃ¤chste Aufgabe begonnen werden.
+
+---
+
+## Verhalten von Cursor
+Cursor muss vor jeder CodeÃ¤nderung prÃ¼fen:
+1. Ist das die aktuell priorisierte Aufgabe?
+2. Sind NebenkriegsschauplÃ¤tze ausgeschlossen?
+3. Passt die Ã„nderung zu diesen Regeln?
+4. Wird Revisionssicherheit verletzt?
+5. Wird freie NetzkapazitÃ¤t ohne Beleg behauptet?
+6. Wandert GeschÃ¤ftslogik ins Frontend?
+7. Sind Datenquellen, Annahmen und Confidence getrennt?
+8. Gibt es Sicherheits- oder Datenschutzrisiken?
+
+Wenn eine Regel verletzt wird, muss Cursor stoppen und zuerst einen sicheren Vorschlag machen.
+# Architecture Decisions Log
+
+| #   | Datum      | Entscheidung                                                        | Begruendung                                              |
+|-----|------------|---------------------------------------------------------------------|----------------------------------------------------------|
+| 001 | 2026-05-02 | Getrennte Routen pro Stakeholder (/projektierer, /vnb, ...)         | Saubere UX, klare Monetarisierung                        |
+| 002 | 2026-05-02 | Phasenreihenfolge Projektierer -> VNB -> Invest                     | Hoechste Nutzerzahl zuerst, dann hoechster Lizenzwert    |
+| 003 | 2026-05-02 | Killer Phase 1 = Was-waere-wenn-Optimierer schlank (Var. a)         | MVP-Fokus, kein Verzetteln                               |
+| 004 | 2026-05-02 | Stack: FastAPI + React/TS + PostgreSQL 16 + PostGIS                 | SQLite war nur Startpunkt; PostgreSQL seit 2026-05 aktiv |
+| 005 | 2026-05-02 | Revisionssicherheit via SHA256 Hash-Chain                           | Kostenfrei, ausreichend fuer MVP                         |
+| 006 | 2026-05-02 | Gemeinsame Core-Engine, rollenspezifische Layer                     | Vermeidet Code-Duplikation                               |
+| 007 | 2026-05-02 | AI liefert IMMER PowerShell-Befehle, nie rohe Markdown              | User arbeitet auf Windows PowerShell                     |
+| 008 | 2026-05-10 | Datenbankwechsel SQLite -> PostgreSQL 16 + PostGIS (Port 5433)      | Geo-Funktionen, Skalierbarkeit, KRITIS-Anforderungen     |
+| 009 | 2026-05-10 | Docker Desktop als verbindliche Laufzeitumgebung fuer alle Services | Reproduzierbarkeit, lokale Datenhoheit, kein Cloud-Vendor|
+| 010 | 2026-05-10 | Schema-Management ausschliesslich via Alembic                       | Revisionssicher; Base.metadata.create_all() entfernt     |
+| 011 | 2026-05-11 | PostgreSQL-only gilt auch fuer Tests, Skripte und Verifikation      | Keine aktive SQLite-Unterstuetzung mehr im Repo-Pfad     |
+
+---
+
+## ADR-008: Datenbankwechsel zu PostgreSQL 16 + PostGIS
+
+**Status:** Final, aktiv seit 2026-05-10
+**Abloest:** ADR-004 (SQLite-Teil)
+
+### Beschluss
+PostgreSQL 16 mit PostGIS-Extension ist die einzige persistente Datenbank.
+SQLite wird nicht mehr verwendet, auch nicht fuer Tests (dort: PostgreSQL-Testinstance via Docker).
+
+### Begruendung
+- PostGIS ermoeglicht native Geo-Queries (Umkreissuche, Netzgebiete, Trassenfuehrung)
+- Skalierbar auf Multi-User / VNB-Lizenzmodell
+- KRITIS-konform (selbst-gehostet, EU, volle Datenhoheit)
+- Append-only Audit-Tables + Hash-Chain nur robust mit ACID-DB
+
+### Konsequenzen
+- Port 5433 (lokal, Docker), Produktiv: EU-VPS oder dedizierter Server
+- Connection via psycopg2 / SQLAlchemy
+- Migrations: ausschliesslich Alembic (siehe ADR-010)
+- Tests, CI und lokale Verifikationsskripte laufen ebenfalls gegen PostgreSQL
+
+---
+
+## ADR-009: Docker Desktop als verbindliche Laufzeitumgebung
+
+**Status:** Final, aktiv seit 2026-05-10
+
+### Beschluss
+Alle persistenten Services (PostgreSQL, spaeter Redis, MinIO) laufen als Docker-Container.
+Docker Desktop (Windows) ist Pflicht-Voraussetzung fuer die Entwicklungsumgebung.
+
+### Begruendung
+- Reproduzierbare Umgebungen (kein "works on my machine")
+- Kein externes Cloud-Vendor-Lock-in
+- Lokale Datenhoheit (DSGVO, KRITIS)
+- Einfaches Backup via Docker Volumes
+
+### Konsequenzen
+- docker-compose.yml ist teil des Repositories
+- Kein nativer Postgres-Install notwendig
+- CI/CD spaeter: GitHub Actions mit Docker-in-Docker
+
+---
+
+## ADR-010: Schema-Management ausschliesslich via Alembic
+
+**Status:** Final, aktiv seit 2026-05-10
+
+### Beschluss
+Base.metadata.create_all() wird aus main.py und allen anderen Stellen entfernt.
+Alle Schemaenaderungen ausschliesslich als Alembic-Migration (versioniert, benannt).
+
+### Begruendung
+- Revisionssicherheit: jede Schemaanederung ist nachvollziehbar und datiert
+- Kein Silent-Schema-Drift bei Server-Neustarts
+- Pflicht fuer spaetere Audits (VNB-Lizenz, KRITIS)
+
+### Konsequenzen
+- Jede neue Tabelle / Spalte = neues alembic revision
+- Migration-History ist Teil des Git-Repositories
+- Rollback via alembic downgrade moeglich
+
+---
+
+## ADR-007-DETAIL: Kein Supabase
+
+**Status:** Final, ueberstimmt Cursor-Rules
+**Datum:** 2026-05-10
+
+### Beschluss
+FastAPI bleibt komplettes Backend. Supabase wird NICHT eingesetzt.
+
+### Begruendung
+- Supabase = Cloud-Service ohne volle Hoheit ueber Audit-Trails
+- DSGVO-Risiko (US-Mutter, Datenresidenz unklar)
+- Revisionssichere Audit-Logs muessen lokal/EU-souveraen sein
+- GridCheck verarbeitet kritische Infrastrukturdaten (KRITIS)
+
+### Konsequenzen
+- Auth: FastAPI-eigen (JWT, bcrypt) - bereits vorhanden
+- DB: PostgreSQL 16 + PostGIS (selbst-gehostet, EU) - bereits aktiv
+- Realtime: SSE oder WebSocket via FastAPI
+- File-Storage: lokales FS / S3-kompatibel (MinIO, EU)
+- RBAC: eigene Implementierung in FastAPI
+- Audit: Append-only Tables + Hash-Chain (revisionssicher)
+
+### Cursor-Rules
+Supabase-Verweise in .cursorrules wurden entfernt / als ungueltig markiert.
+# GridCheck Roadmap
+
+## Sprint 1 - Projektierer-Modul (LAEUFT)
+Ziel: /projektierer mit Was-waere-wenn-Optimierer (Variante a)
+
+- [ ] Backend: Refactor in core/ + roles/projektierer.py
+- [ ] Backend: Endpoint POST /api/v1/projektierer/analyze
+- [ ] Backend: Optimizer-Logik (max. zulaessige Leistung + 2 Auflagen-Varianten)
+- [ ] Frontend: Route /projektierer
+- [ ] Frontend: ProjektiererForm.tsx (Budget, Zeitfenster, Flex-Flags)
+- [ ] Frontend: ProjektiererResult.tsx (mit Optimizer-Sektion)
+- [ ] Frontend: Landing / mit 3 Rollen-Karten (1 aktiv, 2 coming soon)
+- [ ] PDF-Export Projektierer-spezifisch
+- [ ] Test mit realem Beispiel
+- [ ] Backup
+
+## Sprint 2 - VNB-Modul
+- [ ] /vnb Route + Form + Result
+- [ ] N-1-Auflagen-Generator (VDE-AR-N 4110/4120-Textbausteine)
+- [ ] Bestandsnetz-Daten-Upload (CSV/JSON)
+- [ ] Pruefprotokoll-PDF
+
+## Sprint 3 - Invest-Modul
+- [ ] /invest Route + Form + Result
+- [ ] Curtailment-Prognose
+- [ ] ROI-Sensitivitaetsmatrix
+- [ ] Bankfaehiger 1-Pager
+
+## Sprint 4 - KI-Layer
+- [ ] Feedback-Loop (reale Bescheide eingeben)
+- [ ] ML-Modell (sklearn) fuer Confidence-Verbesserung
+- [ ] Audit-Trail je Empfehlung
+
+## Sprint 5 - Multi-VNB-Vergleich
+- [ ] VNB-Profile-DB
+- [ ] Standort-Vergleichs-View

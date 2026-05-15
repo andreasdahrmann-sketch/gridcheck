@@ -1,0 +1,324 @@
+﻿# C:\Users\andre\gridcheck\backend\api\routes.py
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from db.database import get_db
+from db.models import Project, CheckResult, AuditLog, make_checksum
+from engine import berechne_netzcheck
+from pydantic import BaseModel
+from typing import Optional
+import json
+
+router = APIRouter()
+
+
+class AnalyzeRequest(BaseModel):
+    # Projektdaten (Step 1)
+    projektname: str
+    plz: str
+    anlagentyp: str = "pv"
+    leistung_kw: float
+    spannungsebene: str = "20"
+    cos_phi: float = 0.95
+    einspeiseart: str = "volleinspeisung"
+    speicher: bool = False
+    speicher_kwh: Optional[float] = None
+    koordinaten_lat: Optional[float] = None
+    koordinaten_lon: Optional[float] = None
+    inbetriebnahme: Optional[str] = None
+    kontakt_name: Optional[str] = None
+    kontakt_email: Optional[str] = None
+    kontakt_firma: Optional[str] = None
+    # Netzparameter (Step 2)
+    trafo_mva: float = 0.63
+    leitungslaenge_km: float = 1.0
+    leitungstyp: str = "NAYY"
+    querschnitt_mm2: str = "150"
+    netzverknuepfungspunkt: str = ""
+    skv_mva: Optional[float] = None
+    parallelsysteme: int = 1
+    eigentumsgrenze: str = "HAK"
+    vorbelastung_mw: Optional[float] = None
+    netz_typ: str = "kabel"
+
+
+def map_spannungsebene(se: str) -> str:
+    """Mappt Frontend-Spannungsebene auf Engine VoltageLevel"""
+    mapping = {
+        "0.4": "NS",
+        "10": "MS_10",
+        "20": "MS_20",
+        "30": "MS_30",
+        "110": "HS",
+        "220": "HoeS",
+        "380": "HoeS",
+    }
+    return mapping.get(se, "MS_20")
+
+
+def map_cable_key(leitungstyp: str, querschnitt: str, spannungsebene: str) -> str:
+    """Mappt Frontend Leitungstyp+Querschnitt auf CABLE_DATABASE Key"""
+    from constants import CABLE_DATABASE, DEFAULT_CABLE
+
+    # Direkt-Mapping versuchen
+    candidates = [
+        f"{leitungstyp} {querschnitt}",           # "NAYY 150"
+        f"{leitungstyp.upper()} {querschnitt}",    # "NAYY 150"
+    ]
+
+    # Spezial-Mappings
+    typ_upper = leitungstyp.upper()
+    if typ_upper in ("NAYY", "NAVY"):
+        candidates.append(f"NAYY {querschnitt}")
+    elif typ_upper in ("NYY",):
+        candidates.append(f"NAYY {querschnitt}")  # Fallback auf Alu-Äquivalent
+    elif typ_upper in ("AL/ST", "ACSR"):
+        candidates.append(f"Al/St {querschnitt}")
+    elif typ_upper.startswith("NA2XS"):
+        candidates.append(f"NA2XS2Y {querschnitt}")
+
+    # MS-Kabel automatisch
+    vl = map_spannungsebene(spannungsebene)
+    if vl.startswith("MS"):
+        candidates.append(f"NA2XS2Y {querschnitt}")
+    elif vl == "HS":
+        candidates.append(f"Al/St {querschnitt}")
+
+    for c in candidates:
+        if c in CABLE_DATABASE:
+            return c
+
+    # Fallback: Default für Spannungsebene
+    return DEFAULT_CABLE.get(vl, "NAYY 150")
+
+
+def map_anlagentyp(typ: str) -> str:
+    """Mappt Frontend-Anlagentyp auf Engine ProjectType"""
+    mapping = {
+        "pv": "pv",
+        "wind": "wind",
+        "bess": "speicher",
+        "hybrid": "hybrid",
+        "speicher": "speicher",
+    }
+    return mapping.get(typ.lower(), "pv")
+
+
+@router.post("/api/calculate")
+def run_analysis(req: AnalyzeRequest, db: Session = Depends(get_db)):
+    """Hauptendpoint - nimmt Frontend-Daten, mappt auf Engine, speichert revisionssicher"""
+
+    # Kabel-Key auflösen
+    cable_key = map_cable_key(req.leitungstyp, req.querschnitt_mm2, req.spannungsebene)
+    engine_typ = map_anlagentyp(req.anlagentyp)
+    vorbelastung_kw = (req.vorbelastung_mw or 0) * 1000
+
+    # Projekt in DB speichern
+    project = Project(
+        name=req.projektname,
+        plz=req.plz,
+        ort=req.netzverknuepfungspunkt,
+        typ=engine_typ,
+        leistung_kw=req.leistung_kw,
+        spannung_kv=float(req.spannungsebene),
+        einspeiseart=req.einspeiseart,
+        skv_mva=req.skv_mva,
+        bestehende_einspeisung_kw=vorbelastung_kw,
+        leitungstyp=cable_key,
+        leitungslaenge_km=req.leitungslaenge_km,
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+
+    # Engine aufrufen
+    result = berechne_netzcheck(
+        typ=engine_typ,
+        leistung_kw=req.leistung_kw,
+        plz=req.plz,
+        spannung_kv=float(req.spannungsebene),
+        skv_mva=req.skv_mva,
+        bestehende_einspeisung_kw=vorbelastung_kw,
+        leitungstyp=cable_key,
+        leitungslaenge_km=req.leitungslaenge_km,
+        cos_phi=req.cos_phi,
+        trafo_mva=req.trafo_mva,
+        parallelsysteme=req.parallelsysteme,
+    )
+
+    # CheckResult speichern
+    check = CheckResult(
+        project_id=project.id,
+        score=result["score"],
+        spannungsband_ok=result["spannungsband_ok"],
+        thermische_auslastung_ok=result["thermische_auslastung_ok"],
+        kurzschluss_ok=result["kurzschluss_ok"],
+        n1_ok=result["n1_ok"],
+        netzebene=result["netzebene"],
+        empfehlung=result["empfehlung"],
+        details=json.dumps(result["details"], default=str),
+    )
+    db.add(check)
+    db.commit()
+
+    # Audit-Log (revisionssicher)
+    audit_data = {
+        "input": req.dict(),
+        "result": result,
+        "cable_resolved": cable_key,
+    }
+    audit = AuditLog(
+        project_id=project.id,
+        action="ANALYSIS_COMPLETED",
+        detail=json.dumps(audit_data, default=str),
+        checksum=make_checksum(audit_data),
+    )
+    db.add(audit)
+    db.commit()
+
+    return {"project_id": project.id, **result}
+
+
+# Legacy-Endpoint (Kompatibilität)
+@router.post("/api/check")
+def run_check_legacy(req: AnalyzeRequest, db: Session = Depends(get_db)):
+    return run_analysis(req, db)
+
+
+@router.get("/api/result/{project_id}")
+def get_result(project_id: int, db: Session = Depends(get_db)):
+    check = db.query(CheckResult).filter(CheckResult.project_id == project_id).first()
+    if not check:
+        raise HTTPException(status_code=404, detail="Projekt nicht gefunden")
+    return {
+        "project_id": check.project_id,
+        "score": check.score,
+        "spannungsband_ok": check.spannungsband_ok,
+        "thermische_auslastung_ok": check.thermische_auslastung_ok,
+        "kurzschluss_ok": check.kurzschluss_ok,
+        "n1_ok": check.n1_ok,
+        "netzebene": check.netzebene,
+        "empfehlung": check.empfehlung,
+        "details": json.loads(check.details) if check.details else {},
+    }
+
+
+@router.get("/api/audit/{project_id}")
+def get_audit(project_id: int, db: Session = Depends(get_db)):
+    logs = db.query(AuditLog).filter(AuditLog.project_id == project_id).all()
+    if not logs:
+        raise HTTPException(status_code=404, detail="Keine Audit-Logs gefunden")
+    return [
+        {
+            "id": l.id,
+            "timestamp": str(l.timestamp),
+            "action": l.action,
+            "detail": l.detail,
+            "checksum": l.checksum,
+        }
+        for l in logs
+    ]
+
+
+@router.get("/api/projects")
+def list_projects(db: Session = Depends(get_db)):
+    projects = db.query(Project).order_by(Project.created_at.desc()).all()
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "plz": p.plz,
+            "ort": p.ort,
+            "typ": p.typ,
+            "leistung_kw": p.leistung_kw,
+            "created_at": str(p.created_at),
+        }
+        for p in projects
+    ]
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Optional
+from ..db.database import get_db
+from ..db.models import Project, CheckResult, AuditLog, make_checksum
+from ..services.netzcheck import berechne_netzcheck
+import json
+
+router = APIRouter()
+
+class ProjectCreate(BaseModel):
+    name: str
+    plz: str
+    ort: Optional[str] = None
+    typ: str
+    leistung_kw: float
+    spannung_kv: Optional[float] = None
+    einspeiseart: Optional[str] = "Volleinspeisung"
+    skv_mva: Optional[float] = None
+    bestehende_einspeisung_kw: Optional[float] = 0
+    leitungstyp: Optional[str] = "NAYY 150"
+    leitungslaenge_km: Optional[float] = 1.0
+
+@router.post("/api/check")
+def run_check(data: ProjectCreate, db: Session = Depends(get_db)):
+    project = Project(
+        name=data.name, plz=data.plz, ort=data.ort, typ=data.typ,
+        leistung_kw=data.leistung_kw, spannung_kv=data.spannung_kv,
+        einspeiseart=data.einspeiseart, skv_mva=data.skv_mva,
+        bestehende_einspeisung_kw=data.bestehende_einspeisung_kw,
+        leitungstyp=data.leitungstyp, leitungslaenge_km=data.leitungslaenge_km,
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+
+    result = berechne_netzcheck(
+        typ=data.typ, leistung_kw=data.leistung_kw, plz=data.plz,
+        spannung_kv=data.spannung_kv, skv_mva=data.skv_mva,
+        bestehende_einspeisung_kw=data.bestehende_einspeisung_kw,
+        leitungstyp=data.leitungstyp, leitungslaenge_km=data.leitungslaenge_km,
+        einspeiseart=data.einspeiseart,
+    )
+
+    check = CheckResult(
+        project_id=project.id, score=result["score"],
+        spannungsband_ok=result["spannungsband_ok"],
+        thermische_auslastung_ok=result["thermische_auslastung_ok"],
+        kurzschluss_ok=result["kurzschluss_ok"], n1_ok=result["n1_ok"],
+        netzebene=result["netzebene"], empfehlung=result["empfehlung"],
+        details=json.dumps(result["details"]),
+    )
+    db.add(check)
+    db.commit()
+
+    checksum = make_checksum(result)
+    audit = AuditLog(
+        project_id=project.id, action="CHECK_CREATED",
+        detail=json.dumps(result), checksum=checksum,
+    )
+    db.add(audit)
+    db.commit()
+
+    return {"project_id": project.id, "result": result}
+
+@router.get("/api/result/{project_id}")
+def get_result(project_id: int, db: Session = Depends(get_db)):
+    check = db.query(CheckResult).filter(CheckResult.project_id == project_id).first()
+    if not check:
+        return {"error": "Not found"}
+    return {
+        "project_id": check.project_id,
+        "score": check.score,
+        "spannungsband_ok": check.spannungsband_ok,
+        "thermische_auslastung_ok": check.thermische_auslastung_ok,
+        "kurzschluss_ok": check.kurzschluss_ok,
+        "n1_ok": check.n1_ok,
+        "netzebene": check.netzebene,
+        "empfehlung": check.empfehlung,
+        "details": json.loads(check.details) if check.details else {},
+    }
+
+@router.get("/api/audit/{project_id}")
+def get_audit(project_id: int, db: Session = Depends(get_db)):
+    logs = db.query(AuditLog).filter(AuditLog.project_id == project_id).all()
+    return [{"id": l.id, "timestamp": str(l.timestamp), "action": l.action,
+             "detail": l.detail, "checksum": l.checksum} for l in logs]

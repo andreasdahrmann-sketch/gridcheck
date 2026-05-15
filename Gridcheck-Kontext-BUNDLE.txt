@@ -1,0 +1,2862 @@
+﻿#
+# Gridcheck - Projekt-Kontext (md/mdc in Root, .cursor/rules, .cursor/skills, docs, skills, backend/compliance, optional frontend|backend/*.md)
+# Dateien: 29
+# Root: C:\Users\andre\gridcheck
+# Zeit: 2026-05-10 23:48:50
+#
+=== .cursor/rules/00-gridcheck.mdc ===
+---
+description: Projektziel und übergeordnete Leitplanken für GridCheck
+alwaysApply: true
+---
+
+# GridCheck – Pre-Netzanschluss-Check App
+
+## Projektziel
+Eine Diagnose-App für Netzanschluss-Prüfung von EE-Anlagen (PV, BESS, Wind, Wallbox-Cluster).
+Liefert schnell begründete Antworten: "Geht / Geht mit Auflagen / Geht nicht" – inkl. N-1-Analyse,
+Netzplan, Empfehlungen. Ziel: Projektierer sparen Wochen, Netzbetreiber sparen Prüfzeit.
+
+## Kernprinzipien (nicht verhandelbar)
+1. **Kein Ampel-Spielzeug** – jede Aussage ist fachlich begründet (Norm + Berechnung + Annahmen).
+2. **Revisionssicher** – jede Berechnung ist reproduzierbar, Eingaben + Ergebnisse + Normstand + App-Version werden versioniert gespeichert (Audit-Log, unveränderlich).
+3. **Transparenz** – Annahmen, Grenzwerte, Quellen werden im Ergebnis angezeigt.
+4. **Konservativ** – im Zweifel strengerer Grenzwert. Nie "optimistisch" rechnen.
+5. **KI lernend, nicht ratend** – ML-Komponenten ergänzen, ersetzen aber nie deterministische Normprüfung.
+
+## Tech-Stack (verbindlich)
+- Backend: Python 3.11+, FastAPI, SQLAlchemy 2.x, Pydantic v2, PostgreSQL
+- Frontend: React 18 + TypeScript + Vite, TailwindCSS, shadcn/ui, React Hook Form + Zod
+- Deployment: Railway (Backend + DB), Vercel oder Railway (Frontend)
+- Struktur: **flach**, kein Monorepo – `backend/` und `frontend/` nebeneinander im Repo-Root.
+
+## Arbeitsweise der KI-Assistenten
+- Vor jeder Code-Änderung: betroffene Dateien lesen, Abhängigkeiten prüfen.
+- Keine Halluzinationen. Unsicherheit → nachfragen, nicht erfinden.
+- Details siehe `05-workflow.mdc`.
+
+
+
+=== .cursor/rules/01-backend.mdc ===
+---
+description: Backend-Standards (FastAPI, SQLAlchemy, Security)
+globs: backend/**/*.py
+alwaysApply: true
+---
+
+# Backend-Regeln
+
+## Struktur
+backend/
+â”œâ”€â”€ app/
+â”‚   â”œâ”€â”€ main.py              # FastAPI-App, Router-Registrierung
+â”‚   â”œâ”€â”€ core/                # Config, Security, Logging, DB-Session
+â”‚   â”œâ”€â”€ api/v1/              # Endpoints, versioniert (/api/v1/...)
+â”‚   â”œâ”€â”€ models/              # SQLAlchemy ORM-Modelle
+â”‚   â”œâ”€â”€ schemas/             # Pydantic v2 Request/Response-Schemas
+â”‚   â”œâ”€â”€ services/            # Businesslogik (z.B. grid_check, n1_analysis)
+â”‚   â”œâ”€â”€ calculations/        # Reine Rechenkerne (deterministisch, testbar)
+â”‚   â””â”€â”€ audit/               # Revisionssichere Protokollierung
+â”œâ”€â”€ alembic/                 # DB-Migrationen
+â”œâ”€â”€ tests/                   # pytest, Spiegel von app/
+â””â”€â”€ requirements.txt
+
+## Code-Standards
+- Python 3.11+, Type Hints Ã¼berall, `from __future__ import annotations`.
+- Formatter: `ruff format`, Linter: `ruff check`. Kein `black`, kein `flake8` parallel.
+- Pydantic v2 (`model_config`, `Field`, `@field_validator`). Keine v1-Syntax.
+- SQLAlchemy 2.x Style (`Mapped[...]`, `mapped_column`). Keine Legacy-Syntax.
+- Async nur wo sinnvoll (I/O-Endpoints). Rechenkerne synchron + testbar.
+
+## API-Regeln
+- Alle Endpoints unter `/api/v1/...`.
+- Response-Modelle immer explizit (`response_model=...`).
+- Fehler: HTTPException mit klarer `detail`-Struktur `{code, message, hint}`.
+- Keine Businesslogik in Routern â€“ nur Delegation an `services/`.
+
+## Rechenkerne (`calculations/`)
+- **Rein deterministisch**, keine DB-Zugriffe, keine Seiteneffekte.
+- Input + Output als Pydantic-Schemas. Einheiten im Feldnamen (`p_kw`, `u_kv`).
+- Konservativ runden (im Zweifel zu Lasten der Anlage).
+- Jede Berechnung gibt zusÃ¤tzlich Annahmen + verwendete Normversion zurÃ¼ck.
+
+## Security
+- Secrets ausschlieÃŸlich Ã¼ber ENV (`pydantic-settings`). Niemals im Code.
+- Auth: JWT (kurzlebig) + Refresh-Token. PasswÃ¶rter mit `bcrypt` (>=12 rounds).
+- Input-Validation strikt per Pydantic. Keine rohen Dicts aus Requests weiterreichen.
+- CORS: nur konfigurierte Origins. Kein `allow_origins=["*"]` in Prod.
+- Rate-Limiting auf Ã¶ffentliche Endpoints (`slowapi` oder Reverse-Proxy).
+
+## Datenbank & Migrationen
+- Jede SchemaÃ¤nderung â†’ Alembic-Migration. Keine manuellen DB-Ã„nderungen.
+- Migrationen **reversibel** schreiben (down-Funktion ausgefÃ¼llt).
+- Keine destruktiven Migrationen ohne Backup-Nachweis.
+
+## Tests
+- `pytest`, Zielabdeckung Rechenkerne â‰¥ 90 %, Services â‰¥ 70 %.
+- Jeder Bugfix bekommt einen Regressionstest.
+- Fixtures fÃ¼r Test-DB (SQLite oder Postgres-Testcontainer).
+
+## Logging & Audit
+- Strukturiertes Logging (JSON, `structlog`).
+- Audit-Log fÃ¼r jede Berechnung: siehe `05-workflow.mdc` (Revisionssicherheit).
+
+
+
+
+=== .cursor/rules/02-frontend.mdc ===
+---
+description: Frontend-Standards (React, TS, Zod, shadcn/ui)
+globs: frontend/**/*.{ts,tsx}
+alwaysApply: true
+---
+
+# Frontend-Regeln
+
+## Struktur
+frontend/
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ main.tsx
+â”‚   â”œâ”€â”€ App.tsx
+â”‚   â”œâ”€â”€ pages/               # Seiten (Routing-Ziele)
+â”‚   â”œâ”€â”€ features/            # Fachliche Module (grid-check, projects, reports)
+â”‚   â”œâ”€â”€ components/          # Wiederverwendbare UI (shadcn/ui-basiert)
+â”‚   â”œâ”€â”€ lib/                 # API-Client, Utils, Hooks
+â”‚   â”œâ”€â”€ schemas/             # Zod-Schemas (spiegeln Backend-Pydantic)
+â”‚   â””â”€â”€ styles/
+â”œâ”€â”€ public/
+â”œâ”€â”€ index.html
+â”œâ”€â”€ tsconfig.json
+â””â”€â”€ package.json
+
+## Code-Standards
+- React 18 + TypeScript **strict** (`"strict": true` in tsconfig).
+- Keine `any`. Bei unvermeidbarem unsafe-Cast: Kommentar mit BegrÃ¼ndung.
+- Komponenten: Funktional, Hooks. Keine Klassen.
+- Dateinamen: Komponenten `PascalCase.tsx`, Hooks `useXxx.ts`, Utils `kebab-case.ts`.
+- Formatter/Linter: `eslint` + `prettier`. Nur **eine** Konfigurationsquelle.
+
+## UI / UX
+- TailwindCSS + shadcn/ui als Basis. Keine Mischung mit Material-UI o.Ã¤.
+- Formulare: React Hook Form + Zod Resolver. Validation-Nachrichten auf Deutsch.
+- Fehler immer nutzernah: was ist falsch + was ist zu tun.
+- LadezustÃ¤nde sichtbar (Skeleton/Spinner). Keine stillen Waits > 500 ms.
+- Barrierefreiheit: Labels, Fokus-States, `aria-*` wo nÃ¶tig.
+
+## API-Client
+- Zentral in `lib/api.ts`, eine Instanz (z.B. `ky` oder `fetch`-Wrapper).
+- Basis-URL aus ENV (`VITE_API_URL`).
+- Response-Schemas mit Zod parsen â†’ garantierte Typsicherheit am Rand.
+- Fehler-Mapping zu UI-freundlichen Meldungen an einer Stelle.
+
+## State
+- Server-State: `@tanstack/react-query`. Kein manuelles Caching.
+- Client-State lokal (`useState`) bevorzugt. Global nur wenn nÃ¶tig (Zustand/Context).
+- Kein Redux.
+
+## Routing
+- `react-router-dom` v6+. Routen zentral in `App.tsx` oder `routes.tsx`.
+- GeschÃ¼tzte Routen Ã¼ber `<ProtectedRoute>`-Wrapper.
+
+## Ergebnisanzeige (GridCheck-spezifisch)
+- Jedes Diagnose-Ergebnis zeigt: Verdict, BegrÃ¼ndung, Annahmen, Norm-Version, App-Version, Berechnungs-ID.
+- Export-Button (PDF) sichtbar, aber nur aktiv wenn Berechnung abgeschlossen.
+- Keine reinen Ampeln ohne Text. Jede Farbe hat eine BegrÃ¼ndung daneben.
+
+## Tests
+- `vitest` + `@testing-library/react`.
+- E2E optional (`playwright`), mindestens Happy-Path Grid-Check.
+
+
+
+
+=== .cursor/rules/03-elektrotechnik.mdc ===
+---
+description: Fachregeln Elektrotechnik / Netzanschluss
+alwaysApply: true
+---
+
+# Elektrotechnik-Regeln
+
+## Normgrundlage (Deutschland)
+- **VDE-AR-N 4105** – Niederspannung (≤ 1 kV), Erzeugungsanlagen
+- **VDE-AR-N 4110** – Mittelspannung (> 1 kV bis 35 kV)
+- **VDE-AR-N 4120** – Hochspannung (> 35 kV bis 110 kV)
+- **VDE-AR-N 4100** – Netzanschluss Niederspannung (Verbraucher)
+- **TAB** des jeweiligen Netzbetreibers (kann strenger sein – konservativ!)
+
+Jede Berechnung speichert die **verwendete Normversion** (z. B. "VDE-AR-N 4110:2018-11 inkl. Änderung A1:2023-03").
+
+## Spannungsebenen-Logik
+- NS (LV): ≤ 1 kV → VDE 4105 / 4100
+- MS (MV): > 1 kV bis 35 kV → VDE 4110
+- HS (HV): > 35 kV → VDE 4120
+
+## N-1-Analyse
+- **Pflicht** für MS- und HS-Anschlüsse (ab VDE 4110).
+- Für NS nur, wenn Netzbetreiber es verlangt oder Anlage systemrelevant ist.
+- Bei N-1 werden nacheinander alle relevanten Betriebsmittel (Trafo, Leitung) ausgefallen simuliert; Grenzwerte (Spannung, Strom, Kurzschlussleistung) müssen auch dann eingehalten sein.
+
+## Grenzwerte & Konservativität
+- Spannungsänderung dU: NS 3%, MS 2% (Richtwerte, TAB kann abweichen).
+- Flicker, Oberschwingungen: nach IEC 61000-3-x bzw. DACHCZ.
+- Kurzschlussleistung Sk'' am Verknüpfungspunkt: **immer** aus Netzbetreiber-Auskunft, nicht schätzen. Fehlt sie → Rechnung mit Vermerk "vorläufig, Sk'' ausstehend".
+
+## Reproduzierbarkeit
+- Jede Berechnung: Input-JSON + Ergebnis-JSON + Norm-Version + Engine-Version in DB.
+- Keine stochastischen Defaults. Alle Annahmen explizit im Ergebnis.
+
+
+
+=== .cursor/rules/04-deployment.mdc ===
+---
+description: Deployment (Railway, PostgreSQL, ENV)
+alwaysApply: true
+---
+
+# Deployment-Regeln
+
+## Railway
+- Backend + PostgreSQL als separate Services im selben Projekt.
+- `Procfile` oder `railway.toml` fÃ¼r Start-Command.
+- Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Healthcheck-Endpoint: `GET /health` â†’ `{"status":"ok","version":"..."}`
+
+## ENV-Variablen (Pflicht)
+
+### Backend (Railway)
+| Variable              | Zweck                                     | Beispiel / Hinweis                |
+|-----------------------|-------------------------------------------|-----------------------------------|
+| `APP_ENV`             | Umgebung                                  | `dev` \| `staging` \| `prod`      |
+| `APP_VERSION`         | Aus Git-Tag gesetzt, fÃ¼r Audit-Log        | `v1.2.3`                          |
+| `DATABASE_URL`        | Postgres-Verbindung                       | von Railway injiziert             |
+| `JWT_SECRET`          | Signatur Access-Token                     | min. 32 Zeichen, zufÃ¤llig         |
+| `JWT_REFRESH_SECRET`  | Signatur Refresh-Token                    | eigener Wert, â‰  `JWT_SECRET`      |
+| `JWT_ACCESS_TTL_MIN`  | Lebensdauer Access-Token                  | `15`                              |
+| `JWT_REFRESH_TTL_DAYS`| Lebensdauer Refresh-Token                 | `14`                              |
+| `CORS_ORIGINS`        | Komma-getrennte Liste erlaubter Origins   | `https://app.gridcheck.de`        |
+| `LOG_LEVEL`           | Logging-Schwelle                          | `INFO` (prod), `DEBUG` (dev)      |
+| `NORM_VERSION`        | Aktuell genutzte Normensammlung           | `VDE-AR-N-4105:2018-11 + ...`     |
+| `SENTRY_DSN`          | Error-Tracking (optional, empfohlen)      | von Sentry                        |
+
+### Frontend (Vercel/Railway)
+| Variable         | Zweck                                  | Beispiel                          |
+|------------------|----------------------------------------|-----------------------------------|
+| `VITE_API_URL`   | Basis-URL Backend                      | `https://api.gridcheck.de`        |
+| `VITE_APP_ENV`   | Umgebung fÃ¼r UI-Hinweise               | `prod`                            |
+| `VITE_SENTRY_DSN`| Frontend-Error-Tracking (optional)     | von Sentry                        |
+
+### Regeln
+- **Keine** Defaults fÃ¼r Secrets im Code. Fehlt eine Pflicht-Variable â†’ App startet nicht (fail-fast).
+- Secrets werden **nie** geloggt. Auch nicht teilweise.
+- Rotation: `JWT_SECRET` und `JWT_REFRESH_SECRET` mindestens jÃ¤hrlich, bei Verdacht sofort.
+- Lokale Entwicklung: `.env.local` (gitignored). Template `.env.example` wird gepflegt und committed.
+- In CI/CD werden Secrets ausschlieÃŸlich Ã¼ber die Plattform (Railway/Vercel Variables) injiziert.
+
+## PostgreSQL
+- Version: 15+.
+- Backups: tÃ¤glich automatisch (Railway), zusÃ¤tzlich wÃ¶chentliches Offsite-Backup.
+- Migrations: Alembic, **vor** Deploy via CI ausfÃ¼hren. Kein Auto-Migrate beim App-Start in Prod.
+- Connection Pool: `pool_size=5, max_overflow=10` als Startwert.
+
+## CI/CD
+- Bei jedem Push auf `main`: Lint + Tests + Migrations-Check. Nur bei grÃ¼n â†’ Deploy.
+- Tags fÃ¼r Releases: `v1.2.3` â†’ landet in `APP_VERSION`.
+
+
+
+
+=== .cursor/rules/05-workflow.mdc ===
+---
+description: Arbeitsweise, Revisionssicherheit, KI-Verhalten
+alwaysApply: true
+---
+
+# Workflow-Regeln
+
+## Arbeitsweise (für KI-Assistenten und Entwickler)
+1. **Lesen vor Schreiben** – bevor Code geändert wird, betroffene Dateien + Abhängigkeiten prüfen.
+2. **Schritt für Schritt** – große Änderungen in kleine, testbare Schritte zerlegen.
+3. **Jedes Zwischenziel testen** – bevor weitergebaut wird.
+4. **Nach Meilensteinen: Backup / Git-Tag.**
+5. **Im Zweifel fragen, nicht raten.** Keine Halluzinationen, keine erfundenen APIs/Pakete.
+6. **Konsistenz** – gleiche Aufgabe → gleiches Tool/Muster. Abweichung begründen.
+
+## Revisionssicherheit (projektweit)
+- Jede Berechnung wird vollständig gespeichert: Input, Output, App-Version, Norm-Version, User, Timestamp.
+- Historische Berechnungen sind **append-only**. Änderungen erzeugen eine neue Version.
+- Exporte (PDF-Report) enthalten: Projekt-ID, Berechnungs-ID, Hash, Norm-Version, App-Version.
+- Löschung nur durch Soft-Delete (`deleted_at`), Daten bleiben für Audit erhalten.
+
+## Git
+- Branches: `main` (deployable), `feature/<kurz>`, `fix/<kurz>`.
+- Commits: Konventionell (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`).
+- Keine Commits direkt auf `main` in Produktivphase.
+
+## Qualitätssicherung vor Code-Ausgabe (KI)
+Vor jedem Code-Vorschlag prüfen:
+- [ ] Konflikt mit bestehendem Code?
+- [ ] Typen/Schemas konsistent (Backend Pydantic ↔ Frontend Zod)?
+- [ ] Fehlerfälle behandelt?
+- [ ] Security-Implikationen (Input-Validation, Auth, Secrets)?
+- [ ] Test vorhanden oder ergänzbar?
+
+## Proaktive Hinweise (erwünscht)
+- Optimierungspotenzial benennen (Performance, UX, Security), auch wenn nicht gefragt.
+- Technische Schulden markieren (`# TODO(tech-debt): ...`).
+- Bei Unklarheit in Anforderungen: nachfragen, bevor gecodet wird.
+
+
+
+=== .cursor/rules/06-arbeitsweise-gridcheck.mdc ===
+---
+description: Arbeitsweise und Architekturregeln für die Pre Gridcheck App
+alwaysApply: true
+---
+
+# Pre Gridcheck App — Cursor Rules
+
+## Rolle
+
+Du bist ein Senior Fullstack Engineer, GIS Engineer, Stromnetzplaner, Netzanschluss-Spezialist und Experte für erneuerbare Energien.
+
+Du arbeitest an der **Pre Gridcheck App**.
+
+Die App ist eine SaaS-Plattform für vorläufige Netzanschlussdiagnostik, Netzkapazitätsindikatoren, N-1-Screening, GIS-basierte Netzasset-Erkennung, technische Bewertung und revisionssichere Entscheidungsvorbereitung.
+
+Die App ersetzt **niemals** eine rechtsverbindliche Netzanschlussprüfung durch den zuständigen Netzbetreiber.
+
+---
+
+## Absolute Arbeitsregel
+
+Es wird **immer nur eine Aufgabe gleichzeitig** bearbeitet.
+
+Keine Nebenkriegsschauplätze.
+
+Keine ungefragten Umbauten.
+
+Keine Architekturwechsel ohne ausdrückliche Freigabe.
+
+Keine neue Funktion beginnen, bevor die aktuelle Aufgabe abgeschlossen, geprüft und dokumentiert ist.
+
+Wenn während einer Aufgabe weitere Probleme auffallen:
+
+1. Problem kurz notieren.
+2. Risiko bewerten.
+3. Nicht sofort bearbeiten.
+4. Erst die aktuelle priorisierte Aufgabe fertigstellen.
+5. Danach Rückfrage stellen oder die nächste priorisierte Aufgabe vorschlagen.
+
+---
+
+## Priorisierung
+
+Bei jeder Aufgabe gilt diese Reihenfolge:
+
+1. Ziel der aktuellen Aufgabe verstehen.
+2. Nur die dafür notwendigen Dateien anfassen.
+3. Bestehenden Code und Projektstand berücksichtigen.
+4. Minimal-invasive Lösung wählen.
+5. Ergebnis prüfen.
+6. Erst danach nächste Aufgabe beginnen.
+
+Wenn der Nutzer eine konkrete Aufgabe vorgibt, ist diese Aufgabe führend.
+
+---
+
+## Projektziel
+
+Die Pre Gridcheck App soll Projektentwicklern, Planern, Kommunen, Investoren und Netzbetreibern helfen, schnell vorläufig einzuschätzen:
+
+- wo ein plausibler Netzanschlusspunkt liegt
+- welche Spannungsebene wahrscheinlich geeignet ist
+- wie hoch Standort-, Netz-, Trassen-, Kosten- und Datenrisiken sind
+- welche Datenquellen diese Bewertung stützen
+- welche Unsicherheiten bestehen
+- welche nächsten Schritte sinnvoll sind
+
+Die App ist kein Ampelspielzeug, sondern ein diagnostisches Entscheidungsunterstützungssystem.
+
+---
+
+## Kernprinzipien
+
+- API-first
+- revisionssicher
+- erklärbar
+- auditierbar
+- datenquellenbasiert
+- typisiert
+- sicher
+- keine Scheingenauigkeit
+- keine erfundene Netzkapazität
+- keine verbindliche Netzanschlusszusage
+- keine Geschäftslogik im Frontend
+
+---
+
+## Technikzielbild
+
+Bevorzugter Ziel-Stack:
+
+- Monorepo
+- pnpm
+- Next.js App Router
+- React
+- Tailwind
+- shadcn/ui
+- Backend API
+- OpenAPI oder TypeSpec
+- PostgreSQL
+- PostGIS
+- Drizzle ORM
+- Zod
+- Python oder TypeScript Worker für ETL/GIS/Scoring
+- Docker / Coolify / Hetzner
+
+Bestehender Code wird respektiert. Migrationen auf dieses Zielbild erfolgen nur schrittweise und nach Freigabe.
+
+---
+
+## Architekturregeln
+
+Frontend ist Consumer.
+
+Das Frontend darf:
+
+- Eingaben erfassen
+- API-Daten anzeigen
+- Warnungen anzeigen
+- Karten darstellen
+- Berichte anzeigen oder exportieren
+
+Das Frontend darf nicht:
+
+- Datenbanklogik enthalten
+- ORM-Code importieren
+- Netzberechnungen durchführen
+- Scoringentscheidungen treffen
+- Auditlogik selbst erzeugen
+- verfügbare Netzkapazität behaupten
+
+Backend / Worker verantworten:
+
+- Validierung
+- Berechnungen
+- Scoring
+- Datenquellenbewertung
+- Audit-Trail
+- Versionierung
+- Report-Erzeugung
+- Sicherheitsprüfungen
+
+---
+
+## Datenquellenregeln
+
+Jede Datenquelle braucht:
+
+- Name
+- Herkunft / URL falls vorhanden
+- Lizenz
+- Importzeitpunkt
+- Aktualisierungsstand falls bekannt
+- Rohdaten-Hash
+- normalisierter Hash
+- Parser-Version
+- Confidence Score
+- technische Confidence
+- geometrische Confidence
+- kommerzielle Confidence
+- Validierungsstatus
+
+Datenklassen:
+
+- A = offizielle öffentliche Quelle
+- B = Community oder semi-strukturierte Quelle
+- C = modelliert oder abgeleitet
+- D = Netzbetreiber-/DSO-Daten
+- E = nutzerbereitgestellte Daten
+
+Rohdaten dürfen niemals still überschrieben werden.
+
+Abgeleitete Daten dürfen niemals still als verifiziert dargestellt werden.
+
+---
+
+## Wichtige Datenquellen
+
+Für Deutschland MVP relevant:
+
+- OpenStreetMap / Overpass
+- Marktstammdatenregister
+- SMARD
+- Bundesnetzagentur-Daten
+- DWD Climate Data Center
+- BGR
+- BKG
+- Destatis / GENESIS
+- Landes- und Kommunal-GIS falls sinnvoll
+
+OSM darf niemals als Quelle für freie Netzkapazität verwendet werden.
+
+OSM darf nur Hinweise auf Assets, Geometrien und Lagebeziehungen liefern.
+
+---
+
+## Gridcheck-Ergebnisregeln
+
+Ein Gridcheck-Ergebnis muss mindestens enthalten:
+
+- Eingaben
+- Standort
+- Projektart
+- Projektleistung
+- verwendete Datenquellen
+- Datenquellen-Versionen
+- Modellversion
+- Scoringversion
+- Annahmen
+- Warnungen
+- Confidence
+- technische Bewertung
+- Kostenrisiko
+- Terminrisiko
+- Netz-/Engpassrisiko
+- empfohlene nächste Schritte
+- Disclaimer
+- Audit-ID oder Hash
+- Erzeugungszeitpunkt
+
+Ein bestehendes Ergebnis darf niemals still überschrieben werden.
+
+Bei neuer Datenlage wird eine neue Ergebnisversion erzeugt.
+
+---
+
+## Elektrische Regeln
+
+Alle elektrotechnischen Berechnungen müssen nachvollziehbar sein.
+
+Intern SI-Einheiten nutzen.
+
+Pflichtangaben:
+
+- Spannungsebene
+- Leistung
+- Strom
+- cos phi
+- Leitungslänge
+- Leitungstyp oder Annahme
+- thermische Annahme
+- Impedanzquelle
+- Spannungsfall
+- N-1-Level
+- Confidence
+
+Wichtige Formeln:
+
+Drehstrom-Scheinleistung:
+
+S = sqrt(3) * U * I
+
+Strom aus Scheinleistung:
+
+I = S / (sqrt(3) * U)
+
+Spannungsfall:
+
+DeltaU = sqrt(3) * I * (R * cosPhi + X * sinPhi) * L
+
+Keine exakte freie Kapazität ohne verifizierte Netzbetreiberdaten behaupten.
+
+---
+
+## N-1-Regeln
+
+N-1 muss klar klassifiziert werden:
+
+| Level | Bedeutung |
+|------|-----------|
+| N1-0 | Keine N-1-Aussage möglich |
+| N1-1 | Heuristisches Screening |
+| N1-2 | Topologische Näherung |
+| N1-3 | Lastfluss mit geschätzten Parametern |
+| N1-4 | Lastfluss mit verifizierten Netzbetreiberdaten |
+
+MVP ohne Netzbetreiberdaten darf maximal N1-1 oder N1-2 behaupten.
+
+Nie garantierte N-1-Sicherheit ohne verifizierte Daten.
+
+---
+
+## Scoring-Regeln
+
+Scores müssen zerlegbar sein.
+
+Keine einzelne undurchsichtige Ampel.
+
+Mögliche Komponenten:
+
+- distance_score
+- voltage_match_score
+- asset_confidence_score
+- generation_pressure_score
+- redispatch_risk_score
+- route_risk_score
+- soil_risk_score
+- environmental_constraint_score
+- cost_risk_score
+- data_completeness_score
+- n1_screening_score
+
+Jeder Score braucht Erklärung, Annahmen und Confidence.
+
+---
+
+## Kostenregeln
+
+Kosten immer als Bandbreite ausgeben:
+
+- niedrig
+- Basis
+- hoch
+
+Immer anzeigen:
+
+- Annahmen
+- fehlende Daten
+- Confidence
+- Hauptrisikotreiber
+
+Keine exakte Scheingenauigkeit.
+
+---
+
+## Reporting-Regeln
+
+Jeder Bericht enthält:
+
+- Projekteingaben
+- Standort
+- verwendete Datenquellen
+- Kandidaten für Anschluss
+- Spannungsempfehlung
+- technische Bewertung
+- Risikoaufschlüsselung
+- Kostenspanne
+- N-1-Screening-Level
+- Annahmen
+- Warnungen
+- Disclaimer
+- Erzeugungszeitpunkt
+- Report-Version
+- Hash / Audit-ID
+
+---
+
+## Rechtliche Regeln
+
+Immer klarstellen:
+
+- vorläufige Analyse
+- keine Netzanschlusszusage
+- keine Kapazitätsgarantie
+- öffentliche Daten können unvollständig oder veraltet sein
+- finale Entscheidung liegt beim zuständigen Netzbetreiber
+
+---
+
+## Sicherheitsregeln
+
+- alle Eingaben validieren
+- Organisationsgrenzen prüfen
+- BOLA vermeiden
+- keine fremden Projekte anzeigen
+- keine Stacktraces in Produktion
+- keine sensiblen Infrastrukturdaten unnötig exponieren
+- API Keys scopen
+- Uploads validieren
+- teure Berechnungen rate-limiten
+- verdächtige Nutzung loggen
+
+---
+
+## Entwicklungsworkflow
+
+Bei jeder Änderung:
+
+1. Aktuelle Aufgabe bestätigen.
+2. Relevante bestehende Dateien prüfen.
+3. Nur notwendige Dateien ändern.
+4. Änderung minimal halten.
+5. Ergebnis testen oder prüfbar machen.
+6. Kurzes Fazit geben.
+7. Keine nächste Aufgabe starten, bis die aktuelle abgeschlossen ist.
+
+Feature-Reihenfolge:
+
+1. Schema / Vertrag
+2. Backend
+3. Tests
+4. Frontend als Consumer
+5. Auditprüfung
+6. Sicherheitsprüfung
+7. fachliche Plausibilitätsprüfung
+
+---
+
+## Testing-Regeln
+
+Testen mindestens:
+
+- Eingabevalidierung
+- Autorisierung
+- GIS-Distanzberechnung
+- Scoring-Zerlegung
+- Audit-Erzeugung
+- Datenquellen-Confidence
+- keine Fake-Kapazitätsclaims
+- Warnungsanzeige im Frontend
+- elektrotechnische Standardfälle
+- GIS-Plausibilitätsfälle
+
+---
+
+## Definition of Done
+
+Eine Aufgabe ist erst abgeschlossen, wenn:
+
+- sie das konkrete Ziel erfüllt
+- keine unnötigen Dateien geändert wurden
+- sie regelkonform ist
+- sie nachvollziehbar ist
+- sie keine Scheinsicherheit erzeugt
+- sie sicherheitlich vertretbar ist
+- sie geprüft wurde oder eine klare Prüfanweisung existiert
+
+Erst danach darf die nächste Aufgabe begonnen werden.
+
+---
+
+## Verhalten von Cursor
+
+Cursor muss vor jeder Codeänderung prüfen:
+
+1. Ist das die aktuell priorisierte Aufgabe?
+2. Sind Nebenkriegsschauplätze ausgeschlossen?
+3. Passt die Änderung zu diesen Regeln?
+4. Wird Revisionssicherheit verletzt?
+5. Wird freie Netzkapazität ohne Beleg behauptet?
+6. Wandert Geschäftslogik ins Frontend?
+7. Sind Datenquellen, Annahmen und Confidence getrennt?
+8. Gibt es Sicherheits- oder Datenschutzrisiken?
+
+Wenn eine Regel verletzt wird, muss Cursor stoppen und zuerst einen sicheren Vorschlag machen.
+
+
+
+=== .cursor/skills/project-api-skill/API_CHECKLIST.md ===
+# API Checklist (Gridcheck)
+
+## Endpoint-Design
+- Pfad unter `/api/v1/...`
+- Eindeutige Verantwortlichkeit
+- Response-Model explizit
+
+## Validation
+- Pydantic v2
+- Keine impliziten Defaults für sicherheitskritische Felder
+- Feldnamen mit Einheit bei elektrotechnischen Werten
+
+## Fehlervertrag
+- `detail` als Objekt mit:
+  - `code`
+  - `message`
+  - `hint`
+
+## Security
+- AuthN/AuthZ geprüft
+- Mandantentrennung/BOLA geprüft
+- Keine Secrets in Antworten/Logs
+
+## Fachlogik
+- Keine Businesslogik im Router
+- Rechenlogik deterministisch
+- Annahmen, Normversion, Confidence transparent
+
+## Tests
+- Happy Path
+- Validierungsfehler
+- Fachlicher Fehlerfall
+- Regression bei Bugfix
+
+
+
+=== .cursor/skills/project-api-skill/SKILL.md ===
+---
+name: project-api-skill
+description: Standardisiert API-Arbeit in diesem Gridcheck-Projekt. Use when implementing or reviewing backend API endpoints, request/response schemas, error contracts, API versioning, validation, security checks, or API tests.
+---
+
+# Project API Skill (Gridcheck)
+
+## Ziel
+Dieser Skill erzwingt eine konsistente, revisionssichere API-Umsetzung für dieses Projekt.
+
+## Wann nutzen
+Nutze diesen Skill immer, wenn es um API-Endpunkte, Contracts, Validierung, Fehlerobjekte, Versionierung oder API-Tests geht.
+
+## Verbindliche Leitplanken
+1. Endpunkte unter `/api/v1/...`.
+2. Businesslogik nicht im Router, nur Delegation an Services.
+3. Request/Response über Pydantic v2-Schemas, keine rohen Dict-Pipelines.
+4. Fehlerobjekt konsistent: `{ code, message, hint }` in `detail`.
+5. Rechenkerne deterministisch, nachvollziehbar, mit Annahmen + Normversion.
+6. Keine Kapazitätszusagen ohne verifizierte Netzbetreiberdaten.
+7. Sicherheitsgrundlagen immer prüfen: Input-Validation, AuthZ/AuthN, BOLA, Secret-Leaks.
+
+## Standard-Workflow
+1. Ziel und Scope klären (eine Aufgabe, minimal-invasiv).
+2. Betroffene Dateien lesen (Router, Schema, Service, Tests).
+3. Contract zuerst definieren/prüfen (Input, Output, Fehlerfälle).
+4. Endpoint implementieren oder anpassen.
+5. Tests ergänzen (Happy Path + mindestens 1 negativer Fall).
+6. Lint/Tests ausführen und Ergebnis dokumentieren.
+
+## Contract-Checklist
+- Request-Schema typisiert, Feldnamen mit Einheiten wo sinnvoll (`p_kw`, `u_kv`).
+- Response-Schema explizit (`response_model=...`).
+- Fehlerfälle enthalten maschinenlesbaren `code` und nutzbaren `hint`.
+- Norm-/Version-Hinweise werden nicht unterschlagen, wenn fachlich relevant.
+
+## Sicherheits-Checklist
+- Untrusted Input strikt validiert.
+- Keine sensiblen Daten im Log.
+- Rechte-/Mandantengrenzen geprüft (BOLA vermeiden).
+- Rate-Limiting für teure/public Endpoints berücksichtigt.
+
+## Test-Checklist
+- Positiver Hauptfall.
+- Mindestens ein Validierungsfehler (422/400 je nach Design).
+- Mindestens ein fachlicher Fehlerfall mit korrekt strukturiertem `detail`.
+- Regressionstest bei Bugfix.
+
+## Ausgabeformat bei API-Arbeit
+Kurzes Ergebnis mit:
+1. Geänderte Dateien
+2. Contract-Änderung
+3. Sicherheitsauswirkungen
+4. Tests (ausgeführt/offen)
+
+## Referenz
+Für detailiertere Prüfungen: [API_CHECKLIST.md](API_CHECKLIST.md)
+
+
+
+=== backend/compliance/REGISTRY.md ===
+# Compliance-Registry - TODO & Status
+
+**Stand:** 2025-01
+**Pflege:** Bei jeder Norm-Aenderung Eintrag aktualisieren.
+
+## Vollstaendig in `norm_registry.py` gelistet
+Siehe `compliance/norm_registry.py` - aktuell 21 Normen/Gesetze.
+
+## Im Code referenziert, Bewertungslogik noch unvollstaendig
+
+| Norm | Modul | Status | Fehlend |
+|---|---|---|---|
+| VDE-AR-N 4110 | engine/spannung.py | teilweise | Q(U)-Statik komplett, FRT-Pruefung |
+| VDE-AR-N 4120 | engine/n1.py | teilweise | Mehrfachausfaelle, Topologie-Erkennung |
+| DIN EN 60909 | engine/kurzschluss.py | teilweise | Max/min Kurzschlussstrom |
+| EU 2016/631 RfG | - | offen | Anlagentyp-Klassifizierung A/B/C/D |
+
+## Noch nicht implementiert (TODO Sprint 2+)
+- [ ] VDE-AR-N 4140 Speicher-Bewertung (separate Logik)
+- [ ] DIN EN 50160 Spannungsqualitaets-Pruefung (THD, Flicker, Unsymmetrie)
+- [ ] IEC 61000-3-Reihe Oberschwingungsbewertung
+- [ ] TAB Hoechstspannung 2019 (HoeS-spezifische Pruefungen)
+- [ ] MsbG Messstellen-Anbindung
+- [ ] Lokale Netzbetreiber-TAB (NB-spezifische Abweichungen)
+
+## Aenderungsprotokoll
+- **2025-01:** Initiale Registry erstellt (Sprint 1, MS PDF-1a)
+
+
+
+=== DECISIONS.md ===
+# Architecture Decisions Log
+
+| #   | Datum      | Entscheidung                                                | Begruendung                                          |
+|-----|------------|-------------------------------------------------------------|------------------------------------------------------|
+| 001 | 2026-05-02 | Getrennte Routen pro Stakeholder (/projektierer, /vnb, ...) | Saubere UX, klare Monetarisierung                    |
+| 002 | 2026-05-02 | Phasenreihenfolge Projektierer -> VNB -> Invest             | Hoechste Nutzerzahl zuerst, dann hoechster Lizenzwert|
+| 003 | 2026-05-02 | Killer Phase 1 = Was-waere-wenn-Optimierer schlank (Var. a) | MVP-Fokus, kein Verzetteln                           |
+| 004 | 2026-05-02 | Stack: FastAPI + React/TS + SQLite                          | Bereits implementiert, kostenfrei                    |
+| 005 | 2026-05-02 | Revisionssicherheit via SHA256 Hash-Chain                   | Kostenfrei, ausreichend fuer MVP                     |
+| 006 | 2026-05-02 | Gemeinsame Core-Engine, rollenspezifische Layer             | Vermeidet Code-Duplikation                           |
+| 007 | 2026-05-02 | AI liefert IMMER PowerShell-Befehle, nie rohe Markdown      | User arbeitet auf Windows PowerShell                 |
+
+---
+
+## Entscheidung 2026-XX-XX: Option C — Kein Supabase
+
+**Status:** Final, ueberstimmt Cursor-Rules
+**Datum:** 2026-05-10
+
+### Beschluss
+FastAPI bleibt komplettes Backend. Supabase wird NICHT eingesetzt.
+
+### Begruendung (Revisionssicherheit)
+- Supabase = Cloud-Service ohne volle Hoheit ueber Audit-Trails
+- DSGVO-Risiko (US-Mutter, Datenresidenz unklar)
+- Revisionssichere Audit-Logs muessen lokal/EU-souveraen sein
+- GridCheck verarbeitet kritische Infrastrukturdaten (KRITIS)
+
+### Konsequenzen
+- Auth: FastAPI-eigen (JWT, bcrypt) - bereits vorhanden
+- DB: SQLite -> spaeter PostgreSQL (selbst-gehostet, EU)
+- Realtime: SSE oder WebSocket via FastAPI
+- File-Storage: lokales FS / S3-kompatibel (MinIO, EU)
+- RBAC: eigene Implementierung in FastAPI
+- Audit: Append-only Tables + Hash-Chain (revisionssicher)
+
+### Cursor-Rules
+Werden entsprechend angepasst (Supabase-Verweise entfernt).
+
+
+
+=== docs/_archive/PROJECT_STATE.md ===
+# GridCheck — Project State (Single Source of Truth)
+
+**Letzte Aktualisierung:** 2026-05-02
+**Regel:** Diese Datei ist verbindlich. Vor jeder Code-Aenderung lesen.
+
+---
+
+## 1. Vision
+Pre-Netzanschluss-Check-App mit echter Diagnose (nicht nur Ampel).
+N-1-Analyse, Netzplan, Empfehlungen, lernende KI, revisionssicher.
+Ziel: Projektierer bekommen schnelle Antwort, VNB sparen Arbeit.
+
+---
+
+## 2. Aktueller Stand
+
+### Backend (FastAPI, Python)
+- [x] Scoring-Engine (Kapazitaet, Spannung, Kurzschluss, N-1, Datenqualitaet)
+- [x] Szenarien-Analyse (Normal, Schwachlast, Starklast, N-1)
+- [x] Impedanzmodell (Z_Quelle, Z_Trafo, Z_Leitung, Z_gesamt)
+- [x] Kurzschluss-Berechnung (Ik_min, Ik_max, Sk am NVP)
+- [x] Kostenindikation + Bauzeit-Schaetzung
+- [x] Empfehlungs-Generator (regelbasiert)
+- [x] SQLite-Persistenz
+- [x] PDF-Export mit Hash + Zeitstempel
+- [x] PLZ-Heuristik (Confidence D bei unbekannter Topologie)
+
+### Frontend (React/TypeScript)
+- [x] Eingabeformular (generisch)
+- [x] Ergebnisseite mit Score 0-100, Confidence A-D
+- [x] Sektionen: Kerndaten, Bewertung, Szenarien, N-1, Kurzschluss, Kosten, Empfehlungen, Impedanz
+- [x] PDF-Export-Button
+- [x] Stakeholder-Auswahl-Buttons (AKTUELL NUR KOSMETISCH - siehe Sprint 1)
+
+---
+
+## 3. Stakeholder-Spezifikation (FIX)
+
+### Prioritaet 1: Projektierer / EPC
+- Frage: "Geht das hier - und was kostet es mich?"
+- Zusatz-Inputs: Budget, Zeitfenster, Flexibilitaet (Standort/Leistung anpassbar)
+- Outputs: Geht/Bedingt/Nein + Was-waere-wenn-Optimierer + Kosten + Zeitachse
+- Killer: Was-waere-wenn-Optimierer
+
+### Prioritaet 2: Netzbetreiber (VNB)
+- Frage: "Kann ich das integrieren ohne N-1 zu verletzen?"
+- Zusatz-Inputs: Bestandsnetz-Daten, Trafo-Daten (Sn/uk), Sk am NVP, geplante Ausbauten
+- Outputs: Netzanschlussbeurteilung-Entwurf, Auflagen-Katalog, N-1-Detail, TAR-Konformitaet
+- Killer: N-1-Auflagen-Generator (VDE-AR-N 4110/4120-Textbausteine)
+
+### Prioritaet 3: Asset Owner / Investor / Bank
+- Frage: "Lohnt es sich, welches Risiko?"
+- Zusatz-Inputs: Strompreis-Annahme, Foerderregime, Betriebsstunden, Renditeerwartung
+- Outputs: Curtailment-Prognose, ROI, Sensitivitaetsmatrix, Bankfaehiger 1-Pager
+- Killer: Bankfaehiger Risk- & Rendite-Report
+
+### Phase 4 (spaeter): Gutachter, Kommune
+
+---
+
+## 4. Architektur
+
+### Routing (FIX)
+- /                 -> Landing mit Rollenauswahl
+- /projektierer     -> Projektierer-Modul (Phase 1)
+- /vnb              -> Netzbetreiber-Modul (Phase 2)
+- /invest           -> Investor-Modul (Phase 3)
+
+### Backend-Endpunkte (FIX)
+- POST /api/v1/projektierer/analyze
+- POST /api/v1/vnb/analyze
+- POST /api/v1/invest/analyze
+- Gemeinsame Engine in core/ (Lastfluss, Kurzschluss, N-1)
+- Rollenspezifische Layer in roles/projektierer.py, roles/vnb.py, roles/invest.py
+
+### Frontend-Komponenten (FIX)
+- forms/ProjektiererForm.tsx
+- forms/VnbForm.tsx
+- forms/InvestForm.tsx
+- forms/BaseFields.tsx (gemeinsame Pflichtfelder)
+- results/ProjektiererResult.tsx
+- results/VnbResult.tsx
+- results/InvestResult.tsx
+- results/SharedBlocks/ (Score, Impedanz, PDF-Button)
+
+---
+
+## 5. Monetarisierung (FIX)
+
+| Tier              | Zielgruppe     | Preis            |
+|-------------------|----------------|------------------|
+| Free              | Lead-Gen       | 0 EUR            |
+| Pro Projektierer  | EPC            | 49-99 EUR/Mon.   |
+| Pro Asset Owner   | Betreiber      | 99-199 EUR/Mon.  |
+| VNB-Edition       | Netzbetreiber  | 500-2000 EUR/Mon.|
+| Gutachten-Modul   | Berater        | 29 EUR/Gutachten |
+| API/White-Label   | Grosskunden    | individuell      |
+
+---
+
+## 6. Killer-Features (FIX, Reihenfolge)
+
+1. Was-waere-wenn-Optimierer (Projektierer) - Phase 1 MVP-Variante (a) schlank
+2. N-1-Auflagen-Generator (VNB) - Phase 2
+3. Bankability-Report (Invest) - Phase 3
+4. KI lernend + Audit-Trail - parallel
+5. Multi-VNB-Vergleich - Phase 4
+
+---
+
+## 7. Revisionssicherheit (FIX)
+- SHA256 Hash-Chain in SQLite
+- Zeitstempel + Modellversion + Annahmen pro Analyse
+- PDF mit Hash sichtbar
+- Disclaimer: nicht qualifizierter Zeitstempel
+
+---
+
+## 8. Was NICHT mehr diskutiert wird
+- Stakeholder-Trennung getrennte Routen -> JA, fix
+- Killer-Features Reihenfolge -> fix
+- Stack: FastAPI + React + SQLite -> fix
+- Revisionssicherheit via Hash-Chain -> fix fuer MVP
+
+---
+
+## 9. CURSOR/AI RULES (WICHTIG!)
+- IMMER PowerShell-Befehle liefern (User arbeitet auf Windows PowerShell)
+- KEINE rohen Markdown-Bloecke zum copy-paste in PowerShell - nutze @'...'@ Here-Strings + Out-File
+- Encoding immer UTF-8: -Encoding UTF8
+- Keine Sonderzeichen wie Emojis in PowerShell-Strings (Encoding-Probleme)
+- Bei Code-Aenderungen: erst PROJECT_STATE.md lesen, dann handeln
+- Keine Doppel-Diskussionen abgeschlossener Themen
+
+
+
+=== docs/_archive/STATUS.md ===
+# GRIDCHECK – PROJEKTSTATUS
+Stand: 2026-05-02 14:06
+
+## ✅ ERLEDIGT
+- Backend läuft auf http://127.0.0.1:8000
+- Swagger erreichbar unter /docs
+- Endpunkte vorhanden: /api/analyze, /api/check, /api/calculate,
+  /api/projects, /api/history, /api/result/{id}, /api/audit/{id}, /health
+- DB: backend/gridcheck.db (~40 KB)
+- Backup erstellt: BACKUP_backend_*.zip
+
+## ⏭️ NÄCHSTER SCHRITT (hier weitermachen!)
+SCHRITT 2: Funktionstest /api/analyze mit Beispieldaten
+  - Prüfen ob N-1, Diagnose, Empfehlung echte Werte liefert
+  - oder nur Dummy-Antworten
+
+## 📋 DANACH (Reihenfolge)
+3. Audit-Trail prüfen (Hash-Kette? Append-only? = Revisionssicherheit)
+4. Engine-Code Review (ist N-1 echt implementiert?)
+5. KI-Lernmodul prüfen / planen
+6. Frontend starten und prüfen
+7. Netzplan-Ausgabe
+8. Empfehlungslogik
+
+## 🎯 ZIEL
+Pre-Netzanschluss-Check App: schnelle Antwort ob/wie Netzanschluss geht,
+mit N-1, Netzplan, Empfehlungen, lernender KI, revisionssicher.
+
+## 📂 PFAD
+C:\Users\andre\gridcheck
+
+## 🚀 SERVER STARTEN
+cd C:\Users\andre\gridcheck\backend
+.\.venv\Scripts\Activate.ps1
+uvicorn main:app --reload
+
+
+
+=== docs/ARCHITEKTUR.md ===
+# GRIDCHECK — Architekturentscheidungen
+
+## 1. KEIN Supabase (bewusster Bruch mit .cursorrules-Default)
+Grund: Revisionssicherheit (GoBD) + volle Datenhoheit.
+Cloud-Dienste sind ausgeschlossen.
+
+## 2. Docker = Supabase-Ersatz (lokal)
+- gridcheck-postgres : postgis/postgis:16-3.4, Port 5433
+- gridcheck-redis    : redis:7-alpine, Port 6379
+- Volume: gridcheck-pgdata (persistent)
+- Compose: C:\Users\andre\gridcheck\docker-compose.yml
+
+## 3. Revisionskette (Audit-Layer)
+daten/revisionen.jsonl, SHA-256 Hash-Chain.
+Bleibt bestehen AUCH nach Postgres-Migration (Audit ueber DB).
+
+## 4. Aktueller Stand
+- Engine v2 + API v2: laufen JSONL-basiert
+- Postgres-Container: laeuft, aber von Engine NOCH NICHT genutzt
+- Migration JSONL -> Postgres: geplanter Meilenstein
+
+## 5. Regel
+Docker Desktop MUSS laufen, bevor Backend gestartet wird
+(sobald Postgres-Anbindung aktiv ist).
+
+
+
+=== docs/monetarisierungspakete.md ===
+# Monetarisierungspakete (MVP -> Growth)
+
+## Ziel
+Diese Datei konkretisiert die Monetarisierung aus `Ideen.md` in umsetzbare Pakete mit klaren Scope-Grenzen.
+Sie dient als Produkt- und Umsetzungsreferenz fuer Sprint-Planung, Vertrieb und Priorisierung.
+
+## Paket 1: Project Developer
+
+- Zielgruppe: Projektierer, EPC, kleinere Entwicklerteams.
+- Job-to-be-done: schnelle Vorpruefung, um Sackgassen frueh zu vermeiden.
+- Produktumfang (MVP):
+  - Standortcheck
+  - Netzebenen-Vorschlag
+  - Anschlusskandidaten
+  - Bedingungsdiagnose
+  - PDF-Export
+  - einfache Kostenbandbreite
+- Nicht enthalten (MVP-Grenze):
+  - Portfoliovergleich
+  - Vollstaendige Due-Diligence
+  - Netzbetreiber-spezifische Intake-Automation
+- Preismodell (Rahmen):
+  - 499-1.490 EUR/Monat
+  - alternativ 99-490 EUR pro Analyse
+- Primare Erfolgsmetriken:
+  - Time-to-First-Result
+  - Conversion von Trial zu Paid
+  - Wiederholungsquote pro Projektierer-Team
+
+## Paket 2: Storage / Investment Intelligence
+
+- Zielgruppe: Speicherparkbetreiber, Investoren, Asset Owner.
+- Job-to-be-done: Investierbarkeit und Risiko-/Renditeprofil belastbar einschaetzen.
+- Produktumfang:
+  - alle Features aus Paket 1
+  - CAPEX-/Timeline-/Risiko-Modell
+  - Szenariorechnungen
+  - Portfoliovergleich
+  - Management-Report
+  - Regionenranking
+- Abhaengigkeiten:
+  - belastbare Datenquellen-Pipeline (MaStR/SMARD/DWD + spaeter weitere)
+  - stabile Datenmodell-Tabellen fuer Signale, Wetter, Kostenindizes
+- Preismodell (Rahmen):
+  - 2.500-10.000 EUR/Monat
+  - alternativ 5.000-25.000 EUR pro Projekt-/Portfolioanalyse
+- Primare Erfolgsmetriken:
+  - Upsell-Quote aus Paket 1
+  - durchschnittlicher Vertragswert
+  - Anzahl Portfolioauswertungen pro Kunde
+
+## Paket 3: Grid Operator Suite
+
+- Zielgruppe: Netzbetreiber.
+- Job-to-be-done: standardisierte Vorpruefung, Priorisierung und revisionssichere Fallakte.
+- Produktumfang:
+  - Intake-Management
+  - automatische Vorpruefung
+  - Priorisierung
+  - Fallakte
+  - Audit-Trail
+  - Rollen/Rechte
+  - Schnittstellen
+  - internes Dashboard
+- Nicht enthalten (MVP-Grenze):
+  - verbindliche Netzanschlusszusage
+  - garantierte Kapazitaetsauskunft ohne verifizierte DSO-Daten
+- Preismodell (Rahmen):
+  - Setup 15.000-100.000 EUR
+  - Lizenz 30.000-200.000 EUR+ pro Jahr
+  - Support/SLA zusaetzlich
+- Primare Erfolgsmetriken:
+  - reduzierte Bearbeitungszeit je Fall
+  - weniger Rueckfragen im Intake
+  - Nachvollziehbarkeit in Audit- und Pruefprozessen
+
+## Paket-Mapping zu Roadmap
+
+- Sprint 1 (laufend): Paket 1 als kaufbares Kernprodukt abschliessen.
+- Sprint 2 (VNB): Fundament fuer Paket 3 legen (VNB-Route, Auflagen, Pruefprotokoll).
+- Sprint 3 (Invest): Fundament fuer Paket 2 legen (ROI, Curtailment, Szenario-/Portfoliologik).
+- Sprint 4-5: Paket-Vertiefung durch KI-Feedback und Multi-VNB-Vergleich.
+
+## Go-to-Market Reihenfolge
+
+1. Paket 1 stabilisieren und produktisieren.
+2. Paket 2 als Upsell fuer bestehende Projektierer-/Speicherkunden aufbauen.
+3. Paket 3 mit laengerem Sales-Cycle parallel als Enterprise-Track entwickeln.
+
+## Offene Entscheidungen
+
+- Finale Preisgrenzen pro Segment und Region.
+- Trial-/Freemium-Strategie fuer Paket 1.
+- Vertragsmodell fuer Paket 3 (pro Netzgebiet, pro Nutzer, pro Fallvolumen).
+- SLA-Stufen und Supportpakete.
+
+
+
+
+=== docs/PROJECT_STATUS.md ===
+# GridCheck – Project Status
+> Zuletzt aktualisiert: 2025-06-10
+
+## Installierte Dependencies
+
+### Frontend (frontend/)
+- next, react, react-dom
+- typescript, @types/react, @types/node
+- tailwindcss (v4)
+- recharts
+- leaflet, react-leaflet, @types/leaflet
+- lucide-react
+- Hinweis: shadcn/ui Komponenten manuell unter components/ui/
+
+### Backend (backend/)
+- fastapi, uvicorn
+- pydantic
+- sqlite3 (built-in)
+- python-dotenv
+- Ggf. weitere: requirements.txt prüfen
+
+## Erledigte Features
+- [x] Projektstruktur (Root, Frontend, Backend, Backups)
+- [x] .cursorrules konsolidiert im Root
+- [x] Schnell-Check Formular (GridCheckForm)
+- [x] Detail-Analyse Wizard (DetailWizard)
+- [x] Netzbetreiber-Dashboard (NetzbetreiberDashboard)
+- [x] 3-Tab Navigation (page.tsx)
+- [x] Berechnungs-Engine Grundgerüst (engine.ts / calc_engine)
+- [x] Kartenintegration (Leaflet/OSM)
+- [x] Ergebnis-Visualisierung (Recharts)
+- [x] Backend FastAPI Grundgerüst
+- [x] dump.ps1 + PROJECT_STATUS.md
+
+## Offene TODOs
+- [ ] page.tsx ist KAPUTT (duplizierter Code – muss gefixt werden!)
+- [ ] Backend API-Routen vollständig implementieren
+- [ ] Datenbankschema (SQLite) definieren + migrieren
+- [ ] Auth-System implementieren
+- [ ] PDF-Export
+- [ ] KI-Integration (OpenAI)
+- [ ] N-1 Analyse vollständig implementieren
+- [ ] Revisionssichere Audit-Logs
+- [ ] Feature-Flags / Monetarisierung
+- [ ] Tests (Unit + Integration)
+
+## Bekannte Bugs
+- **page.tsx**: Datei enthält massiv duplizierten Code (Buttons + Sections mehrfach). MUSS als nächstes gefixt werden.
+
+## Meilensteine
+| Nr | Beschreibung | Datum | Backup |
+|----|-------------|-------|--------|
+| M1 | Grundstruktur + 3 Tabs | 2025-04-09 | backups/frontend_20260409_230525 |
+| M2 | Detail-Wizard + Dashboard | 2025-04-10 | backups/frontend_20260410_180320 |
+| M3 | Tooling (dump.ps1, Status, Rules) | 2025-06-10 | - |
+
+
+
+=== docs/PROJEKTPLAN.md ===
+# GridCheck Projektplan
+# Letzte Aktualisierung: 2026-04-13 07:03
+
+| # | Bereich | Aufgabe | Status | Prio |
+|---|---------|---------|--------|------|
+| **PHASE 1: Backend fertigstellen** |||||
+| 1.1 | Backend | FastAPI Server mit /api/analyze Endpoint | ✅ | 🔴 |
+| 1.2 | Backend | Engine-Logik Python (Impedanz, Spannungsfall, Score) | ✅ | 🔴 |
+| 1.3 | Backend | PLZ→Netzbetreiber Zuordnung | ⬜ | 🔴 |
+| 1.4 | Backend | Defaults pro Kundentyp (Trafo, Sk, Fallbacks) | ✅ | 🔴 |
+| 1.5 | Backend | Input-Validierung und Error-Handling | ✅ | 🔴 |
+| **PHASE 2: Frontend↔Backend verbinden** |||||
+| 2.1 | Frontend | API-Call an Backend statt lokaler Engine | ⬜ | 🔴 |
+| 2.2 | Frontend | Loading-State und Error-Anzeige | ⬜ | 🟡 |
+| 2.3 | Frontend | CORS konfigurieren | ✅ | 🔴 |
+| **PHASE 3: Kernfeatures** |||||
+| 3.1 | Frontend | PDF-Export | ⬜ | 🟡 |
+| 3.2 | Backend | Ergebnis-Speicherung (SQLite/JSON) | ⬜ | 🟡 |
+| 3.3 | Frontend | Ergebnis-Historie / Dashboard | ⬜ | 🟡 |
+| 3.4 | Engine | Blindleistungs-Kompensation berechnen | ⬜ | 🟡 |
+| 3.5 | Engine | Oberschwingungen (THD) Bewertung | ⬜ | 🟡 |
+| **PHASE 4: Datenqualitaet** |||||
+| 4.1 | Daten | Reale Netzbetreiber-Daten je PLZ-Gebiet | ⬜ | 🟡 |
+| 4.2 | Daten | Reale Trafodaten (Standard-Ortsnetztrafos) | ⬜ | 🟡 |
+| 4.3 | Daten | Leitungstypen-Katalog (NAYY, NYY etc.) | ⬜ | 🟡 |
+| 4.4 | Engine | Confidence-Score auf Basis realer vs. geschaetzter Daten | ⬜ | 🟡 |
+| **PHASE 5: Polish und Deploy** |||||
+| 5.1 | Frontend | Responsive Design / Mobile | ⬜ | 🟢 |
+| 5.2 | Frontend | Dark/Light Mode Toggle | ⬜ | 🟢 |
+| 5.3 | Auth | Login / Multi-User | ⬜ | 🟢 |
+| 5.4 | Deploy | Docker Compose (Frontend + Backend) | ⬜ | 🟢 |
+| 5.5 | Deploy | CI/CD Pipeline | ⬜ | 🟢 |
+| 5.6 | Legal | Disclaimer / Haftungsausschluss | ⬜ | 🟢 |
+| **PHASE 6: Monetarisierung (Master-Backlog)** |||||
+| 6.1 | Product | Paket-Features in Tickets schneiden (P1/P2/P3) | ⬜ | 🔴 |
+| 6.2 | Product | Paket 1 MVP DoD finalisieren (kaufbar, klar abgegrenzt) | ⬜ | 🔴 |
+| 6.3 | Product | Paket 2 Abhaengigkeiten definieren (Datenpipeline, Portfolio) | ⬜ | 🟡 |
+| 6.4 | Product | Paket 3 Abhaengigkeiten definieren (Intake, Audit, Schnittstellen) | ⬜ | 🟡 |
+| 6.5 | Sales | Preis-Hypothesen Paket 1 als Testplan aufsetzen | ⬜ | 🔴 |
+| 6.6 | Sales | Preis-Hypothesen Paket 2/3 als Testplan aufsetzen | ⬜ | 🟡 |
+| 6.7 | Ops | SLA-/Supportstufen als Angebotsbausteine spezifizieren | ⬜ | 🟡 |
+| 6.8 | Product | Monetarisierungs-Metriken im Tracking verankern | ⬜ | 🟡 |
+
+## Akzeptanzkriterien - Monetarisierung
+
+- 6.1 gilt als fertig, wenn fuer jedes Paket mindestens 5 umsetzbare Tickets mit eindeutiger Abnahmebedingung vorliegen.
+- 6.2 gilt als fertig, wenn Paket 1 Scope/No-Scope, Preisrahmen und Verkaufsargumente dokumentiert und intern freigegeben sind.
+- 6.3 gilt als fertig, wenn technische Gates fuer Paket 2 (Datenverfuegbarkeit, Modellguete, Reportumfang) als Checkliste vorliegen.
+- 6.4 gilt als fertig, wenn technische Gates fuer Paket 3 (RBAC, Audit, Intake-Flow, Schnittstellen) als Checkliste vorliegen.
+- 6.5/6.6 gelten als fertig, wenn pro Paket mindestens 3 Preisannahmen mit Zielsegment, KPI und Auswertungsfenster definiert sind.
+- 6.7 gilt als fertig, wenn Bronze/Silber/Gold-SLA mit Reaktionszeiten und Leistungsumfang spezifiziert ist.
+- 6.8 gilt als fertig, wenn KPI-Definitionen (Conversion, ARPA, Churn, Nutzungsintensitaet) in einem Tracking-Dokument hinterlegt sind.
+
+## Referenz
+
+- Detailkonzept der Pakete: `docs/monetarisierungspakete.md`
+
+## Ticket-Schnitt je Paket (6.1)
+
+## Execution-Reihenfolge (Now / Next / Later)
+
+- NOW: P1-T01, P1-T02, P1-T05, P1-T04, P1-T03
+- NEXT: P2-T01, P2-T02, P2-T03, P2-T05, P2-T04
+- LATER: P3-T01, P3-T02, P3-T03, P3-T04, P3-T05
+
+### Paket 1 - Project Developer (MVP, kaufbar)
+
+- [NOW] P1-T01: Ergebnis-PDF finalisieren (Pflichtfelder, Warnungen, Disclaimer, Audit-ID/Hash)
+  - Abnahme: PDF enthaelt alle Pflichtbloecke und besteht den Realfall-Smoke-Test.
+- [NOW] P1-T02: Paket-1 Scope im UI/Onboarding klar markieren (inkl. No-Scope)
+  - Abnahme: Featuregrenzen sind an mindestens 2 Kundenkontaktpunkten sichtbar.
+- [NOW] P1-T03: Analyse-Limits fuer Paket 1 (pro Zeitraum / Fair Use) technisch vorbereiten
+  - Abnahme: Limit-Konfiguration vorhanden und bei Ueberschreitung nachvollziehbare Meldung.
+- [NOW] P1-T04: Paket-1 Angebotsseite/Infosektion in App dokumentieren
+  - Abnahme: Funktionen + Nutzen + Disclaimer sind konsistent mit `monetarisierungspakete.md`.
+- [NOW] P1-T05: KPI-Basis fuer Paket 1 erfassen (Conversion, Wiederholungsquote)
+  - Abnahme: Events definiert, dokumentiert und mindestens in Dev pruefbar.
+
+### Paket 2 - Storage / Investment Intelligence
+
+- [NEXT] P2-T01: CAPEX-/Timeline-/Risiko-Modell als fachliches Schema spezifizieren
+  - Abnahme: Feldkatalog inkl. Einheiten, Annahmen und Datenquellen ist freigegeben.
+- [NEXT] P2-T02: Szenariorechnungen fuer Speicher-/Invest-Cases definieren
+  - Abnahme: Mindestens 3 Standardszenarien mit Input/Output und Grenzen dokumentiert.
+- [NEXT] P2-T03: Portfoliovergleich-Datenmodell und Aggregationslogik beschreiben
+  - Abnahme: Tabellen- und API-Entwurf liegen vor, inkl. Beispielauswertung.
+- [NEXT] P2-T04: Management-Report Struktur (1-Pager + Detailanhang) spezifizieren
+  - Abnahme: Report-Template mit Pflichtkennzahlen und Risikoblatt ist abgestimmt.
+- [NEXT] P2-T05: Regionenranking-Methodik (Scoring + Datenqualitaet) definieren
+  - Abnahme: Gewichtung, Confidence-Logik und Disclaimer sind dokumentiert.
+
+### Paket 3 - Grid Operator Suite
+
+- [LATER] P3-T01: Intake-Workflow (Eingang -> Vorpruefung -> Priorisierung -> Fallakte) modellieren
+  - Abnahme: Prozessdiagramm und API-Schritte sind eindeutig beschrieben.
+- [LATER] P3-T02: Rollen-/Rechte-Matrix fuer VNB-Organisationen finalisieren
+  - Abnahme: RBAC-Matrix inkl. kritischer Berechtigungen ist verabschiedet.
+- [LATER] P3-T03: Audit-Trail-Anforderungen fuer Betreiberpruefung konkretisieren
+  - Abnahme: Pflichtfelder, Unveraenderlichkeit und Exportformat sind definiert.
+- [LATER] P3-T04: Schnittstellenbedarf (CSV/API/Webhook) priorisieren
+  - Abnahme: Top-3 Integrationen mit Datenvertrag und Sicherheitsanforderungen liegen vor.
+- [LATER] P3-T05: Internes Dashboard fuer Fallpriorisierung als MVP spezifizieren
+  - Abnahme: KPI-Set, Filterlogik und Drilldown-Anforderungen sind dokumentiert.
+
+
+
+=== docs/railway-deployment.md ===
+# GridCheck – Railway Deployment
+
+## Übersicht
+GridCheck läuft auf Railway mit zwei Services:
+- **backend** – FastAPI (Python)
+- **frontend** – Next.js
+
+## Voraussetzungen
+- Railway CLI installiert
+- PostgreSQL 16 als Railway Plugin
+- Umgebungsvariablen gesetzt
+
+## Umgebungsvariablen
+
+### Backend
+\\\
+DATABASE_URL=postgresql://...
+SECRET_KEY=...
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+CORS_ORIGINS=https://your-frontend.railway.app
+\\\
+
+### Frontend
+\\\
+NEXT_PUBLIC_API_URL=https://your-backend.railway.app
+\\\
+
+## Deployment
+
+### Backend
+\\\ash
+cd backend
+railway up
+\\\
+
+### Frontend
+\\\ash
+cd frontend
+railway up
+\\\
+
+## Datenbank-Migration
+\\\ash
+cd backend
+alembic upgrade head
+\\\
+
+## Health Check
+- Backend: GET /health
+- Frontend: GET /
+
+## Wichtige Hinweise
+- Kein SQLite in Produktion
+- Secrets NIEMALS im Code
+- Logs: strukturiert (JSON)
+- Soft-Delete: kein hartes DELETE
+
+
+
+=== docs/SESSION_STATE.md ===
+# SESSION STATE — Letzter Stand
+
+**Stand:** 2026-05-06 06:37
+**Letzter Meilenstein:** Backend-Engine + Testsuite 25/25 gruen
+
+---
+
+## Was funktioniert (getestet, 25/25 gruen)
+- Engine berechne_netzanschluss vollstaendig (pqs, impedanz, thermisch, trafo, spannung, kurzschluss, n1, scores, fazit, empfehlungen)
+- N-1-Logik topologie-basiert (stich=ROT, ring/vermascht je Restkapazitaet, unbekannt=ROT)
+- Score-Cap-Logik bei harten Verstoessen (Score <= 25/30)
+- Fazit-Kaskade A/B/C
+- Stakeholder-Begruendungen (klartext + technisch)
+- engine/revision.py vorhanden (Hash-Verkettung + GENESIS)
+- Tests: test_berechnung.py (9), test_n1_ms.py (13), test_v1_projektierer_analyze.py (3)
+
+## Naechste Aufgabe — Phase B: Revisionssicheres Logging
+
+### OFFENE DESIGN-FRAGE (zuerst klaeren!)
+**Soll Logging immer-an oder opt-in sein?**
+- Empfehlung: immer-an mit dry_run=True Flag fuer Tests
+- Begruendung: GoBD-konform, keine Audit-Luecken
+
+### Plan nach Entscheidung
+- B.1 revision.py erweitern: engine_version, vollstaendige Felder, atomares Schreiben
+- B.2 Auto-Integration in berechne_netzanschluss (mit dry_run-Flag)
+- B.3 Tests: Append, Hash-Kette, Tampering-Erkennung, Reproduzierbarkeit
+- B.4 Verify-Endpoint /api/v1/revision/verify
+
+### Identifizierte Schwachstellen revision.py
+1. engine_version fehlt -> Reproduzierbarkeit unmoeglich
+2. JSON nicht atomar geschrieben -> Race Condition moeglich
+3. Felder unvollstaendig (scores, kurzschluss, trafo fehlen)
+
+## SPAETER (M2-M4 Frontend, zurueckgestellt)
+- M2 Dashboard-Detailansicht (Drawer)
+- M3 Stakeholder-PDF mit Management-Summary
+- M4 Frontend an echte Backend-API anbinden
+
+## REGELN (gelten IMMER)
+- Eine Aufgabe nach der anderen
+- PowerShell-Einzeiler
+- Vor jedem Schreiben: Backup mit Timestamp
+- Bei Unsicherheit: STOPPEN und fragen
+- Tests muessen gruen sein, bevor weitergegangen wird
+- Vor Code-Ausgabe: Konsistenzpruefung mit bisherigem Code
+
+## SERVER STARTEN
+cd C:\Users\andre\gridcheck\backend; .\venv\Scripts\Activate.ps1; uvicorn main:app --reload --port 8000
+
+## TESTS LAUFEN LASSEN
+cd C:\Users\andre\gridcheck\backend; .\venv\Scripts\Activate.ps1; python -m pytest tests\ -v
+
+
+
+=== docs/ui-guidelines.md ===
+# GridCheck – UI Guidelines
+
+## Design-Prinzipien
+- Klarheit vor Komplexität: Ergebnisse sofort erkennbar
+- Fachlich korrekt: Elektrotechnik-Terminologie konsistent
+- Revisionssicher: Jede Aktion nachvollziehbar
+- Mobil-kompatibel: Responsive ab 375px
+
+## Status-Darstellung (KEIN reines Ampelsystem)
+
+| Status                  | Farbe       | Bedeutung                                     |
+|-------------------------|-------------|-----------------------------------------------|
+| MACHBAR                 | emerald-600 | Anschluss technisch möglich, keine Maßnahmen  |
+| MACHBAR_MIT_AUFLAGEN    | amber-500   | Möglich mit definierten Maßnahmen             |
+| GRENZWERTIG             | orange-500  | Technisch möglich, wirtschaftlich kritisch    |
+| NICHT_MACHBAR           | destructive | Technisch nicht realisierbar                  |
+| DATEN_UNVOLLSTAENDIG    | muted-fg    | Weitere Eingaben erforderlich                 |
+
+Status IMMER mit Diagnose-Text und Empfehlungen kombinieren!
+
+## Netzplan-Farben
+
+| Element          | Farbe   | Bedeutung           |
+|------------------|---------|---------------------|
+| Leitung normal   | #22c55e | Betrieb OK          |
+| Leitung überlast | #ef4444 | Überlastung         |
+| Leitung kritisch | #f97316 | > 80% Auslastung    |
+| N-1-kritisch     | #a855f7 | Fällt bei N-1 aus   |
+| Neuer Anschluss  | #3b82f6 | Geplanter Anschluss |
+| Umspannwerk      | #1e293b | HV/MV-Knoten        |
+
+## Komponenten
+
+### Buttons
+- variant=default: Hauptaktion (Check starten, Bericht exportieren)
+- variant=outline: Sekundäre Aktionen, Filter, Navigation zurück
+- variant=ghost: Toolbar-Aktionen, Sidebar-Items
+- variant=destructive: Projekt löschen, Check zurücksetzen
+
+### Check-Wizard
+- Multi-Step-Form mit validiertem Fortschritt
+- Jeder Schritt einzeln speicherbar (kein Datenverlust bei Abbruch)
+- Pflichtfelder klar markiert
+- Fachbegriffe mit InfoTooltip erklären
+
+### Diagnose-Karte (Kern-Komponente)
+- Props: status, title, summary, details, recommendations, n1Result, auditId
+- Ergebnis-Detail in Sheet (Seitenblatt, nicht Modal)
+- Netzplan in Dialog mit maximierter Ansicht
+
+## Formulare
+
+| Feld                 | Typ    | Einheit | Validierung       |
+|----------------------|--------|---------|-------------------|
+| Anschlussleistung    | number | kVA     | 1 – 100.000       |
+| Spannungsebene       | select | –       | NS/MS/HS/HöS      |
+| cos phi              | number | –       | 0.6 – 1.0         |
+| Gleichzeitigkeit     | number | –       | 0.1 – 1.0         |
+| Anschlussart         | select | –       | Einspeisung/Bezug |
+
+## Loading States
+
+### Berechnungs-Schritte (Check-Wizard)
+Schritte: Eingabe → Topologie → Lastfluss → N-1 → KI → Ergebnis
+Kein globaler Overlay, nur innerhalb der Check-Card.
+
+## Navigation
+- Interne Navigation: next/link (KEIN window.location.href)
+- Auth-Gates: Middleware + (protected)/layout.tsx
+- Rollen: admin, netzbetreiber, projektierer
+
+
+
+=== docs/WORKFLOW.md ===
+# Workflow für die Pre Gridcheck App
+
+## Wichtigste Arbeitsregel
+
+Es wird immer nur eine Aufgabe gleichzeitig bearbeitet.
+
+Erst wenn eine Aufgabe abgeschlossen, geprüft und dokumentiert ist, wird mit der nächsten Aufgabe begonnen.
+
+Keine Nebenkriegsschauplätze.
+
+Keine ungefragten Zusatzumbauten.
+
+Wenn zusätzliche Probleme auffallen, werden sie notiert, aber nicht sofort bearbeitet.
+
+---
+
+## Standardablauf pro Aufgabe
+
+1. Aufgabe verstehen
+2. Priorität bestätigen
+3. Betroffene Dateien identifizieren
+4. Minimal-invasive Lösung umsetzen
+5. Ergebnis prüfen
+6. Kurz dokumentieren
+7. Erst danach nächste Aufgabe beginnen
+
+---
+
+## Definition of Done
+
+Eine Aufgabe ist erst fertig, wenn:
+
+- das konkrete Ziel erfüllt ist
+- keine unnötigen Dateien geändert wurden
+- die Änderung zu PROJECT_RULES.md passt
+- die Änderung zu .cursorrules passt
+- Revisionssicherheit nicht verletzt wird
+- keine falsche Netzkapazität behauptet wird
+- keine Geschäftslogik unnötig ins Frontend wandert
+- Prüfung oder Test durchgeführt wurde oder klar beschrieben ist
+
+---
+
+## Pflicht vor jeder größeren Änderung
+
+Cursor muss prüfen:
+
+- Ist das wirklich die aktuelle Aufgabe?
+- Muss diese Datei wirklich geändert werden?
+- Gibt es eine einfachere Lösung?
+- Entsteht ein Sicherheitsproblem?
+- Entsteht eine falsche fachliche Aussage?
+- Bleibt das Ergebnis auditierbar?
+
+---
+
+## Umgang mit neuen Problemen
+
+Wenn während der Arbeit ein neues Problem auffällt:
+
+1. Nicht sofort bearbeiten.
+2. Kurz notieren.
+3. Risiko einschätzen.
+4. Aktuelle Aufgabe beenden.
+5. Danach Rückfrage stellen.
+
+---
+
+## Gridcheck-Fachregeln
+
+Die App darf niemals eine verbindliche Netzanschlusszusage erzeugen.
+
+OSM darf niemals als Quelle für freie Netzkapazität verwendet werden.
+
+Gridcheck-Ergebnisse müssen versioniert, erklärbar und auditierbar sein.
+
+N-1-Aussagen müssen klassifiziert werden.
+
+Kosten dürfen nur als Bandbreite angegeben werden.
+
+Jede Datenquelle braucht Herkunft, Lizenz, Stand, Hash und Confidence.
+
+---
+
+## Frontend-Regel
+
+Frontend ist Consumer.
+
+Berechnungen, Scoring, Auditlogik und Datenquellenbewertung gehören nicht ins Frontend.
+
+---
+
+## Backend-Regel
+
+Backend und Worker verantworten:
+
+- Validierung
+- Berechnung
+- Scoring
+- Audit
+- Datenquellenlogik
+- Reportlogik
+- Sicherheit
+
+
+
+=== docs/ZUSAMMENFASSUNG_v3.md ===
+# GridCheck - Technische Zusammenfassung v3
+## Stand: 12.04.2026 23:05
+
+---
+
+## 1. UEBERBLICK
+
+GridCheck ist eine Pre-Netzanschluss-Check Web-App fuer Netzanschlussbegehren
+im Mittelspannungsnetz (10-30 kV, primaer 20 kV).
+
+Die App liefert Projektierern und Netzbetreibern eine schnelle, fundierte
+Erstbewertung, ob ein Netzanschluss (Einspeisung/Bezug) an einem bestimmten
+Standort im MS-Netz technisch machbar ist.
+
+Zielgruppe: Projektierer (EE-Anlagen), Netzbetreiber, Planungsbueros
+Anwendungsbereich: Ausschliesslich Mittelspannung 10-30 kV
+Typischer Leistungsbereich: 100 kW bis 10 MW
+Regelwerk: VDE-AR-N 4110 (MS-Anschlussregeln)
+Monetarisierung: SaaS-Modell (Pay-per-Check / Abo)
+
+---
+
+## 2. TECH-STACK
+
+- Frontend: React 18 + TypeScript
+- Build-Tool: Vite
+- Styling: Tailwind CSS
+- State: React Hooks
+- Backend (geplant): Python FastAPI
+- Datenbank (geplant): PostgreSQL
+
+---
+
+## 3. PROJEKTSTRUKTUR
+
+gridcheck/frontend/src/
+- App.tsx - Haupt-App mit Tab-Navigation
+- components/QuickCheck.tsx - Schnell-Check (Eingabe + Ergebnis)
+- components/DetailAnalysis.tsx - Detail-Analyse (Platzhalter)
+- components/OperatorDashboard.tsx - Netzbetreiber-Dashboard (Platzhalter)
+- engine/gridEngine.ts - Berechnungskern
+- types/index.ts - TypeScript Typdefinitionen
+
+---
+
+## 4. BERECHNUNGSKERN (gridEngine.ts)
+
+### 4.1 Anwendungsbereich
+- Ausschliesslich Mittelspannungsnetz (MS)
+- Nennspannung: 20 kV (primaer), 10 kV (sekundaer)
+- Leistungsbereich: 100 kW bis 10 MW
+- Regelwerk: VDE-AR-N 4110
+
+### 4.2 Eingabeparameter
+- PLZ: Heuristisches Netzgebiet-Mapping (Region, Netzbetreiber, Sk)
+- Leistung (kW): Wirkleistung der Anlage (100 kW - 10 MW)
+- Anlagentyp: PV / Wind / Batterie / Ladepark / Industrie / Waermepumpe
+- Nennspannung: 20 kV (Standard) / 10 kV (waehlbar)
+- cos(phi): Leistungsfaktor (Default 0.95)
+
+### 4.3 Kurzschlussleistung (Sk) nach PLZ-Heuristik
+- Grossstadt (1xxxxx, 2xxxxx): Sk = 250 MVA
+- Mittelstadt: Sk = 150 MVA
+- Laendlich: Sk = 80 MVA
+- Alle Werte beziehen sich auf die MS-Sammelschiene (20 kV)
+
+### 4.4 Kernformeln (alle bezogen auf 20 kV MS-Ebene)
+
+Scheinleistung:
+  S = P / cos(phi)
+
+Anschlussstrom (MS-seitig):
+  I = S / (sqrt(3) * U_MS)
+  mit U_MS = 20 kV
+
+Spannungsaenderung nach VDE-AR-N 4110:
+  delta_u = (P * R + Q * X) / (U_MS^2)
+  Vereinfacht: delta_u_prozent = (S / Sk) * 100
+
+Kurzschlussstrom-Beitrag:
+  Ik_anteil = S / (sqrt(3) * U_MS)
+
+Thermische Auslastung (MS-Trafo / UW):
+  Typische MS-Trafo-Leistung: 20-63 MVA (HS/MS-Umspanner)
+  Standard-Annahme: S_trafo = 40 MVA
+  Auslastung = S / S_trafo * 100
+
+### 4.5 VDE-AR-N 4110 Pruefungen (MS-spezifisch)
+- Spannungsaenderung: max 2% am Netzverknuepfungspunkt (NVP)
+- Kurzschlussstrom: Ik_anteil < 10% von Ik_netz
+- Thermische Belastung: < 70% Trafo-Nennleistung (N-1 Reserve)
+- Oberschwingungen: THD < 8% (vereinfacht, nicht modelliert)
+- Flickerbeitrag: Pst < 0.46 / Plt < 0.37 (vereinfacht, nicht modelliert)
+
+### 4.6 N-1 Pruefung (MS-Netz)
+- Reduzierte Sk: Sk_n1 = Sk * 0.6 (Ausfall eines MS-Strangs)
+- Alle Pruefungen werden mit reduzierter Sk wiederholt
+- N-1 ist im MS-Netz immer relevant (Ringbetrieb -> Stichbetrieb)
+
+### 4.7 MS-spezifische Randbedingungen
+- Typische MS-Kabelleitungen: NA2XS2Y, NAYY (Impedanzwerte hinterlegt)
+- Typische Leitungslaengen MS: 5-30 km
+- Schaltanlagen: Einschleifung in bestehenden MS-Ring oder Stichleitung
+- Schutzkonzept: UMZ-Schutz, Distanzschutz am UW
+
+---
+
+## 5. SCORING-SYSTEM
+
+### 5.1 Punkte (max 100)
+- Spannungsaenderung: 35 Punkte (< 50% des 2%-Grenzwerts = voll, > 100% = 0)
+- Kurzschlussstrom: 25 Punkte (< 50% Grenzwert = voll, > 100% = 0)
+- Thermische Belastung: 25 Punkte (< 50% = voll, > 100% = 0)
+- N-1 Sicherheit: 15 Punkte (bestanden = 15, nicht = 0)
+
+### 5.2 Ampel-Bewertung
+- GRUEN (>= 70 Punkte): Anschluss voraussichtlich machbar
+- GELB (40-69 Punkte): Eingeschraenkt machbar, Massnahmen noetig
+- ROT (< 40 Punkte): Kritisch, erhebliche Netzmassnahmen erforderlich
+
+### 5.3 Szenarien-Analyse
+Drei Szenarien werden parallel berechnet:
+- Optimistisch: Sk * 1.3 (starkes Netz, stadtnah)
+- Realistisch: Sk * 1.0 (Standardannahme)
+- Konservativ: Sk * 0.7 (schwaches Netz, laendlich, langer MS-Strang)
+
+---
+
+## 6. UI-STRUKTUR
+
+### Tab 1: Schnell-Check
+- Eingabeformular (PLZ, Leistung, Anlagentyp, Nennspannung 20/10kV, cos phi)
+- Ergebnisanzeige: Ampel, Score, Detailwerte
+- Szenarien-Vergleich
+- Empfehlungen + Einschraenkungen
+
+### Tab 2: Detail-Analyse (Platzhalter)
+### Tab 3: Netzbetreiber-Dashboard (Platzhalter)
+
+---
+
+## 7. DATENQUALITAET / CONFIDENCE
+
+- Level A: Reale Netzdaten vom Betreiber (Sk am NVP bekannt)
+- Level B: Verifizierte Regionaldaten (Netzbetreiber-Richtwerte)
+- Level C: Statistische Schaetzung
+- Level D: PLZ-Heuristik (aktueller Stand)
+
+---
+
+## 8. ROADMAP
+
+1. PDF-Export (revisionssicher)
+2. Detail-Analyse + Netzplan-Visualisierung
+3. Backend API (FastAPI)
+4. Datenbank (PostgreSQL)
+5. KI-Modul (Lernfaehigkeit)
+6. Netzbetreiber-Dashboard
+7. User Auth + Rollen
+8. Echte Netzdaten-Integration (Sk-Werte je UW)
+9. Billing / Abo-System
+10. Mobile Optimierung
+
+---
+
+## 9. BEKANNTE EINSCHRAENKUNGEN
+
+1. Rein clientseitige Berechnung (kein Backend)
+2. PLZ-Heuristik statt realer Netzdaten
+3. Vereinfachtes Impedanzmodell (keine Leitungslaengen-Differenzierung)
+4. Keine Beruecksichtigung bestehender Einspeiser am selben NVP
+5. Trafo-Daten sind Standardwerte (nicht UW-spezifisch)
+6. Keine Blindleistungskompensation modelliert
+7. Kein Oberschwingungseinfluss beruecksichtigt
+8. Kein Flickerbeitrag berechnet
+9. Keine Schaltanlagen-Topologie (Ring/Stich) beruecksichtigt
+
+---
+
+Generiert am 12.04.2026 23:05 - GridCheck v3
+
+
+
+=== Ideen.md ===
+# Ideen
+
+Diese Datei ist die zentrale Ideensammlung fuer die Pre-Gridcheck-App.  
+Ziel: priorisieren, automatisch Vorschlaege ableiten und schrittweise abarbeiten.
+
+## Grundidee der App
+
+- [ ] Deutschlandweite Pre-Netzanschlusspruefung bereitstellen.
+- [ ] Keine verbindliche Netzanschlusszusage, sondern technisch-wirtschaftliche Vorbewertung.
+- [ ] Diagnose-Tool mit folgenden Kernergebnissen:
+  - Netzanschlusswahrscheinlichkeit
+  - geeignete Spannungsebene
+  - Standort- und Trassenrisiken
+  - Kostenindikatoren
+  - Einspeisedruckanalyse
+  - Empfehlungen fuer naechste Schritte
+
+## Zentrale Datenstrategie
+
+- [ ] Mehrschichtige Datenbasis aufbauen (keine Einzelquelle).
+- [ ] Datenquellen nach Relevanz und Verlaesslichkeit priorisieren.
+
+### Offizielle Primaerquellen
+
+- [ ] MaStR
+- [ ] SMARD
+- [ ] DWD
+- [ ] Bundesnetzagentur
+- [ ] Destatis
+- [ ] BGR
+- [ ] BKG
+
+### Geografische Kandidatenquellen
+
+- [ ] OpenStreetMap
+- [ ] Overpass API
+- [ ] Spaeter: manuelle Asset-Erfassung in der Karte (Umspannwerk, Trafostation, Leitungssegmente) pro Projekt mit Quelle, Confidence, Nutzer und Zeitstempel fuer revisionssicheren Datenaufbau.
+
+### Spaetere Ergaenzungen
+
+- [ ] VNB-Kapazitaetskarten
+- [ ] Netzbetreiber-Preisblaetter
+- [ ] Anschlussrichtlinien
+- [ ] Kommunale und Landes-GIS-Daten
+
+## Wichtige Datenquellen und Nutzen
+
+### OpenStreetMap / Overpass
+
+- [ ] Findet Umspannwerke, Leitungen, Masten, Kraftwerke, moegliche Netzanschlusspunkte.
+- [ ] Nutzbar fuer Naehe, Standortkandidaten, Trassenindikatoren.
+- [ ] Nicht als Beweis fuer freie Netzkapazitaet verwenden.
+
+### MaStR
+
+- [ ] Offizielle Quelle fuer Erzeugungsanlagen, Speicher, Leistung, Standort, Status.
+- [ ] Relevant fuer Einspeisedruck, Anlagencluster, lokale Netzpraegung.
+
+### SMARD
+
+- [ ] Markt-, Redispatch-, Engpass- und Systemdaten.
+- [ ] Relevant fuer regionale Engpassindikatoren und Abregelungsrisiken.
+
+### DWD
+
+- [ ] Wetter-, Wind-, Strahlungs- und Klimadaten.
+- [ ] Relevant fuer Ertragsprognosen, Einspeisespitzen, Bau-/Wetterrisiken.
+
+### BGR
+
+- [ ] Boden, Geologie, Grundwasser, Baugrund.
+- [ ] Relevant fuer Trassenkosten, Tiefbaurisiken, Genehmigungsindikatoren.
+
+### BKG
+
+- [ ] Amtliche Geodaten, Verwaltungsgrenzen, Kartenbasis.
+- [ ] Wichtig fuer Reporting und Georeferenzierung.
+
+### Destatis
+
+- [ ] Baupreisindex, Preisstatistiken, Strukturdaten.
+- [ ] Nützlich fuer Kostenmodelle.
+
+### ENTSO-E (optional spaeter)
+
+- [ ] Europaeische Strommarkt-, Last-, Erzeugungs- und Engpassdaten.
+- [ ] Optional fuer spaetere System- und Plausibilitaetsmodelle.
+
+## Empfohlenes Kern-Datenmodell
+
+### `asset_candidates`
+- [ ] Netzasset-Kandidaten aus OSM/GIS.
+- [ ] Umspannwerke, Leitungen, Schaltanlagen, Transformatorstandorte.
+- [ ] Spannungsebenen, Betreiber, Geometrie, Confidence.
+
+### `generation_assets`
+- [ ] Anlagen aus MaStR und Kraftwerksliste.
+- [ ] Leistung, Energietraeger, Standort, Status, Netzebene.
+
+### `system_signals`
+- [ ] Daten aus SMARD / ENTSO-E.
+- [ ] Redispatch, Abregelung, Preise, Last, Engpassindikatoren.
+
+### `weather_resource`
+- [ ] Wetter- und Ertragsdaten aus DWD.
+- [ ] Wind, Strahlung, Temperatur, Niederschlag.
+
+### `ground_risk`
+- [ ] Baugrund- und Trassenrisiken.
+- [ ] Bodenklasse, Geologie, Grundwasser, Grabungsrisiko.
+
+### `cost_indices`
+- [ ] Kosten- und Preisindikatoren.
+- [ ] Baukosten, Netzentgeltumfeld, regionale Kostenfaktoren.
+
+### `gridcheck_result_audit`
+- [ ] Revisionssichere Speicherung aller Ergebnisse.
+- [ ] Inputdaten, Quellenstaende, Modellversion, Score, Warnungen, Annahmen.
+
+## Revisionssicherheit (Pflicht)
+
+Jede App-Antwort soll speichern:
+
+- [ ] verwendete Datenquellen
+- [ ] Datenstand
+- [ ] Modellversion
+- [ ] Annahmen
+- [ ] Unsicherheiten
+- [ ] Scoring-Komponenten
+- [ ] verwendete Geometrie- und Zuordnungslogik
+- [ ] finale Bewertung
+- [ ] Warnungen und Review-Hinweise
+
+## Markt- und Konkurrenzumfeld
+
+### Bestehende Loesungen
+
+- [ ] Netzampeln einzelner VNB
+- [ ] PowerFactory / NEPLAN
+- [ ] envelio
+- [ ] PV*SOL / Polysun
+- [ ] Energy Brainpool / Enervis
+- [ ] Excel-basierte Eigenloesungen
+
+### Beobachtete Luecke
+
+- [ ] Niederschwellige Tools fehlen, die Folgendes verbinden:
+  - Netz-Physik
+  - Wirtschaftlichkeit
+  - Standortdiagnose
+  - Netzanschlussrisiko
+  - Auflagen
+  - revisionssichere Reports
+
+## Moegliche Killer-Features
+
+### Was-waere-wenn-Optimierer
+
+- [ ] Zeigt, welche Leistung unter welchen Bedingungen moeglich waere.
+- [ ] Beispiel-Szenarien:
+  - maximale Leistung ohne Auflage
+  - Leistung mit Q(U)-Regelung
+  - Leistung mit Spitzenkappung
+  - Leistung mit Speicherbetrieb
+
+### N-1-Auflagen-Generator
+
+- [ ] Technische Auflagenvorschlaege fuer Netzbetreiber erzeugen.
+- [ ] Textbausteine und Referenzen auf technische Anschlussregeln.
+
+### Bankfaehiger Risk- und Rendite-Report
+
+- [ ] Verknuepft Netzrisiko, Curtailment, CAPEX, Strompreisszenarien, Rendite.
+- [ ] Zielgruppen: Investoren, Banken, Speicherparkbetreiber.
+
+### Lernende KI mit Audit-Trail
+
+- [ ] Nutzt freigegebene reale Anschlussfaelle zur Modellverbesserung.
+- [ ] Jede Empfehlung bleibt versioniert und nachvollziehbar.
+
+### Multi-VNB-Vergleich (spaeter)
+
+- [ ] Vergleich von Standorten nach Netzbetreibergebiet, erwarteter Dauer, Kosten, Risiko.
+
+## Zielgruppen
+
+### Projektierer
+
+Kaufen vor allem:
+- [ ] schnellere Standortentscheidung
+- [ ] bessere Trefferquote
+- [ ] Vermeidung von Sackgassen
+
+Wichtige Funktionen:
+- [ ] Standortcheck
+- [ ] Netzebenen-Vorschlag
+- [ ] Netzanschlusspunkt-Kandidaten
+- [ ] Was-waere-wenn-Optimierer
+- [ ] Kostenbandbreite
+- [ ] Export
+
+### Speicherparkbetreiber / Investoren / Asset Owner
+
+Kaufen vor allem:
+- [ ] Investierbarkeitspruefung
+- [ ] Risiko- und Renditebewertung
+- [ ] bessere CAPEX- und Zeitannahmen
+
+Wichtige Funktionen:
+- [ ] Due-Diligence-Report
+- [ ] Portfoliovergleich
+- [ ] Szenarioanalyse
+- [ ] Regionenranking
+- [ ] Risk-/Rendite-Report
+
+### Netzbetreiber
+
+Kaufen vor allem:
+- [ ] Prozessentlastung
+- [ ] standardisierte Vorpruefung
+- [ ] bessere Priorisierung
+- [ ] Fallakte und Dokumentation
+- [ ] Revisionssicherheit
+
+Wichtige Funktionen:
+- [ ] Intake-Management
+- [ ] automatische Vorpruefung
+- [ ] N-1-Auflagen-Generator
+- [ ] Rollen/Rechte
+- [ ] Audit-Trail
+- [ ] internes Dashboard
+
+## Monetarisierungsideen
+
+### Paket 1: Project Developer
+
+Fuer Projektierer.
+
+Moegliche Features:
+- [ ] Standortcheck
+- [ ] Netzebenen-Vorschlag
+- [ ] Anschlusskandidaten
+- [ ] Bedingungsdiagnose
+- [ ] PDF-Export
+- [ ] einfache Kostenbandbreite
+
+Moegliche Preise:
+- [ ] 499-1.490 EUR/Monat
+- [ ] oder 99-490 EUR pro Analyse
+
+### Paket 2: Storage / Investment Intelligence
+
+Fuer Speicherparkbetreiber, Betreiber und Investoren.
+
+Moegliche Features:
+- [ ] alle Developer-Funktionen
+- [ ] CAPEX-/Timeline-/Risiko-Modell
+- [ ] Szenariorechnungen
+- [ ] Portfoliovergleich
+- [ ] Management-Report
+- [ ] Regionenranking
+
+Moegliche Preise:
+- [ ] 2.500-10.000 EUR/Monat
+- [ ] oder 5.000-25.000 EUR pro Projekt-/Portfolioanalyse
+
+### Paket 3: Grid Operator Suite
+
+Fuer Netzbetreiber.
+
+Moegliche Features:
+- [ ] Intake-Management
+- [ ] automatische Vorpruefung
+- [ ] Priorisierung
+- [ ] Fallakte
+- [ ] Audit-Trail
+- [ ] Rollen/Rechte
+- [ ] Schnittstellen
+- [ ] internes Dashboard
+
+Moegliche Preise:
+- [ ] Setup: 15.000-100.000 EUR
+- [ ] Lizenz: 30.000-200.000 EUR+ pro Jahr
+- [ ] Support/SLA zusaetzlich
+
+### Umsetzungsstand (konkretisiert)
+
+- [x] Paketstruktur und Scope-Grenzen in `docs/monetarisierungspakete.md` dokumentiert.
+- [ ] Feature-Mapping in konkrete Tickets mit Akzeptanzkriterien ueberfuehren.
+- [ ] Preisannahmen je Zielsegment in Vertriebshypothesen testen.
+
+## Zusaetzliche Umsatzhebel
+
+- [ ] API-Zugriff
+- [ ] White-Label-Version
+- [ ] Premium-Reports
+- [ ] regionale Exklusivitaet
+- [ ] historische Entwicklung und Trends
+- [ ] Monitoring von Netzausbau-Massnahmen
+- [ ] Team-Schulungen
+- [ ] Upload eigener Projektdaten
+- [ ] CRM-/GIS-Integrationen
+- [ ] individuelle Standortanalysen
+- [ ] Portfolio-Screenings
+- [ ] Marktberichte
+- [ ] Netzanschluss-Heatmaps
+- [ ] Anschlusskosten-Benchmarking
+
+## Abarbeitungsmodus (Vorschlag)
+
+- [ ] Ideen regelmaessig priorisieren (Impact x Umsetzbarkeit).
+- [ ] Je Sprint 1-3 Punkte aus dieser Liste fix einplanen.
+- [ ] Jede erledigte Idee mit Datum und kurzem Ergebnis dokumentieren.
+- [ ] Offene Punkte in konkrete Tickets mit Akzeptanzkriterien ueberfuehren.
+
+
+
+=== PROJECT_RULES.md ===
+---
+description: Arbeitsweise und Architekturregeln für die Pre Gridcheck App
+alwaysApply: true
+---
+
+# Pre Gridcheck App — Cursor Rules
+
+## Rolle
+
+Du bist ein Senior Fullstack Engineer, GIS Engineer, Stromnetzplaner, Netzanschluss-Spezialist und Experte für erneuerbare Energien.
+
+Du arbeitest an der **Pre Gridcheck App**.
+
+Die App ist eine SaaS-Plattform für vorläufige Netzanschlussdiagnostik, Netzkapazitätsindikatoren, N-1-Screening, GIS-basierte Netzasset-Erkennung, technische Bewertung und revisionssichere Entscheidungsvorbereitung.
+
+Die App ersetzt **niemals** eine rechtsverbindliche Netzanschlussprüfung durch den zuständigen Netzbetreiber.
+
+---
+
+## Absolute Arbeitsregel
+
+Es wird **immer nur eine Aufgabe gleichzeitig** bearbeitet.
+
+Keine Nebenkriegsschauplätze.
+
+Keine ungefragten Umbauten.
+
+Keine Architekturwechsel ohne ausdrückliche Freigabe.
+
+Keine neue Funktion beginnen, bevor die aktuelle Aufgabe abgeschlossen, geprüft und dokumentiert ist.
+
+Wenn während einer Aufgabe weitere Probleme auffallen:
+
+1. Problem kurz notieren.
+2. Risiko bewerten.
+3. Nicht sofort bearbeiten.
+4. Erst die aktuelle priorisierte Aufgabe fertigstellen.
+5. Danach Rückfrage stellen oder die nächste priorisierte Aufgabe vorschlagen.
+
+---
+
+## Priorisierung
+
+Bei jeder Aufgabe gilt diese Reihenfolge:
+
+1. Ziel der aktuellen Aufgabe verstehen.
+2. Nur die dafür notwendigen Dateien anfassen.
+3. Bestehenden Code und Projektstand berücksichtigen.
+4. Minimal-invasive Lösung wählen.
+5. Ergebnis prüfen.
+6. Erst danach nächste Aufgabe beginnen.
+
+Wenn der Nutzer eine konkrete Aufgabe vorgibt, ist diese Aufgabe führend.
+
+---
+
+## Projektziel
+
+Die Pre Gridcheck App soll Projektentwicklern, Planern, Kommunen, Investoren und Netzbetreibern helfen, schnell vorläufig einzuschätzen:
+
+- wo ein plausibler Netzanschlusspunkt liegt
+- welche Spannungsebene wahrscheinlich geeignet ist
+- wie hoch Standort-, Netz-, Trassen-, Kosten- und Datenrisiken sind
+- welche Datenquellen diese Bewertung stützen
+- welche Unsicherheiten bestehen
+- welche nächsten Schritte sinnvoll sind
+
+Die App ist kein Ampelspielzeug, sondern ein diagnostisches Entscheidungsunterstützungssystem.
+
+---
+
+## Kernprinzipien
+
+- API-first
+- revisionssicher
+- erklärbar
+- auditierbar
+- datenquellenbasiert
+- typisiert
+- sicher
+- keine Scheingenauigkeit
+- keine erfundene Netzkapazität
+- keine verbindliche Netzanschlusszusage
+- keine Geschäftslogik im Frontend
+
+---
+
+## Technikzielbild
+
+Bevorzugter Ziel-Stack:
+
+- Monorepo
+- pnpm
+- Next.js App Router
+- React
+- Tailwind
+- shadcn/ui
+- Backend API
+- OpenAPI oder TypeSpec
+- PostgreSQL
+- PostGIS
+- Drizzle ORM
+- Zod
+- Python oder TypeScript Worker für ETL/GIS/Scoring
+- Docker / Coolify / Hetzner
+
+Bestehender Code wird respektiert. Migrationen auf dieses Zielbild erfolgen nur schrittweise und nach Freigabe.
+
+---
+
+## Architekturregeln
+
+Frontend ist Consumer.
+
+Das Frontend darf:
+
+- Eingaben erfassen
+- API-Daten anzeigen
+- Warnungen anzeigen
+- Karten darstellen
+- Berichte anzeigen oder exportieren
+
+Das Frontend darf nicht:
+
+- Datenbanklogik enthalten
+- ORM-Code importieren
+- Netzberechnungen durchführen
+- Scoringentscheidungen treffen
+- Auditlogik selbst erzeugen
+- verfügbare Netzkapazität behaupten
+
+Backend / Worker verantworten:
+
+- Validierung
+- Berechnungen
+- Scoring
+- Datenquellenbewertung
+- Audit-Trail
+- Versionierung
+- Report-Erzeugung
+- Sicherheitsprüfungen
+
+---
+
+## Datenquellenregeln
+
+Jede Datenquelle braucht:
+
+- Name
+- Herkunft / URL falls vorhanden
+- Lizenz
+- Importzeitpunkt
+- Aktualisierungsstand falls bekannt
+- Rohdaten-Hash
+- normalisierter Hash
+- Parser-Version
+- Confidence Score
+- technische Confidence
+- geometrische Confidence
+- kommerzielle Confidence
+- Validierungsstatus
+
+Datenklassen:
+
+- A = offizielle öffentliche Quelle
+- B = Community oder semi-strukturierte Quelle
+- C = modelliert oder abgeleitet
+- D = Netzbetreiber-/DSO-Daten
+- E = nutzerbereitgestellte Daten
+
+Rohdaten dürfen niemals still überschrieben werden.
+
+Abgeleitete Daten dürfen niemals still als verifiziert dargestellt werden.
+
+---
+
+## Wichtige Datenquellen
+
+Für Deutschland MVP relevant:
+
+- OpenStreetMap / Overpass
+- Marktstammdatenregister
+- SMARD
+- Bundesnetzagentur-Daten
+- DWD Climate Data Center
+- BGR
+- BKG
+- Destatis / GENESIS
+- Landes- und Kommunal-GIS falls sinnvoll
+
+OSM darf niemals als Quelle für freie Netzkapazität verwendet werden.
+
+OSM darf nur Hinweise auf Assets, Geometrien und Lagebeziehungen liefern.
+
+---
+
+## Gridcheck-Ergebnisregeln
+
+Ein Gridcheck-Ergebnis muss mindestens enthalten:
+
+- Eingaben
+- Standort
+- Projektart
+- Projektleistung
+- verwendete Datenquellen
+- Datenquellen-Versionen
+- Modellversion
+- Scoringversion
+- Annahmen
+- Warnungen
+- Confidence
+- technische Bewertung
+- Kostenrisiko
+- Terminrisiko
+- Netz-/Engpassrisiko
+- empfohlene nächste Schritte
+- Disclaimer
+- Audit-ID oder Hash
+- Erzeugungszeitpunkt
+
+Ein bestehendes Ergebnis darf niemals still überschrieben werden.
+
+Bei neuer Datenlage wird eine neue Ergebnisversion erzeugt.
+
+---
+
+## Elektrische Regeln
+
+Alle elektrotechnischen Berechnungen müssen nachvollziehbar sein.
+
+Intern SI-Einheiten nutzen.
+
+Pflichtangaben:
+
+- Spannungsebene
+- Leistung
+- Strom
+- cos phi
+- Leitungslänge
+- Leitungstyp oder Annahme
+- thermische Annahme
+- Impedanzquelle
+- Spannungsfall
+- N-1-Level
+- Confidence
+
+Wichtige Formeln:
+
+Drehstrom-Scheinleistung:
+
+S = sqrt(3) * U * I
+
+Strom aus Scheinleistung:
+
+I = S / (sqrt(3) * U)
+
+Spannungsfall:
+
+DeltaU = sqrt(3) * I * (R * cosPhi + X * sinPhi) * L
+
+Keine exakte freie Kapazität ohne verifizierte Netzbetreiberdaten behaupten.
+
+---
+
+## N-1-Regeln
+
+N-1 muss klar klassifiziert werden:
+
+| Level | Bedeutung |
+|------|-----------|
+| N1-0 | Keine N-1-Aussage möglich |
+| N1-1 | Heuristisches Screening |
+| N1-2 | Topologische Näherung |
+| N1-3 | Lastfluss mit geschätzten Parametern |
+| N1-4 | Lastfluss mit verifizierten Netzbetreiberdaten |
+
+MVP ohne Netzbetreiberdaten darf maximal N1-1 oder N1-2 behaupten.
+
+Nie garantierte N-1-Sicherheit ohne verifizierte Daten.
+
+---
+
+## Scoring-Regeln
+
+Scores müssen zerlegbar sein.
+
+Keine einzelne undurchsichtige Ampel.
+
+Mögliche Komponenten:
+
+- distance_score
+- voltage_match_score
+- asset_confidence_score
+- generation_pressure_score
+- redispatch_risk_score
+- route_risk_score
+- soil_risk_score
+- environmental_constraint_score
+- cost_risk_score
+- data_completeness_score
+- n1_screening_score
+
+Jeder Score braucht Erklärung, Annahmen und Confidence.
+
+---
+
+## Kostenregeln
+
+Kosten immer als Bandbreite ausgeben:
+
+- niedrig
+- Basis
+- hoch
+
+Immer anzeigen:
+
+- Annahmen
+- fehlende Daten
+- Confidence
+- Hauptrisikotreiber
+
+Keine exakte Scheingenauigkeit.
+
+---
+
+## Reporting-Regeln
+
+Jeder Bericht enthält:
+
+- Projekteingaben
+- Standort
+- verwendete Datenquellen
+- Kandidaten für Anschluss
+- Spannungsempfehlung
+- technische Bewertung
+- Risikoaufschlüsselung
+- Kostenspanne
+- N-1-Screening-Level
+- Annahmen
+- Warnungen
+- Disclaimer
+- Erzeugungszeitpunkt
+- Report-Version
+- Hash / Audit-ID
+
+---
+
+## Rechtliche Regeln
+
+Immer klarstellen:
+
+- vorläufige Analyse
+- keine Netzanschlusszusage
+- keine Kapazitätsgarantie
+- öffentliche Daten können unvollständig oder veraltet sein
+- finale Entscheidung liegt beim zuständigen Netzbetreiber
+
+---
+
+## Sicherheitsregeln
+
+- alle Eingaben validieren
+- Organisationsgrenzen prüfen
+- BOLA vermeiden
+- keine fremden Projekte anzeigen
+- keine Stacktraces in Produktion
+- keine sensiblen Infrastrukturdaten unnötig exponieren
+- API Keys scopen
+- Uploads validieren
+- teure Berechnungen rate-limiten
+- verdächtige Nutzung loggen
+
+---
+
+## Entwicklungsworkflow
+
+Bei jeder Änderung:
+
+1. Aktuelle Aufgabe bestätigen.
+2. Relevante bestehende Dateien prüfen.
+3. Nur notwendige Dateien ändern.
+4. Änderung minimal halten.
+5. Ergebnis testen oder prüfbar machen.
+6. Kurzes Fazit geben.
+7. Keine nächste Aufgabe starten, bis die aktuelle abgeschlossen ist.
+
+Feature-Reihenfolge:
+
+1. Schema / Vertrag
+2. Backend
+3. Tests
+4. Frontend als Consumer
+5. Auditprüfung
+6. Sicherheitsprüfung
+7. fachliche Plausibilitätsprüfung
+
+---
+
+## Testing-Regeln
+
+Testen mindestens:
+
+- Eingabevalidierung
+- Autorisierung
+- GIS-Distanzberechnung
+- Scoring-Zerlegung
+- Audit-Erzeugung
+- Datenquellen-Confidence
+- keine Fake-Kapazitätsclaims
+- Warnungsanzeige im Frontend
+- elektrotechnische Standardfälle
+- GIS-Plausibilitätsfälle
+
+---
+
+## Definition of Done
+
+Eine Aufgabe ist erst abgeschlossen, wenn:
+
+- sie das konkrete Ziel erfüllt
+- keine unnötigen Dateien geändert wurden
+- sie regelkonform ist
+- sie nachvollziehbar ist
+- sie keine Scheinsicherheit erzeugt
+- sie sicherheitlich vertretbar ist
+- sie geprüft wurde oder eine klare Prüfanweisung existiert
+
+Erst danach darf die nächste Aufgabe begonnen werden.
+
+---
+
+## Verhalten von Cursor
+
+Cursor muss vor jeder Codeänderung prüfen:
+
+1. Ist das die aktuell priorisierte Aufgabe?
+2. Sind Nebenkriegsschauplätze ausgeschlossen?
+3. Passt die Änderung zu diesen Regeln?
+4. Wird Revisionssicherheit verletzt?
+5. Wird freie Netzkapazität ohne Beleg behauptet?
+6. Wandert Geschäftslogik ins Frontend?
+7. Sind Datenquellen, Annahmen und Confidence getrennt?
+8. Gibt es Sicherheits- oder Datenschutzrisiken?
+
+Wenn eine Regel verletzt wird, muss Cursor stoppen und zuerst einen sicheren Vorschlag machen.
+
+
+
+=== README.md ===
+# GridCheck – Pre-Netzanschluss-Check App
+
+**Faster Grid Connection Decisions – Powered by AI**
+
+## Was ist GridCheck?
+GridCheck ist ein diagnostisches Tool für Netzbetreiber und Projektierer zur schnellen Bewertung von Netzanschlussanfragen. Keine Ampellogik – sondern echte N-1-Analyse, Lastflussberechnung und KI-gestützte Empfehlungen.
+
+## Tech Stack
+- **Backend:** FastAPI (Python 3.11+), SQLAlchemy, pandapower
+- **Frontend:** Next.js 15 App Router, React 19, TypeScript, shadcn/ui, Tailwind CSS 4
+- **DB:** PostgreSQL 16
+- **Auth:** JWT + OAuth2, rollenbasiert (admin, netzbetreiber, projektierer)
+- **Package Manager:** pnpm (Frontend), pip (Backend)
+
+## Projektstruktur
+\\\
+gridcheck/
+├── backend/
+│   ├── main.py
+│   ├── constants.py
+│   ├── requirements.txt
+│   ├── api/
+│   ├── audit/
+│   ├── db/
+│   ├── engine/        # berechnung.py, ki_modul.py, pdf_report.py, revision.py
+│   └── services/      # netzcheck.py
+├── frontend/
+│   ├── app/           # Next.js App Router
+│   ├── components/
+│   │   ├── gridcheck/
+│   │   ├── dashboard/ # NetzbetreiberDashboard.tsx
+│   │   └── ui/        # shadcn/ui
+│   └── lib/
+└── docs/
+    ├── ui-guidelines.md
+    └── railway-deployment.md
+\\\
+
+## Lokale Entwicklung (Docker + API + Postgres)
+
+### 1) Infrastruktur starten (Docker)
+```bash
+docker compose up -d postgres redis
+```
+
+### 2) Backend starten (Python venv)
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Schema-Migration (empfohlen statt auto create):
+```bash
+cd backend
+alembic upgrade head
+```
+Hinweis: Migrations bauen aufeinander auf (`20260507_01` Basisschema, `20260507_02` Query-Indizes).
+
+Setze Umgebungsvariablen (PowerShell Beispiel):
+```powershell
+$env:APP_ENV="dev"
+$env:DATABASE_URL="postgresql+psycopg2://gridcheck:gridcheck_dev_2026@localhost:5433/gridcheck"
+$env:CORS_ORIGINS="http://localhost:3000,http://localhost:5173"
+$env:JWT_SECRET="replace-with-random-32-plus-char-secret"
+$env:JWT_REFRESH_SECRET="replace-with-second-random-32-plus-char-secret"
+$env:AUTO_CREATE_SCHEMA="false"
+uvicorn main:app --reload
+```
+
+### 3) Frontend starten (API-Consumer)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Das Frontend ruft die API über den Proxy-Pfad `/api/backend/*` auf.
+
+## ENV-Profile
+- `backend/.env.example` -> lokales Development
+- `backend/.env.staging.example` -> staging Baseline
+- `backend/.env.prod.example` -> production Baseline
+
+## Wichtige Regeln
+- Revisionssicher: Jede Berechnung ist immutable gespeichert
+- Prüf-IDs: CHK-YYYY-NNNNN
+- Timestamps: immer UTC
+- Soft-Delete überall (kein hartes DELETE)
+- N-1-Kriterium wird bei jeder Berechnung geprüft
+- TAB 2019 + VDE-AR-N 4100/4110/4120 als Regelwerk
+
+## Deployment
+Siehe docs/railway-deployment.md
+
+## Deploy-Checkliste (CI-Schutz)
+- GitHub Actions `CI` muss gruen sein.
+- Backend-Job erfolgreich:
+  - `alembic upgrade head`
+  - `pytest -q tests/test_auth_projects_api.py`
+- Frontend-Job erfolgreich:
+  - `npm run lint`
+  - `npm run build`
+- In staging/prod sind Pflicht-ENV gesetzt (mindestens `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `CORS_ORIGINS`, `TRUSTED_HOSTS`, `REDIS_URL`).
+
+
+
+=== ROADMAP.md ===
+# GridCheck Roadmap
+
+## Sprint 1 - Projektierer-Modul (LAEUFT)
+Ziel: /projektierer mit Was-waere-wenn-Optimierer (Variante a)
+
+- [ ] Backend: Refactor in core/ + roles/projektierer.py
+- [ ] Backend: Endpoint POST /api/v1/projektierer/analyze
+- [ ] Backend: Optimizer-Logik (max. zulaessige Leistung + 2 Auflagen-Varianten)
+- [ ] Frontend: Route /projektierer
+- [ ] Frontend: ProjektiererForm.tsx (Budget, Zeitfenster, Flex-Flags)
+- [ ] Frontend: ProjektiererResult.tsx (mit Optimizer-Sektion)
+- [ ] Frontend: Landing / mit 3 Rollen-Karten (1 aktiv, 2 coming soon)
+- [ ] PDF-Export Projektierer-spezifisch
+- [ ] Test mit realem Beispiel
+- [ ] Backup
+
+## Sprint 2 - VNB-Modul
+- [ ] /vnb Route + Form + Result
+- [ ] N-1-Auflagen-Generator (VDE-AR-N 4110/4120-Textbausteine)
+- [ ] Bestandsnetz-Daten-Upload (CSV/JSON)
+- [ ] Pruefprotokoll-PDF
+
+## Sprint 3 - Invest-Modul
+- [ ] /invest Route + Form + Result
+- [ ] Curtailment-Prognose
+- [ ] ROI-Sensitivitaetsmatrix
+- [ ] Bankfaehiger 1-Pager
+
+## Sprint 4 - KI-Layer
+- [ ] Feedback-Loop (reale Bescheide eingeben)
+- [ ] ML-Modell (sklearn) fuer Confidence-Verbesserung
+- [ ] Audit-Trail je Empfehlung
+
+## Sprint 5 - Multi-VNB-Vergleich
+- [ ] VNB-Profile-DB
+- [ ] Standort-Vergleichs-View
+
+
+
+=== SESSION_PROMPT.md ===
+SESSION-START GRIDCHECK.
+
+Regeln (verbindlich, nicht diskutieren):
+1. Lies zuerst docs/SESSION_STATE.md, docs/DECISIONS.md, docs/ROADMAP.md.
+2. Antworten ausschliesslich als PowerShell-Befehle (Here-Strings @''...''@ + Out-File -Encoding UTF8). Keine rohen Markdown-Bloecke.
+3. Vor Code-Aenderungen: Ist-Zustand pruefen, keine Annahmen.
+4. Eine Aufgabe nach der anderen, jeweils mit Verifikations-Befehl.
+5. Nach jedem Sprint-Item: Diff fuer ROADMAP.md liefern (Haken setzen).
+6. Keine Diskussion bereits in DECISIONS.md beschlossener Punkte.
+7. Bei Unsicherheit fragen, nicht halluzinieren.
+
+Aktueller Stand: docs/SESSION_STATE.md
+Workflow: docs/WORKFLOW.md
+Regeln: .cursorrules
+
+Bestaetige kurz mit "verstanden + naechster Schritt: ...", dann warte auf GO.
+
+
+
+=== skills/input-validation.skill.md ===
+# input-validation
+
+## purpose
+Pr�ft Benutzereingaben auf Vollst�ndigkeit, Wertebereich und Plausibilit�t.
+
+## use-when
+- bei neuer Eingabe
+- bei �nderungen
+- vor jeder Entscheidung
+
+## inputs
+- projectName
+- applicantName
+- connectionLevel
+- requestedCapacityKw
+- estimatedAvailableCapacityKw
+- loadProfileKnown
+- siteSecured
+
+## outputs
+- valid
+- errors[]
+- warnings[]
+- normalizedInput
+
+## hard-rules
+- Pflichtfelder pr�fen
+- keine Berechnung
+- keine Entscheidung
+- nur validieren
+
+## success-criteria
+- Fehler sauber getrennt
+- Warnungen separat
+- strukturierte Ausgabe
+
+## failure-mode
+- valid = false bei Fehlern
+
+
+
+=== WIEDEREINSTIEG.md ===
+

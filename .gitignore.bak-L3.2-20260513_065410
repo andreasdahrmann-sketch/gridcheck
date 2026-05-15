@@ -1,0 +1,77 @@
+﻿# Node / Frontend
+node_modules/
+.next/
+out/
+dist/
+build/
+frontend/.capacitor/
+frontend/android/.gradle/
+frontend/android/app/build/
+frontend/ios/App/App/public/
+frontend/ios/App/Pods/
+frontend/ios/DerivedData/
+
+# Python / Backend
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Env-Dateien (NIEMALS in Git!) - rekursiv
+**/.env
+**/.env.local
+**/.env.*.local
+.env
+.env.local
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Backups / Müll - rekursiv
+*.bak
+*.bak2
+*.bak_v1.0
+*.old
+*.OLD
+**/_OLD_BACKUP/
+**/_QUARANTAENE_*/
+**/_archiv/
+_OLD_BACKUP/
+_QUARANTAENE_*/
+_archiv/
+_backups/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Datenbank-Dumps (sensibel!)
+*.dump
+*.sql.gz
+
+# Lokale Datenbank-Artefakte / Legacy-Dateien (enthalten Daten)
+*.db
+*.db.LOCAL_BACKUP
+
+# GridCheck lokale Artefakte / Backups / Reports
+_backup_*/
+**/backups/
+backend/backups/
+backend/testberichte/
+backend/report_*.pdf
+*.ok-*
+*.ok_*
+*.bak_*
+session-context.ps1
+
+# Lokale Session-/Kontextdateien
+SESSION_LOCAL.md
+CHAT_CONTEXT_LOCAL.md
+
+# Weitere lokale Backup-Endungen
+*.bak-*

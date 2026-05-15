@@ -1,0 +1,98 @@
+﻿"""
+B.5 - Engine-Tests fuer Revisionskette (revisionssicher / GoBD).
+"""
+import json
+import pytest
+from engine import revision as rm
+from engine.revision import (
+    speichere_revision,
+    lade_revisionen,
+    pruefe_integritaet,
+    SCHEMA_VERSION,
+)
+
+
+def _dummy_daten(seed: int = 1):
+    return {
+        "eingabe": {"leistung_mw": float(seed), "anlagentyp": "PV"},
+        "scores": {"gesamt": seed * 10},
+        "fazit": {"bewertung": "GRUEN"},
+    }
+
+
+class TestGenesis:
+    def test_leere_chain_ist_integer(self, isolierte_revisionen):
+        res = pruefe_integritaet()
+        assert res["ok"] is True
+        assert res["anzahl"] == 0
+        assert res["fehler"] == []
+
+
+class TestAppendOnly:
+    def test_revisionsnummer_inkrementiert(self, isolierte_revisionen):
+        r1 = speichere_revision(_dummy_daten(1), engine_version="test-1.0.0")
+        r2 = speichere_revision(_dummy_daten(2), engine_version="test-1.0.0")
+        r3 = speichere_revision(_dummy_daten(3), engine_version="test-1.0.0")
+        assert r1["revisionsnummer"] == 1
+        assert r2["revisionsnummer"] == 2
+        assert r3["revisionsnummer"] == 3
+
+    def test_jeder_eintrag_hat_pflichtfelder(self, isolierte_revisionen):
+        speichere_revision(_dummy_daten(1), engine_version="test-1.0.0")
+        with open(rm.REVISIONS_PFAD, "r", encoding="utf-8") as f:
+            eintrag = json.loads(f.readline())
+        for key in ("revisionsnummer", "uuid", "timestamp", "hash",
+                    "previous_hash", "schema_version", "engine_version", "daten"):
+            assert key in eintrag, f"Pflichtfeld fehlt in Datei: {key}"
+
+
+class TestHashChain:
+    def test_previous_hash_verkettet_korrekt(self, isolierte_revisionen):
+        r1 = speichere_revision(_dummy_daten(1), engine_version="test-1.0.0")
+        r2 = speichere_revision(_dummy_daten(2), engine_version="test-1.0.0")
+        r3 = speichere_revision(_dummy_daten(3), engine_version="test-1.0.0")
+        assert r2["previous_hash"] == r1["hash"]
+        assert r3["previous_hash"] == r2["hash"]
+
+    def test_pruefe_integritaet_ok_bei_3_eintraegen(self, isolierte_revisionen):
+        for i in range(1, 4):
+            speichere_revision(_dummy_daten(i), engine_version="test-1.0.0")
+        res = pruefe_integritaet()
+        assert res["ok"] is True
+        assert res["anzahl"] == 3
+        assert res["fehler"] == []
+
+
+class TestTamperingErkennung:
+    def test_manipulierte_zeile_wird_erkannt(self, isolierte_revisionen):
+        speichere_revision(_dummy_daten(1), engine_version="test-1.0.0")
+        speichere_revision(_dummy_daten(2), engine_version="test-1.0.0")
+
+        path = isolierte_revisionen
+        zeilen = path.read_text(encoding="utf-8").splitlines()
+        eintrag = json.loads(zeilen[0])
+        eintrag["daten"]["scores"]["gesamt"] = 99999  # Tampering
+        zeilen[0] = json.dumps(eintrag, ensure_ascii=False, separators=(",", ":"))
+        path.write_text("\n".join(zeilen) + "\n", encoding="utf-8")
+
+        res = pruefe_integritaet()
+        assert res["ok"] is False
+        assert len(res["fehler"]) >= 1
+
+
+class TestDryRun:
+    def test_dry_run_schreibt_nicht(self, isolierte_revisionen):
+        vor = len(lade_revisionen())
+        r = speichere_revision(_dummy_daten(1), dry_run=True, engine_version="test-1.0.0")
+        nach = len(lade_revisionen())
+        assert vor == nach == 0
+        assert r["revisionsnummer"] >= 1
+        assert "hash" in r
+
+
+class TestSchemaVersion:
+    def test_schema_version_im_eintrag(self, isolierte_revisionen):
+        speichere_revision(_dummy_daten(1), engine_version="test-1.0.0")
+        with open(rm.REVISIONS_PFAD, "r", encoding="utf-8") as f:
+            eintrag = json.loads(f.readline())
+        assert eintrag["schema_version"] == SCHEMA_VERSION

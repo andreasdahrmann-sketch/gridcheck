@@ -1,0 +1,82 @@
+﻿=== AUTH-AUDIT 20260512_142335 ===
+
+--- A) ADR-007 (Magic-Link Entscheidung) ---
+
+--- B) Auth-relevante Dateinamen Backend ---
+
+FullName                                                                            Length LastWriteTime      
+--------                                                                            ------ -------------      
+C:\Users\andre\gridcheck\backend\alembic\versions\20260507_01_init_auth_projects.py   7201 07.05.2026 21:52:05
+C:\Users\andre\gridcheck\backend\api\auth.py                                          4795 07.05.2026 21:43:31
+C:\Users\andre\gridcheck\backend\api\users.py                                         1818 07.05.2026 21:43:53
+C:\Users\andre\gridcheck\backend\core\auth.py                                         5074 12.05.2026 13:46:56
+C:\Users\andre\gridcheck\backend\services\auth_service.py                             3584 07.05.2026 22:09:15
+C:\Users\andre\gridcheck\backend\services\user_service.py                             1044 07.05.2026 21:06:50
+C:\Users\andre\gridcheck\backend\tests\test_auth_projects_api.py                      9475 12.05.2026 13:58:27
+
+
+
+--- C) Auth-Imports/Decorator-Vorkommen ---
+
+Path                                                  Pattern                                                                                                     
+----                                                  -------                                                                                                     
+C:\Users\andre\gridcheck\backend\api\analyze_v2.py    from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\api\auth.py          from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\api\billing.py       from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\api\ops_followups.py from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\api\projects.py      from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\api\routes.py        from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\api\site_markers.py  from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\api\users.py         from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\api\v2_reports.py    from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\core\auth.py         from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\services\auth_ser... from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\services\user_ser... from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+C:\Users\andre\gridcheck\backend\main.py              from\s+.*auth|import\s+jwt|import\s+bcrypt|passlib|OAuth2|Depends.*user|require_auth|current_user|HTTPBearer
+
+
+
+--- D) Frontend Auth ---
+
+FullName                                                  Length
+--------                                                  ------
+C:\Users\andre\gridcheck\frontend\app\login\page.tsx        6577
+C:\Users\andre\gridcheck\frontend\lib\api\auth.ts           1616
+C:\Users\andre\gridcheck\frontend\lib\user-preferences.ts   2426
+
+
+
+--- E) DB-Modelle User/Session ---
+
+Path                                          Pattern                                        
+----                                          -------                                        
+C:\Users\andre\gridcheck\backend\api\auth.py  class\s+(User|Session|Token|MagicLink|AuthUser)
+C:\Users\andre\gridcheck\backend\db\models.py class\s+(User|Session|Token|MagicLink|AuthUser)
+
+
+
+--- F) .env Auth-Variablen ---
+FILE: C:\Users\andre\gridcheck\backend\.env
+SECRET_KEY=***
+FILE: C:\Users\andre\gridcheck\backend\.env.example
+JWT_SECRET=***
+JWT_REFRESH_SECRET=***
+AUTH_ACCESS_COOKIE=***
+AUTH_REFRESH_COOKIE=***
+AUTH_CSRF_COOKIE=***
+FILE: C:\Users\andre\gridcheck\backend\.env.prod.example
+JWT_SECRET=***
+JWT_REFRESH_SECRET=***
+AUTH_ACCESS_COOKIE=***
+AUTH_REFRESH_COOKIE=***
+AUTH_CSRF_COOKIE=***
+FILE: C:\Users\andre\gridcheck\backend\.env.staging.example
+JWT_SECRET=***
+JWT_REFRESH_SECRET=***
+AUTH_ACCESS_COOKIE=***
+AUTH_REFRESH_COOKIE=***
+AUTH_CSRF_COOKIE=***
+FILE: C:\Users\andre\gridcheck\backups\milestone_v1_projektierer_20260503_220557\.env
+SECRET_KEY=***
+FILE: C:\Users\andre\gridcheck\frontend\.env.example
+FILE: C:\Users\andre\gridcheck\frontend\.env.local
