@@ -183,35 +183,62 @@ export default function Home() {
 
           <div className="mt-8">
             <div className="mb-8 grid gap-4 lg:grid-cols-3">
-              {ROLE_CARDS.map((item) => (
-                <Link
-                  key={item.title}
-                  href={"href" in item ? item.href : "/projektierer"}
-                  className={`rounded-[24px] border p-5 transition ${
-                    item.active
-                      ? "border-brand-cyan/30 bg-brand-cyan/10 hover:bg-brand-cyan/15"
-                      : "border-white/10 bg-white/5 hover:bg-white/10"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-lg font-semibold text-white">{item.title}</p>
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
-                        item.active
-                          ? "border border-brand-cyan/20 bg-brand-cyan/10 text-brand-cyan"
-                          : "border border-white/10 bg-black/20 text-text-muted"
+              {ROLE_CARDS.map((item) => {
+                const cardClassName = `rounded-[24px] border p-5 transition ${
+                  item.active
+                    ? "border-brand-cyan/30 bg-brand-cyan/10 hover:bg-brand-cyan/15"
+                    : "border-white/10 bg-white/5 opacity-90"
+                }`;
+                const badge = (
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
+                      item.active
+                        ? "border border-brand-cyan/20 bg-brand-cyan/10 text-brand-cyan"
+                        : "border border-amber-400/25 bg-amber-400/10 text-amber-200"
+                    }`}
+                  >
+                    {item.status}
+                  </span>
+                );
+                const body = (
+                  <>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-semibold text-white">{item.title}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-text-dim">{item.subtitle}</p>
+                      </div>
+                      {badge}
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-text-muted">{item.description}</p>
+                    <div
+                      className={`mt-4 inline-flex items-center text-sm font-semibold ${
+                        item.active ? "text-white" : "text-text-muted"
                       }`}
                     >
-                      {item.status}
-                    </span>
+                      {item.cta}
+                      {item.active ? <ArrowRight className="ml-2 h-4 w-4" /> : null}
+                    </div>
+                  </>
+                );
+                if (item.active && "href" in item) {
+                  return (
+                    <Link key={item.title} href={item.href} className={cardClassName}>
+                      {body}
+                    </Link>
+                  );
+                }
+                return (
+                  <div
+                    key={item.title}
+                    role="group"
+                    aria-disabled="true"
+                    aria-label={`${item.title}: ${item.status}`}
+                    className={cardClassName}
+                  >
+                    {body}
                   </div>
-                  <p className="mt-3 text-sm leading-6 text-text-muted">{item.description}</p>
-                  <div className="mt-4 inline-flex items-center text-sm font-semibold text-white">
-                    {item.cta}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </div>
-                </Link>
-              ))}
+                );
+              })}
             </div>
 
             <ProductDecisionGuide

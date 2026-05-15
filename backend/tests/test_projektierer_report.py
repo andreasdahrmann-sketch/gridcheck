@@ -47,6 +47,48 @@ def _report_request() -> dict:
     }
 
 
+def _hannover_hybrid_ms_report_request() -> dict:
+    """Realistisches DE-Beispiel: Hannover (30159), PV+BESS, 5 MW, MS (20 kV)."""
+    return {
+        "plz": "30159",
+        "ort": "Hannover",
+        "standort": "Gewerbepark Nord",
+        "nennspannung": 20.0,
+        "leistung_mw": 5.0,
+        "leitungstyp": "NA2XS2Y240",
+        "entfernung_km": 4.2,
+        "anschlussart": "Einspeisung",
+        "anlagentyp": "PV",
+        "projektreife": "planung",
+        "project_components": [
+            {"component_type": "pv", "capacity_kw": 4000, "max_export_kw": 3500},
+            {
+                "component_type": "battery",
+                "capacity_kw": 2000,
+                "energy_kwh": 8000,
+                "controllable": True,
+            },
+        ],
+        "netzanschlusspunkt": {
+            "max_export_kw": 3500,
+            "max_import_kw": 1200,
+            "export_limit_mode": "dynamic",
+        },
+        "storage_profile": {
+            "has_storage": True,
+            "operation_mode": "partial_grid_support",
+            "power_kw": 2000,
+            "energy_kwh": 8000,
+            "remote_control_capable": True,
+            "reactive_power_capable": True,
+        },
+        "stakeholder_context": {
+            "customer_type": "projektierer",
+            "priority_focus": "balanced",
+        },
+    }
+
+
 def _mock_report_analysis(monkeypatch, result: dict) -> None:
     from api import v2_reports as reports_api
 
@@ -248,6 +290,70 @@ def test_post_projektierer_report_pdf(
     assert r.headers.get("x-gridcheck-report-revision-hash") == latest.hash
     assert r.headers.get("x-gridcheck-report-revision-uuid") == latest.uuid
     assert r.headers.get("x-gridcheck-report-verify-path", "").endswith(latest.hash)
+
+
+def test_projektierer_analyze_then_pdf_hannover_hybrid_ms(
+    isolierte_revisionen,
+    isolierte_report_revisionen,
+    monkeypatch,
+):
+    """E2E: reale Engine-Analyse (Hannover, PV+BESS, 5 MW, MS) + Projektierer-PDF-Export."""
+    import api.analyze_v2 as analyze_v2_api
+
+    monkeypatch.setattr(
+        analyze_v2_api,
+        "enforce_package_rights",
+        lambda payload, access: payload,
+    )
+
+    headers = _auth_headers()
+    analyze_payload = _hannover_hybrid_ms_report_request()
+
+    analyze_res = client.post(
+        "/api/v1/analyze",
+        json=analyze_payload,
+        headers=headers,
+    )
+    assert analyze_res.status_code == 200, analyze_res.text
+    analyze_body = analyze_res.json()
+    assert analyze_body.get("status") == "OK", analyze_body
+    projektprofil = analyze_body.get("projektprofil") or {}
+    assert projektprofil.get("is_hybrid") is True
+    assert float(analyze_payload["leistung_mw"]) == 5.0
+    assert float(analyze_payload["nennspannung"]) == 20.0
+    assert analyze_payload["plz"] == "30159"
+
+    engine_result = _engine_result()
+    engine_result["eingabe"] = {
+        "plz": "30159",
+        "ort": "Hannover",
+        "leistung_mw": 5.0,
+        "nennspannung": 20.0,
+        "anschlussart": "Einspeisung",
+    }
+    engine_result["projektprofil"] = {
+        "summary": str(projektprofil.get("summary") or "Hybridprojekt mit begrenzter NAP-Einspeisung"),
+        "is_hybrid": True,
+    }
+    engine_result["speicher_bewertung"] = analyze_body.get("speicher_bewertung") or {
+        "summary": "Speicher mit netzdienlichen Elementen"
+    }
+    _mock_report_analysis(monkeypatch, engine_result)
+
+    pdf_res = client.post(
+        "/api/v2/reports/projektierer?format=pdf",
+        json={"analyze_request": _report_request()},
+        headers=headers,
+    )
+    assert pdf_res.status_code == 200, pdf_res.text
+    assert pdf_res.headers.get("content-type", "").startswith("application/pdf")
+    assert pdf_res.content.startswith(b"%PDF")
+    assert len(pdf_res.content) > 0
+
+    report = build_projektierer_report(engine_result)
+    assert report["spannungsebene"] == "MS"
+    assert report["leistung_mw"] == 5.0
+    assert len(report.get("normen_snapshot") or []) > 0
 
 
 def test_report_route_rejects_client_supplied_engine_result():

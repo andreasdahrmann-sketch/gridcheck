@@ -93,9 +93,9 @@ function formatTimestamp(value?: string | null) {
   return value ? new Date(value).toLocaleString("de-DE") : "Noch nicht gespeichert";
 }
 
-export default function ProjectDetailWorkspace({ params }: { params: { id: string } }) {
+export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { projectId: string }) {
   const router = useRouter();
-  const projectId = Number(params.id);
+  const projectId = Number(projectIdStr);
   const [name, setName] = useState("");
   const [plz, setPlz] = useState("");
   const [typ, setTyp] = useState("pv");
@@ -905,3 +905,5 @@ export default function ProjectDetailWorkspace({ params }: { params: { id: strin
     </main>
   );
 }
+
+

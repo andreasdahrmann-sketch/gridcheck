@@ -7,6 +7,7 @@ import type {
   Spannungsebene,
 } from "@/types";
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
+import { bearerAuthHeaders } from "@/lib/api/session";
 import type { BillingStatus } from "@/lib/api/billing";
 
 type ApiErrorDetail = {
@@ -892,6 +893,7 @@ export async function exportStakeholderPdf(
     headers: {
       "Content-Type": "application/json",
       Accept: "application/pdf",
+      ...bearerAuthHeaders(),
       ...(csrf ? { "X-CSRF-Token": csrf } : {}),
     },
     body: JSON.stringify({ analyze_request: payload }),
