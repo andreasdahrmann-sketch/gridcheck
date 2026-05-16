@@ -1,4 +1,5 @@
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
+import { bearerAuthHeaders } from "@/lib/api/session";
 
 export type SiteMarkerAssetType = "ortsnetztrafo" | "umspannwerk" | "schaltstation";
 export type SiteMarkerLocationSource = "gps" | "manual";
@@ -39,7 +40,11 @@ async function parse<T>(res: Response): Promise<T> {
 }
 
 export async function listSiteMarkers() {
-  const res = await fetch(BASE, { credentials: "include", cache: "no-store" });
+  const res = await fetch(BASE, {
+    credentials: "include",
+    cache: "no-store",
+    headers: { ...bearerAuthHeaders() },
+  });
   return parse<SiteMarker[]>(res);
 }
 
@@ -61,7 +66,7 @@ export async function createSiteMarker(payload: {
   const res = await fetch(BASE, {
     method: "POST",
     credentials: "include",
-    headers: { ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
+    headers: { ...bearerAuthHeaders(), ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
     body: formData,
   });
   return parse<SiteMarker>(res);

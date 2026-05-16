@@ -65,8 +65,8 @@
 
 ### Paket 1 - Project Developer (MVP, kaufbar)
 
-- [NOW] P1-T01: Ergebnis-PDF finalisieren (Pflichtfelder, Warnungen, Disclaimer, Audit-ID/Hash)
-  - Abnahme: PDF enthaelt alle Pflichtbloecke und besteht den Realfall-Smoke-Test.
+- [x] P1-T01: Ergebnis-PDF finalisieren (Pflichtfelder, Warnungen, Disclaimer, Audit-ID/Hash)
+  - Abnahme: PDF enthaelt alle Pflichtbloecke; Backend-Qualitaetsgate + 44+ Report-Tests; Realfall-Smoke via `scripts/smoke_go_live.py` (siehe `docs/PDF_REPORT_ABNAHME.md`).
 - [NOW] P1-T02: Paket-1 Scope im UI/Onboarding klar markieren (inkl. No-Scope)
   - Abnahme: Featuregrenzen sind an mindestens 2 Kundenkontaktpunkten sichtbar.
 - [NOW] P1-T03: Analyse-Limits fuer Paket 1 (pro Zeitraum / Fair Use) technisch vorbereiten

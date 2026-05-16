@@ -508,6 +508,16 @@ def build_gridcheck_report_data_from_engine_result(
         _s(route_environment.get("summary")),
     ]
     key_findings = [k for k in key_findings if k][:8]
+    if not key_findings:
+        for candidate in empfehlungen:
+            text = str(candidate).strip()
+            if text:
+                key_findings = [text]
+                break
+    if not key_findings:
+        key_findings = [
+            "Vorläufige technische Einschätzung auf Basis der Engine-Berechnung."
+        ]
 
     summary = " ".join(
         x

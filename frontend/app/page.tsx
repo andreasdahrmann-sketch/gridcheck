@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -50,34 +50,30 @@ const PUBLIC_OFFERS = [
 
 const ROLE_CARDS = [
   {
-    title: "Projektentwickler",
-    subtitle: "Projektierer",
+    title: "Projektierer",
     status: "Aktiv",
     href: "/projektierer",
-    description:
-      "Aktiver Pfad fuer Vorqualifizierung, Variantenvergleich, Kosten-/Trassenklaerung und PDF-Export im Projektierer-Report.",
+    description: "Aktiver Pfad fuer Vorqualifizierung, Variantenvergleich, Kosten-/Trassenklaerung und VNB-/Invest-Vorbereitung.",
     cta: "Projektierer-Modul oeffnen",
     active: true,
   },
   {
-    title: "Netzbetreiber",
-    subtitle: "VNB",
-    status: "Coming soon",
-    description:
-      "Strukturierte Anfragepruefung, technische Vorpruefung, Auflagen und Audit-/Prozesssicht — Rollout folgt.",
-    cta: "Demnaechst verfuegbar",
-    active: false,
+    title: "VNB",
+    status: "Aktiv",
+    href: "/vnb",
+    description: "Aktiver Pfad fuer strukturierte Anfragepruefung, technische Vorpruefung, Auflagen und Audit-/Prozesssicht.",
+    cta: "VNB-Modul oeffnen",
+    active: true,
   },
   {
-    title: "Investor",
-    subtitle: "Invest",
-    status: "Coming soon",
-    description:
-      "Standortbewertung, Risikoanalyse, Kostenbandbreite und Due-Diligence-orientierte Outputs — Rollout folgt.",
-    cta: "Demnaechst verfuegbar",
-    active: false,
+    title: "Invest",
+    status: "Aktiv",
+    href: "/invest",
+    description: "Aktiver Pfad fuer Standortbewertung, Risikoanalyse, Kostenbandbreite und Due-Diligence-orientierte Outputs.",
+    cta: "Invest-Modul oeffnen",
+    active: true,
   },
-] as const;
+];
 
 export default function Home() {
   const [tab, setTab] = useState<"check" | "dashboard">("check");
@@ -166,7 +162,7 @@ export default function Home() {
 
           <div className="mt-8 grid gap-4 lg:grid-cols-3">
             {[
-              "Der Projektierer-Pfad ist aktiv; VNB- und Investor-Module folgen als Coming soon.",
+              "Die MVP-Rollenpfade /projektierer, /vnb und /invest sind aktiv und fuehren in differenzierte Nutzerfluesse.",
               "3 Checks kostenlos pro Nutzer, danach serverseitige Paywall.",
               "Oeffentlich sichtbare Pay-per-Use-Pakete fuer konkrete Vorhaben.",
               "Invest blendet tiefe Netzdaten bewusst aus; VNB und Projektierer behalten technische Tiefensicht nach Rollenlogik.",
@@ -183,62 +179,35 @@ export default function Home() {
 
           <div className="mt-8">
             <div className="mb-8 grid gap-4 lg:grid-cols-3">
-              {ROLE_CARDS.map((item) => {
-                const cardClassName = `rounded-[24px] border p-5 transition ${
-                  item.active
-                    ? "border-brand-cyan/30 bg-brand-cyan/10 hover:bg-brand-cyan/15"
-                    : "border-white/10 bg-white/5 opacity-90"
-                }`;
-                const badge = (
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
-                      item.active
-                        ? "border border-brand-cyan/20 bg-brand-cyan/10 text-brand-cyan"
-                        : "border border-amber-400/25 bg-amber-400/10 text-amber-200"
-                    }`}
-                  >
-                    {item.status}
-                  </span>
-                );
-                const body = (
-                  <>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-lg font-semibold text-white">{item.title}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-text-dim">{item.subtitle}</p>
-                      </div>
-                      {badge}
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-text-muted">{item.description}</p>
-                    <div
-                      className={`mt-4 inline-flex items-center text-sm font-semibold ${
-                        item.active ? "text-white" : "text-text-muted"
+              {ROLE_CARDS.map((item) => (
+                <Link
+                  key={item.title}
+                  href={item.href}
+                  className={`rounded-[24px] border p-5 transition ${
+                    item.active
+                      ? "border-brand-cyan/30 bg-brand-cyan/10 hover:bg-brand-cyan/15"
+                      : "border-white/10 bg-white/5 hover:bg-white/10"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-lg font-semibold text-white">{item.title}</p>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
+                        item.active
+                          ? "border border-brand-cyan/20 bg-brand-cyan/10 text-brand-cyan"
+                          : "border border-white/10 bg-black/20 text-text-muted"
                       }`}
                     >
-                      {item.cta}
-                      {item.active ? <ArrowRight className="ml-2 h-4 w-4" /> : null}
-                    </div>
-                  </>
-                );
-                if (item.active && "href" in item) {
-                  return (
-                    <Link key={item.title} href={item.href} className={cardClassName}>
-                      {body}
-                    </Link>
-                  );
-                }
-                return (
-                  <div
-                    key={item.title}
-                    role="group"
-                    aria-disabled="true"
-                    aria-label={`${item.title}: ${item.status}`}
-                    className={cardClassName}
-                  >
-                    {body}
+                      {item.status}
+                    </span>
                   </div>
-                );
-              })}
+                  <p className="mt-3 text-sm leading-6 text-text-muted">{item.description}</p>
+                  <div className="mt-4 inline-flex items-center text-sm font-semibold text-white">
+                    {item.cta}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </div>
+                </Link>
+              ))}
             </div>
 
             <ProductDecisionGuide

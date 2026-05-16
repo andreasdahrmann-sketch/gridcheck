@@ -1,4 +1,5 @@
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
+import { bearerAuthHeaders } from "@/lib/api/session";
 
 export type OpsFollowup = {
   entitlement_id: number;
@@ -45,6 +46,7 @@ export async function listOpsFollowups(options?: { includeCompleted?: boolean; a
   const res = await fetch(`${BASE}${query ? `?${query}` : ""}`, {
     credentials: "include",
     cache: "no-store",
+    headers: { ...bearerAuthHeaders() },
   });
   return parse<OpsFollowup[]>(res);
 }
@@ -54,7 +56,11 @@ export async function claimOpsFollowup(entitlementId: number, comment?: string) 
   const res = await fetch(`${BASE}/${entitlementId}/claim`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...bearerAuthHeaders(),
+      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+    },
     body: JSON.stringify({ comment: comment || null }),
   });
   return parse<OpsFollowup>(res);
@@ -65,7 +71,11 @@ export async function updateOpsFollowupStatus(entitlementId: number, status: "in
   const res = await fetch(`${BASE}/${entitlementId}`, {
     method: "PATCH",
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...bearerAuthHeaders(),
+      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+    },
     body: JSON.stringify({ status, comment: comment || null }),
   });
   return parse<OpsFollowup>(res);

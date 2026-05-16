@@ -19,7 +19,10 @@ def _read_cache() -> dict[str, dict[str, object]]:
 
 
 def _write_cache(data: dict[str, dict[str, object]]) -> None:
-    CACHE_PATH.write_text(json.dumps(data, ensure_ascii=True, indent=2), encoding="utf-8")
+    payload = json.dumps(data, ensure_ascii=True, indent=2)
+    tmp_path = CACHE_PATH.with_suffix(".tmp")
+    tmp_path.write_text(payload, encoding="utf-8")
+    tmp_path.replace(CACHE_PATH)
 
 
 def get_cached(key: str, ttl_seconds: int = 86400):

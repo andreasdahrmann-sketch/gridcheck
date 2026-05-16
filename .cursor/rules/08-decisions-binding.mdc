@@ -1,0 +1,16 @@
+---
+description: Bindende Projektentscheidungen (ADR) vor Codeänderungen lesen
+alwaysApply: true
+---
+
+# Projektentscheidungen (bindend)
+
+Vor **jeder Codeänderung** (auch kleine Fixes):
+
+1. **Cursor Rules:** zutreffende `.cursor/rules/*.mdc` lesen (mindestens `06-arbeitsweise-gridcheck.mdc`, `05-workflow.mdc`; bei Stack/Deps zusätzlich `07-toolchain-versions.mdc`).
+2. **Entscheidungslog:** `DECISIONS.md` im Repo-Root lesen; bei Architektur/Stack auch `docs/ARCHITEKTUR.md` prüfen, ob relevante ADRs betroffen sind.
+3. **Keine Improvisation:** dokumentierte Projektentscheidungen (ADR-Tabelle + Detail-Abschnitte in `DECISIONS.md`) haben Vorrang vor Ad-hoc-Vorschlägen, „Best Practices“ oder Annahmen des Agents.
+4. **Konflikt:** widerspricht eine `.cursor/rules/*`-Regel einer Eintragung in `DECISIONS.md` (oder umgekehrt) → **stoppen**, Konflikt kurz benennen, **Nutzer fragen** — nicht still eine Seite wählen.
+5. **Neue Entscheidung nötig:** Scope/Stack/Architektur ändert sich → zuerst Nutzer um Freigabe bitten; nach Freigabe `DECISIONS.md` ergänzen (Zeile in Tabelle + ggf. ADR-Abschnitt), dann implementieren.
+
+**Kanonical source:** `DECISIONS.md` (kein separates `docs/decisions/` — dort nicht suchen).

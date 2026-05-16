@@ -121,8 +121,37 @@ def main() -> int:
             except Exception as exc:
                 _fail("GET /api/v1/history", str(exc))
                 failures += 1
+
+            try:
+                pdf = client.post(
+                    f"{base}/api/v2/reports/projektierer?format=pdf",
+                    headers=headers,
+                    json={"analyze_request": ANALYZE_PAYLOAD},
+                )
+                if pdf.status_code == 422:
+                    detail = pdf.json().get("detail", pdf.text[:300])
+                    code = detail.get("code") if isinstance(detail, dict) else None
+                    if code == "REPORT_PDF_QUALITY_FAILED":
+                        raise ValueError(f"quality gate: {detail}")
+                    _ok(
+                        "POST /api/v2/reports/projektierer?format=pdf",
+                        f"422 (fachlich): {json.dumps(detail)[:120]}",
+                    )
+                else:
+                    pdf.raise_for_status()
+                    if not pdf.headers.get("content-type", "").startswith("application/pdf"):
+                        raise ValueError(f"unexpected content-type: {pdf.headers.get('content-type')}")
+                    if not pdf.content.startswith(b"%PDF"):
+                        raise ValueError("response is not a PDF")
+                    _ok(
+                        "POST /api/v2/reports/projektierer?format=pdf",
+                        f"bytes={len(pdf.content)}",
+                    )
+            except Exception as exc:
+                _fail("POST /api/v2/reports/projektierer?format=pdf", str(exc))
+                failures += 1
         else:
-            print("[SKIP] billing / analyze / history — Login erforderlich")
+            print("[SKIP] billing / analyze / history / pdf — Login erforderlich")
 
     if failures:
         print(f"\n{failures} Check(s) fehlgeschlagen.", file=sys.stderr)

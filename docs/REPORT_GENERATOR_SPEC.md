@@ -55,3 +55,7 @@ Revisionssichere PDF-Reports aus Gridcheck-Analysen erzeugen.
 
 ## Disclaimer
 Dieser Report ist eine automatisierte technische Vorbewertung und ersetzt keine verbindliche Netzanschlusspruefung durch den zustaendigen Netzbetreiber.
+
+## PDF-Abnahme (P1-T01)
+- Pre-PDF-Qualitaetsgate im Backend (`report_quality.py`), API-Fehlercode `REPORT_PDF_QUALITY_FAILED`.
+- Abnahme und Smoke-Befehle: `docs/PDF_REPORT_ABNAHME.md`.

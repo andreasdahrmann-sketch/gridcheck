@@ -19,7 +19,6 @@ from api.projects import router as projects_router
 from api.site_markers import router as site_markers_router
 from api.users import router as users_router
 from api.contact import router as contact_router
-from api.analytics import router as analytics_router
 from api.v2_reports import router_reports
 
 app = FastAPI(
@@ -69,7 +68,6 @@ app.include_router(projects_router)
 app.include_router(site_markers_router)
 app.include_router(users_router)
 app.include_router(contact_router)
-app.include_router(analytics_router)
 app.include_router(router_reports, prefix="/api")
 
 # Legacy-Compatibility (existing clients), gated via feature flag.

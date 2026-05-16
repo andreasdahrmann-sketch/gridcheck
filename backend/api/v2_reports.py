@@ -37,6 +37,7 @@ from engine.stakeholder_reports.renderer import (
     render_vnb_html,
     verify_report_revision_record,
 )
+from engine.stakeholder_reports.report_quality import run_pre_pdf_quality_checks
 from engine.stakeholder_reports.vnb import build_vnb_report
 from services import project_service
 from services.conversion_tracking_service import track_report_exported
@@ -402,6 +403,23 @@ def _resolve_export_format(
     return str(req.output_format).strip().lower()
 
 
+def _report_pdf_quality_failed(issues: list[str]) -> HTTPException:
+    preview = "; ".join(issues[:5])
+    extra = len(issues) - 5
+    hint = preview if extra <= 0 else f"{preview} (+{extra} weitere)"
+    return HTTPException(
+        status_code=422,
+        detail={
+            "code": "REPORT_PDF_QUALITY_FAILED",
+            "message": (
+                "PDF-Export blockiert: Reportdaten erfuellen die Qualitaetspruefung nicht."
+            ),
+            "hint": hint,
+            "issues": issues[:20],
+        },
+    )
+
+
 def _pdf_attachment_response(
     pdf_bytes: bytes,
     report_type: str,
@@ -521,6 +539,20 @@ def _export_stakeholder_report(
         else None
     )
     if out_fmt == "pdf":
+        gc_data = (
+            final_report.get("gridcheck_report_data")
+            if isinstance(final_report, dict)
+            else None
+        )
+        if not isinstance(gc_data, dict):
+            raise _report_pdf_quality_failed(
+                ["gridcheck_report_data fehlt oder ist ungueltig"]
+            )
+        quality_issues = run_pre_pdf_quality_checks(
+            gc_data, report_wrapper=final_report
+        )
+        if quality_issues:
+            raise _report_pdf_quality_failed(quality_issues)
         pdf_bytes = build_stakeholder_report_pdf(final_report)
         return _pdf_attachment_response(
             pdf_bytes,

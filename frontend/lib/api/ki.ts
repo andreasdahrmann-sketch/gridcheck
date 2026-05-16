@@ -1,5 +1,6 @@
 import { AnalyzeApiError } from "@/lib/api/analyze";
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
+import { bearerAuthHeaders } from "@/lib/api/session";
 
 const BASE = "/api/backend/api/v1/ki";
 
@@ -57,6 +58,7 @@ export async function submitKiFeedback(
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
+      ...bearerAuthHeaders(),
       ...(csrf ? { "X-CSRF-Token": csrf } : {}),
     },
     body: JSON.stringify(payload),

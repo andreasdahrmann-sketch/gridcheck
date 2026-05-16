@@ -9,6 +9,12 @@ if (rawBackendUrl && !/^https?:\/\//.test(rawBackendUrl)) {
   throw new Error("BACKEND_URL muss eine absolute http(s)-URL sein.");
 }
 
+if (rawBackendUrl && /\/api(\/v\d+)?\/?$/i.test(rawBackendUrl)) {
+  throw new Error(
+    "BACKEND_URL darf kein /api- oder /api/v1-Suffix enthalten (nur Origin, z. B. https://your-app.up.railway.app).",
+  );
+}
+
 const BACKEND_URL = (rawBackendUrl || "http://localhost:8000").replace(/\/+$/, "");
 
 const nextConfig = {

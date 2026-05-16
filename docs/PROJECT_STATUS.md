@@ -1,55 +1,44 @@
 ﻿# GridCheck – Project Status
-> Zuletzt aktualisiert: 2025-06-10
+> Zuletzt aktualisiert: 2026-05-16
 
 ## Installierte Dependencies
 
-### Frontend (frontend/)
-- next, react, react-dom
-- typescript, @types/react, @types/node
-- tailwindcss (v4)
-- recharts
-- leaflet, react-leaflet, @types/leaflet
-- lucide-react
-- Hinweis: shadcn/ui Komponenten manuell unter components/ui/
+### Frontend (`frontend/`)
+- Next.js 14.2.x, React 18, TypeScript (strict)
+- Tailwind CSS v4, shadcn/ui-Komponenten unter `components/ui/`
+- TanStack Query, Leaflet, Recharts, Lucide
 
-### Backend (backend/)
-- fastapi, uvicorn
-- pydantic
-- PostgreSQL 16 + psycopg2
-- python-dotenv
-- Ggf. weitere: requirements.txt prüfen
+### Backend (`backend/`)
+- Python 3.11+, FastAPI, Pydantic v2, SQLAlchemy 2.x
+- PostgreSQL 16 + PostGIS (lokal Docker Port 5433)
+- Alembic-Migrationen, pytest
 
-## Erledigte Features
-- [x] Projektstruktur (Root, Frontend, Backend, Backups)
-- [x] .cursorrules konsolidiert im Root
-- [x] Schnell-Check Formular (GridCheckForm)
-- [x] Detail-Analyse Wizard (DetailWizard)
-- [x] Netzbetreiber-Dashboard (NetzbetreiberDashboard)
-- [x] 3-Tab Navigation (page.tsx)
-- [x] Berechnungs-Engine Grundgerüst (engine.ts / calc_engine)
-- [x] Kartenintegration (Leaflet/OSM)
-- [x] Ergebnis-Visualisierung (Recharts)
-- [x] Backend FastAPI Grundgerüst
-- [x] dump.ps1 + PROJECT_STATUS.md
+## Erledigte Features (Auszug)
+- [x] Monorepo-Struktur `frontend/` + `backend/`
+- [x] Netzanschluss-Engine (`engine/berechnung.py`) inkl. N-1-Screening
+- [x] Stakeholder-PDF-Reports (Projektierer, VNB, Invest)
+- [x] JWT-Auth Backend + Frontend-Session (`bearerAuthHeaders`)
+- [x] Projekt-CRUD (`/api/v1/projects`) + geschützte UI-Routen
+- [x] PLZ→VNB-Lookup (`/api/v1/geo/plz/{plz}`) mit kuratiertem Datensatz
+- [x] Frontend↔Backend über `/api/backend`-Rewrite (`BACKEND_URL`)
+- [x] Disclaimer-Komponente (`AnalysisDisclaimer`) in Check- und Projekt-UI
+- [x] KI-Feedback-API (`/api/v1/ki/*`) mit Hash-Chain
+- [x] Revisionssichere Audit-Tabellen (PostgreSQL, Alembic)
 
-## Offene TODOs
-- [ ] page.tsx ist KAPUTT (duplizierter Code – muss gefixt werden!)
-- [ ] Backend API-Routen vollständig implementieren
-- [ ] Datenbankschema (PostgreSQL/Alembic) weiterentwickeln
-- [ ] Auth-System implementieren
-- [ ] PDF-Export
-- [ ] KI-Integration (OpenAI)
-- [ ] N-1 Analyse vollständig implementieren
-- [ ] Revisionssichere Audit-Logs
-- [ ] Feature-Flags / Monetarisierung
-- [ ] Tests (Unit + Integration)
+## Offene TODOs (priorisiert)
+- [ ] Produktions-Deploy stabil verifizieren (Vercel `BACKEND_URL`, Railway Health)
+- [ ] GIS-/Netzdatenpipeline (OSM/DSO) als eigener Meilenstein
+- [ ] Security-Onepager / AVV für Enterprise-Procurement
+- [ ] Pilotangebot und Demo-Cases schriftlich freigeben
+- [ ] E2E-Smoke (Playwright) optional ergänzen
 
-## Bekannte Bugs
-- **page.tsx**: Datei enthält massiv duplizierten Code (Buttons + Sections mehrfach). MUSS als nächstes gefixt werden.
+## Bekannte Bugs / Hinweise
+- **`page.tsx` (Startseite):** Kein duplizierter Code mehr (Stand 2026-05-16); früherer Eintrag obsolet.
+- **Deployment:** Stabilität hängt von gesetzten Prod-ENV ab (nicht im Repo).
 
 ## Meilensteine
-| Nr | Beschreibung | Datum | Backup |
-|----|-------------|-------|--------|
-| M1 | Grundstruktur + 3 Tabs | 2025-04-09 | backups/frontend_20260409_230525 |
-| M2 | Detail-Wizard + Dashboard | 2025-04-10 | backups/frontend_20260410_180320 |
-| M3 | Tooling (dump.ps1, Status, Rules) | 2025-06-10 | - |
+| Nr | Beschreibung | Datum |
+|----|-------------|-------|
+| M1 | Grundstruktur + Stakeholder-Routen | 2026-05-02 |
+| M2 | PostgreSQL + Alembic | 2026-05-10 |
+| M3 | Live-API-Integration Frontend | 2026-05-16 |

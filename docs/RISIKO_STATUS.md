@@ -12,12 +12,12 @@
 | Auth, Rollen, Billing Backend      | FERTIG          | -           |
 | PDF-Reports (3 Stakeholder)        | IMPLEMENTIERT   | -           |
 | Frontend UI                        | VORHANDEN       | -           |
-| Frontend <-> Backend Integration   | OFFEN           | KRITISCH    |
-| Deployment produktiv               | INSTABIL        | KRITISCH    |
-| Mock-Daten entfernt                | OFFEN           | KRITISCH    |
+| Frontend <-> Backend Integration   | TEILWEISE       | KRITISCH    |
+| Deployment produktiv               | TEILWEISE       | KRITISCH    |
+| Mock-Daten entfernt                | TEILWEISE       | KRITISCH    |
 | Echte GIS-/Netzdaten               | FEHLEN          | KRITISCH    |
 | KI-Lernmodul aktiv/trainiert       | GRUNDGERUEST    | MITTEL      |
-| Disclaimer / Haftung Frontend      | FEHLT           | KRITISCH    |
+| Disclaimer / Haftung Frontend      | UMGESETZT       | -           |
 | Pilotmodell definiert              | FEHLT           | KRITISCH    |
 
 ---
@@ -28,12 +28,16 @@
 - Wirkung: Kaufentscheidung blockiert. Alle Ergebnisse sind Mock-Daten.
 - Gefahr: Vertrauensverlust bei erster Live-Demo.
 - Massnahme: API-Integration priorisieren. Mock-Daten als [DEMO] markieren.
-- Status: OFFEN
+- Status: TEILWEISE UMGESETZT
+- Stand 2026-05-16: `analyzeGridcheck` und Projekt-APIs rufen `POST /api/v1/analyze` bzw. `/api/v1/projects` ueber `/api/backend`-Rewrite an. Bearer-Token in `projects`, `analyze`, `billing`, `auth`, `ki`, `ops-followups`, `site-markers`. Prod erfordert `BACKEND_URL` in Vercel (siehe `frontend/.env.example`).
+- Offen: End-to-End-Verifikation in Prod-ENV; kein Fallback auf lokale Demo-Daten im Fehlerfall.
 
 ### R-02 - Deployment instabil
 - Wirkung: Keine produktive Demo moeglich.
 - Massnahme: Railway + Vercel stabilisieren. Health-Checks einrichten.
-- Status: OFFEN
+- Status: TEILWEISE UMGESETZT
+- Stand 2026-05-16: `backend/railway.toml` mit `healthcheckPath=/health`; `frontend/next.config.mjs` fail-fast ohne `BACKEND_URL` auf Vercel; `frontend/vercel.json` mit `npm ci` + `npm run build`.
+- Offen: Credentials/ENV in Railway + Vercel; Smoke `backend/scripts/smoke_go_live.py` gegen Prod-URL.
 
 ### R-03 - Disclaimer / Haftungsausschluss fehlt im Frontend
 - Wirkung: Rechtliches Risiko. Missverstaendnis: App = verbindliche Netzpruefung.
@@ -42,18 +46,22 @@
    Daten und Modellannahmen. Sie ersetzt keine verbindliche Netzanschlusspruefung
    durch den zustaendigen Netzbetreiber. Berechnete Werte, insbesondere
    Kapazitaeten und Kosten, sind Indikatoren, keine Zusagen."
-- Status: OFFEN
+- Status: UMGESETZT (Frontend)
+- Stand 2026-05-16: `AnalysisDisclaimer` in GridCheckForm, Projekt-Workspace, Stakeholder-Seiten; Footer/Impressum/AGB; PDF-Profile mit `includeDisclaimer`. API-Engine liefert `transparenz.disclaimers`.
 
 ### R-04 - PLZ -> Netzbetreiber-Zuordnung fehlt
 - Wirkung: NAP-Ermittlung bleibt rein heuristisch.
 - Massnahme: Mindest-Mapping PLZ -> VNB aufbauen.
-- Status: OFFEN
+- Status: TEILWEISE UMGESETZT
+- Stand 2026-05-16: `GET /api/v1/geo/plz/{plz}` + `plz_vnb_snap.json` + UI `VnbBanner` mit Fallback-Hinweis bei Lookup-Fehler.
+- Offen: Vollstaendigkeit des Datensatzes; keine parzellengenaue Zustaendigkeit.
 
 ### R-05 - Scheingenauigkeit bei Ausgabewerten
 - Wirkung: Nutzer interpretiert z.B. "7,42 MW" als verbindlich.
 - Massnahme: Alle Ausgaben als Bandbreiten. Niemals Punktwerte ohne Confidence.
 - Regel: Statt "7,42 MW" -> "ca. 5-8 MW (Datenqualitaet: mittel, +-30%)"
-- Status: TEILWEISE UMGESETZT (Engine), OFFEN (Frontend)
+- Status: TEILWEISE UMGESETZT
+- Stand 2026-05-16: Engine liefert Kostenbandbreiten; Frontend zeigt Bandbreite in Invest-Sicht und allgemeiner Kosten-Sektion (Fallback „ca.“ bei Einzelwert).
 
 ---
 
@@ -62,12 +70,14 @@
 ### R-06 - N-1-Methodik nicht transparent dokumentiert
 - Wirkung: Netzbetreiber und Projektierer zweifeln an Aussagekraft.
 - Massnahme: N-1-Klassifikation einfuehren (siehe Abschnitt 13).
-- Status: OFFEN
+- Status: TEILWEISE UMGESETZT
+- Stand 2026-05-16: `N1AssessmentPanel`, Engine-Felder `n1_klasse`/`n1_konfidenz`, Transparenz-Notizen in Reports.
 
 ### R-07 - KI-Modul kommuniziert staerker als es ist
 - Wirkung: Uebersprechen. Investoren und Netzbetreiber skeptisch.
 - Massnahme: KI immer als "unterstuetzend / assoziativ" kennzeichnen.
-- Status: OFFEN
+- Status: TEILWEISE UMGESETZT
+- Stand 2026-05-16: UI „KI-Lernprofil (unterstuetzend)“ mit Hinweistext; Backend KI-Feedback-Hash-Chain. Kein trainiertes Produktionsmodell. Operatives „Training“: siehe `docs/KI_TRAINING.md`.
 
 ### R-08 - Fehlende GIS-/Netzdatenpipeline
 - Wirkung: NAP-Ermittlung spekulativ. Kaufwahrscheinlichkeit bei 55% statt 85%.
@@ -90,11 +100,11 @@
 
 | Schwachstelle                        | Risiko             | Status        |
 |--------------------------------------|--------------------|---------------|
-| JSON nicht atomar geschrieben        | Race Condition     | OFFEN         |
+| JSON nicht atomar geschrieben        | Race Condition     | TEILWEISE (pricing cache atomic) |
 | Felder unvollstaendig (scores/trafo) | Audit-Luecke       | OFFEN         |
 | Verify-Endpoint /revision/verify     | Revisionssicherheit| IMPLEMENTIERT |
-| page.tsx duplizierter Code           | Runtime-Fehler     | PRUEFEN       |
-| Auth Frontend-Integration            | Zugriffskontrolle  | PRUEFEN       |
+| page.tsx duplizierter Code           | Runtime-Fehler     | ERLEDIGT (kein Duplikat 2026-05-16) |
+| Auth Frontend-Integration            | Zugriffskontrolle  | UMGESETZT (`ProtectedRoute` + Bearer) |
 
 ---
 
@@ -194,11 +204,11 @@ Zahlungsbereitschaft Netzbetreiber: 6-stellig/Jahr moeglich bei Enterprise-Lizen
 
 ## 11. MVP-CHECKLISTE (vor erstem Kundenpilot)
 
-- [ ] Frontend <-> Backend live verbunden
-- [ ] Mock-Daten entfernt oder als [DEMO] markiert
+- [ ] Frontend <-> Backend live verbunden (Code ja, Prod-Smoke offen)
+- [x] Mock-Daten entfernt oder als [DEMO] markiert (kein Frontend-Mock-Pfad fuer Analyze)
 - [ ] Deployment stabil (Railway + Vercel)
-- [ ] PDF-Report produktionsreif exportierbar
-- [ ] Disclaimer sichtbar im Frontend + PDF + API
+- [x] PDF-Report produktionsreif exportierbar (API + UI-Export)
+- [x] Disclaimer sichtbar im Frontend + PDF + API
 - [ ] Confidence-Level prominent angezeigt
 - [ ] Jede Eingabe mit Quelle markiert (User / Default / Modell)
 - [ ] 3 Beispiel-Demo-Cases vorbereitet:
@@ -263,4 +273,5 @@ Die Demo muss in unter 5 Minuten zeigen:
 |------------|-----------------------------------------------------|--------|
 | 2026-05-16 | Initiale Erstellung aus Testergebnis-Review         | System |
 | 2026-05-16 | Abschnitte 4-7 + 14-15 ergaenzt (vollstaendige Fassung) | System |
+| 2026-05-16 | Status-Update nach Code-Audit: Auth-Guard, API-Bearer, Disclaimer, PLZ-VNB, THD-Transparenz | Agent |
 

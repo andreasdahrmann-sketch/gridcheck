@@ -7,8 +7,8 @@ import type {
   Spannungsebene,
 } from "@/types";
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
-import { bearerAuthHeaders } from "@/lib/api/session";
 import type { BillingStatus } from "@/lib/api/billing";
+import { bearerAuthHeaders } from "@/lib/api/session";
 
 type ApiErrorDetail = {
   code?: string;
@@ -168,6 +168,10 @@ function formatApiErrorMessage(status: number, detail: unknown) {
         .filter(Boolean)
         .join(" ");
     }
+  }
+
+  if (status === 401) {
+    return "Anmeldung erforderlich. Bitte einloggen und die Analyse erneut starten.";
   }
 
   if (typeof detail === "string") {
@@ -844,6 +848,7 @@ export async function analyzeGridcheck(
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
+        ...bearerAuthHeaders(),
         ...(csrf ? { "X-CSRF-Token": csrf } : {}),
       },
       body: JSON.stringify(payload),
@@ -851,7 +856,7 @@ export async function analyzeGridcheck(
   } catch {
     throw new AnalyzeApiError(
       0,
-      "Backend nicht erreichbar. Bitte pruefen, ob die API auf http://localhost:8000 laeuft.",
+      "Backend nicht erreichbar. Bitte pruefen, ob Backend (Port 8000) und NEXT_PUBLIC_API_BASE (/api/backend) erreichbar sind.",
       null,
     );
   }

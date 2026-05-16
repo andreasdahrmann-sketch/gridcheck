@@ -7,6 +7,7 @@ import { ArrowLeft, ClipboardList, FileDown, MapPinned, Radar, Settings2, Share2
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import BillingUpgradePrompt from "@/components/BillingUpgradePrompt";
+import { AnalysisDisclaimer } from "@/components/legal/AnalysisDisclaimer";
 import NetzplanVisualization from "@/components/NetzplanVisualization";
 import ProjectProfileFields from "@/components/ProjectProfileFields";
 import ProductDecisionGuide from "@/components/billing/ProductDecisionGuide";
@@ -697,6 +698,8 @@ export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { pr
 
               <ProjectProfileFields value={profile} onChange={setProfile} compact />
             </form>
+
+            {result ? <AnalysisDisclaimer className="mb-6" /> : null}
 
             {result && hasNetzplanResult(result) && showDeepTechnicalDetails ? (
               <NetzplanVisualization

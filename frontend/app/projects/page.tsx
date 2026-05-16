@@ -40,12 +40,6 @@ export default function ProjectsPage() {
   });
 
   useEffect(() => {
-    if (projectsQuery.isError) {
-      window.location.href = "/login";
-    }
-  }, [projectsQuery.isError]);
-
-  useEffect(() => {
     setCompactCards(readUserPreferences().compactProjectCards);
   }, []);
 

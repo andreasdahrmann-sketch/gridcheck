@@ -16,16 +16,45 @@ type TokenResponse = {
 
 const BASE = "/api/backend/api/v1/auth";
 
+const BACKEND_UNREACHABLE_HINT =
+  "Backend nicht erreichbar. Vercel: BACKEND_URL auf die Railway-HTTPS-URL setzen (nur Origin, ohne /api/v1). Railway: GET /health pruefen. Lokal: uvicorn auf Port 8000.";
+
+async function readResponseBody(res: Response): Promise<unknown> {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    return res.json().catch(() => ({}));
+  }
+  const text = await res.text().catch(() => "");
+  if (!text) return {};
+  return {
+    detail: {
+      message: `Unerwartete Antwort vom Server (HTTP ${res.status})`,
+      hint: text.slice(0, 160),
+    },
+  };
+}
+
 async function parse<T>(res: Response): Promise<T> {
-  const body = await res.json().catch(() => ({}));
+  const body = await readResponseBody(res);
   if (!res.ok) {
+    if (res.status >= 502 && res.status <= 504) {
+      throw new Error(BACKEND_UNREACHABLE_HINT);
+    }
     throw new Error(extractApiErrorMessage(body, "API request failed"));
   }
   return body as T;
 }
 
+async function backendAuthFetch(path: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(`${BASE}${path}`, init);
+  } catch {
+    throw new Error(BACKEND_UNREACHABLE_HINT);
+  }
+}
+
 export async function register(payload: { email: string; password: string; role?: string; full_name?: string }) {
-  const res = await fetch(`${BASE}/register`, {
+  const res = await backendAuthFetch("/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -35,7 +64,7 @@ export async function register(payload: { email: string; password: string; role?
 }
 
 export async function login(payload: { email: string; password: string }) {
-  const res = await fetch(`${BASE}/login`, {
+  const res = await backendAuthFetch("/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -47,7 +76,7 @@ export async function login(payload: { email: string; password: string }) {
 }
 
 export async function me() {
-  const res = await fetch(`${BASE}/me`, {
+  const res = await backendAuthFetch("/me", {
     credentials: "include",
     cache: "no-store",
     headers: { ...bearerAuthHeaders() },
@@ -57,7 +86,7 @@ export async function me() {
 
 export async function logout() {
   const csrf = getCsrfTokenFromCookie();
-  const res = await fetch(`${BASE}/logout`, {
+  const res = await backendAuthFetch("/logout", {
     method: "POST",
     credentials: "include",
     headers: { ...(csrf ? { "X-CSRF-Token": csrf } : {}), ...bearerAuthHeaders() },

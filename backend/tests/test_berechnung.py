@@ -26,6 +26,11 @@ class TestBerechnungSmoke:
             assert isinstance(s[k], (int, float))
             assert 0 <= s[k] <= 100
 
+    def test_transparenz_enthält_thd_hinweis(self, basis_pv_ms):
+        r = berechne_netzanschluss(basis_pv_ms)
+        notes = r["transparenz"]["confidence_notes"]
+        assert any("THD" in note and "nicht berechnet" in note for note in notes)
+
 
 class TestN1Integration:
     """N-1 muss in Gesamtberechnung korrekt durchschlagen."""

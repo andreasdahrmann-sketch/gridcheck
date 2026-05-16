@@ -9,6 +9,7 @@ import type {
   Topologie,
 } from "../types";
 import VnbBanner from "./VnbBanner";
+import { AnalysisDisclaimer } from "@/components/legal/AnalysisDisclaimer";
 import NetzplanVisualization from "./NetzplanVisualization";
 import BillingUpgradePrompt from "./BillingUpgradePrompt";
 import ProductDecisionGuide from "./billing/ProductDecisionGuide";
@@ -1005,6 +1006,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
 
     return (
       <div className="mx-auto max-w-5xl space-y-6">
+        <AnalysisDisclaimer />
         {/* Header */}
         <div className="rounded-[28px] border border-gray-700 bg-gray-900/60 p-5 md:p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -1371,7 +1373,25 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
           <div className={sectionClass}>
             <h3 className={sectionTitle}>Kosten / Zeit</h3>
             <div className="space-y-2 text-sm text-gray-300">
-              <p>Indikation: <span className="text-white font-semibold">{result.kosten_indikation_eur.toLocaleString("de-DE")} EUR</span></p>
+              {costBand ? (
+                <>
+                  <p>
+                    Bandbreite (indikativ):{" "}
+                    <span className="text-white font-semibold">
+                      {costBand.niedrig.toLocaleString("de-DE")} – {costBand.hoch.toLocaleString("de-DE")} EUR
+                    </span>
+                  </p>
+                  <p>Basiswert: {costBand.basis.toLocaleString("de-DE")} EUR</p>
+                  {costBand.confidence ? <p>Confidence: {costBand.confidence}%</p> : null}
+                </>
+              ) : (
+                <p>
+                  Indikation (einzelwert, unsicher): ca.{" "}
+                  <span className="text-white font-semibold">
+                    {result.kosten_indikation_eur.toLocaleString("de-DE")} EUR
+                  </span>
+                </p>
+              )}
               <p>Kostenklasse: {result.kostenklasse}</p>
               <p>Bearbeitungszeit: ca. {result.geschaetzte_bearbeitungszeit_wochen} Wochen</p>
               <p>Netzausbau: {result.netzausbau_erforderlich ? "Ja" : "Nein"}</p>
@@ -1469,7 +1489,10 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
 
         <div className="grid md:grid-cols-2 gap-4">
           <div className={sectionClass}>
-            <h3 className={sectionTitle}>KI-Lernprofil</h3>
+            <h3 className={sectionTitle}>KI-Lernprofil (unterstuetzend)</h3>
+            <p className="mb-2 text-xs text-gray-500">
+              Assoziative Einordnung aus historischem Feedback – ersetzt keine deterministische Normpruefung.
+            </p>
             <div className="space-y-2 text-sm text-gray-300">
               <p>KI-Konfidenz: <span className="text-white font-semibold">{fmt(result.ki.konfidenz_prozent, 0)}%</span></p>
               <p>Aehnliche Faelle: {result.ki.aehnliche_faelle}</p>
@@ -1602,6 +1625,8 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
             </div>
           </div>
         </div>
+
+        <AnalysisDisclaimer variant="compact" className="border-t border-gray-700 pt-4" />
 
         {/* Buttons */}
         <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">

@@ -1511,6 +1511,9 @@ def erzeuge_transparenzblock(eingabe, dq, speicher, umwelt, stakeholder, n1):
             confidence_notes.append(f'N-1-Screening als {n1_klasse} klassifiziert (Konfidenz {n1_konfidenz}).')
     for annahme in (n1.get('detail_annahmen') or [])[:2]:
         confidence_notes.append(f'N-1-Annahme: {annahme}')
+    confidence_notes.append(
+        'Oberschwingungs-/THD-Bewertung: nicht berechnet (kein Lastflussmodell); bei Bedarf separate Rueckwirkungsstudie.'
+    )
 
     if eingabe.get('project_components'):
         assumptions.append('Die maximale Einspeise-/Bezugswirkung am Netzanschlusspunkt wurde gegenueber der installierten Gesamtleistung bevorzugt bewertet.')

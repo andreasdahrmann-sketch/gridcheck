@@ -2,8 +2,9 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, MapPinned, ShieldAlert, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, MapPinned, Sparkles } from "lucide-react";
 import { Header } from "@/components/Header";
+import { AnalysisDisclaimer } from "@/components/legal/AnalysisDisclaimer";
 
 const GridCheckForm = dynamic(() => import("@/components/GridCheckForm"), {
   loading: () => (
@@ -81,16 +82,7 @@ export default function ProjektiererPage() {
                   </div>
                 ))}
               </div>
-              <div className="mt-4 rounded-2xl border border-brand-orange/20 bg-brand-orange/10 px-4 py-4 text-sm leading-6 text-text-muted">
-                <p className="flex items-center gap-2 font-medium text-white">
-                  <ShieldAlert className="h-4 w-4 text-brand-orange" />
-                  Vorlaeufige Analyse, keine Netzanschlusszusage
-                </p>
-                <p className="mt-2">
-                  GridCheck bleibt ein begruendeter Pre-Check. Oeffentliche Daten und Heuristiken werden transparent
-                  dargestellt, aber nicht als garantierte freie Netzkapazitaet verkauft.
-                </p>
-              </div>
+              <AnalysisDisclaimer className="mt-4" />
             </div>
           </div>
         </div>
