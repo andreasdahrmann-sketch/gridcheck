@@ -1,6 +1,8 @@
 [build]
 
 [deploy]
+# Migration vor Start (Railway Release Phase). Root Directory des Services: backend/
+releaseCommand = "alembic upgrade head"
 startCommand = "python -m uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 300

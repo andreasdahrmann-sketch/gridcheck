@@ -84,11 +84,12 @@ async function parse<T>(res: Response): Promise<T> {
 
 async function backendAuthFetch(path: string, init?: RequestInit): Promise<Response> {
   try {
-    const primary = await fetch(`${AUTH_BASE}${path}`, init);
-    if (primary.status !== 404) {
-      return primary;
+    // Rewrite zuerst: auf allen Vercel-Deploys mit BACKEND_URL stabil (Route Handler optional).
+    const rewrite = await fetch(`${AUTH_REWRITE_BASE}${path}`, init);
+    if (rewrite.status !== 404) {
+      return rewrite;
     }
-    return await fetch(`${AUTH_REWRITE_BASE}${path}`, init);
+    return await fetch(`${AUTH_BASE}${path}`, init);
   } catch {
     throw new Error(BACKEND_UNREACHABLE_HINT);
   }

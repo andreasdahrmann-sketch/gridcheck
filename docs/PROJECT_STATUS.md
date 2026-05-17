@@ -17,7 +17,7 @@
 - [x] Engine + N-1-Screening, Stakeholder-PDFs (38+ Report-Tests)
 - [x] Auth Backend + Frontend (Register/Login, Session)
 - [x] Prod-Frontend: **https://gridcheck.vercel.app** (Vercel)
-- [x] Backend-Proxy Health OK; Register blockiert ohne DB-Migration (503)
+- [x] Lokal: Register/Login OK; Prod: Railway ENV + Redeploy (Migrations) ausstehend
 - [x] PLZ→VNB Lookup (`/api/v1/geo/plz/{plz}`)
 - [x] Disclaimer UI + PDF
 - [x] KI-Feedback-Hash-Chain (`docs/KI_TRAINING.md`)

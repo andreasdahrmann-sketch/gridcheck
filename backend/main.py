@@ -98,6 +98,23 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": app.version}
+    payload: dict[str, str] = {"status": "ok", "version": app.version}
+    if settings.app_env in {"staging", "prod", "production"}:
+        try:
+            from sqlalchemy import text
+
+            from db.database import SessionLocal
+
+            with SessionLocal() as session:
+                session.execute(text("SELECT 1"))
+            payload["database"] = "ok"
+        except Exception as exc:
+            payload["status"] = "degraded"
+            payload["database"] = "error"
+            payload["database_hint"] = (
+                "DATABASE_URL pruefen und `alembic upgrade head` auf Railway ausfuehren."
+            )
+            payload["database_detail"] = str(exc)[:180]
+    return payload
 
 

@@ -99,13 +99,20 @@ def main() -> int:
             except Exception as exc:
                 _fail("Frontend proxy /api/backend/health", str(exc))
                 failures += 1
-            for path in ("/api/auth/register", "/api/backend/api/v1/auth/register"):
-                if not _register_probe(
-                    client,
-                    f"{frontend}{path}",
-                    f"POST {path} (via Frontend)",
-                ):
-                    failures += 1
+            auth_ok = _register_probe(
+                client,
+                f"{frontend}/api/auth/register",
+                "POST /api/auth/register (via Frontend)",
+            )
+            rewrite_ok = _register_probe(
+                client,
+                f"{frontend}/api/backend/api/v1/auth/register",
+                "POST /api/backend/api/v1/auth/register (via Frontend)",
+            )
+            if not (auth_ok or rewrite_ok):
+                failures += 1
+            elif not auth_ok and rewrite_ok:
+                print("[WARN] /api/auth/register 404 — Rewrite-Pfad OK (Vercel-Deploy pruefen)")
 
         if args.email:
             if not args.password:

@@ -21,6 +21,7 @@ __pycache__/
 .env.local
 .env.production
 .env.prod.example
+railway-variables.generated.txt
 
 # Backups & Temp
 backup_workspace.tsx
