@@ -1,8 +1,16 @@
 ﻿/** @type {import('next').NextConfig} */
-const rawBackendUrl = process.env.BACKEND_URL?.trim();
+/** Build-only fallback when Vercel has no BACKEND_URL yet (rewrites need a valid https origin). */
+const VERCEL_BUILD_PLACEHOLDER_BACKEND = "https://placeholder.railway.app";
+
+let rawBackendUrl = process.env.BACKEND_URL?.trim();
 
 if (process.env.VERCEL === "1" && !rawBackendUrl) {
-  throw new Error("BACKEND_URL ist fuer Vercel-Deploys erforderlich.");
+  console.warn(
+    "[next.config] BACKEND_URL fehlt auf Vercel — Platzhalter",
+    VERCEL_BUILD_PLACEHOLDER_BACKEND,
+    "(Auth/API funktionieren erst nach Setzen der Railway-HTTPS-Origin ohne /api/v1).",
+  );
+  rawBackendUrl = VERCEL_BUILD_PLACEHOLDER_BACKEND;
 }
 
 if (rawBackendUrl && !/^https?:\/\//.test(rawBackendUrl)) {

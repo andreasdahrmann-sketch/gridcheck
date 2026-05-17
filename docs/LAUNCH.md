@@ -23,6 +23,18 @@ Dann zwei Terminals (Backend :8000, Frontend :3000 mit `nvm use 20`).
 | **Migration** | `releaseCommand` in `backend/railway.toml` → `alembic upgrade head` beim Deploy |
 | **Health** | `/health` zeigt `database: ok` wenn DB steht |
 
+### Vercel — Pflicht-Variablen (Build + Runtime)
+
+Im Vercel-Projekt (**Root Directory:** `frontend/`, **Node:** 20) unter *Settings → Environment Variables*:
+
+| Variable | Environments | Wert / Regeln |
+|----------|--------------|---------------|
+| **`BACKEND_URL`** | Production, Preview, Development | Railway-**HTTPS**-Origin **ohne** Pfad-Suffix, z. B. `https://gridcheck-production.up.railway.app` — **nicht** `http://`, **nicht** `/api` oder `/api/v1`, **nicht** die Vercel-Frontend-URL |
+
+Ohne `BACKEND_URL` kann der **Build** mit einem Platzhalter durchlaufen; **Register/Login und `/api/backend/*` funktionieren erst**, wenn `BACKEND_URL` gesetzt ist und ein Redeploy gelaufen ist.
+
+Optional (UI): `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_VERSION` — siehe `frontend/.env.example`.
+
 ### Railway-Variablen (Minimum)
 
 ```
