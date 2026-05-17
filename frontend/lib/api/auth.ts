@@ -14,8 +14,9 @@ type TokenResponse = {
   token_type: string;
 };
 
-/** Same-origin route handlers (app/api/auth/*) proxy server-side to FastAPI. */
-const BASE = "/api/auth";
+/** Prefer server route handlers; fallback to rewrite if deploy has no app/api/auth yet. */
+const AUTH_BASE = "/api/auth";
+const AUTH_REWRITE_BASE = "/api/backend/api/v1/auth";
 
 const BACKEND_UNREACHABLE_HINT =
   "Backend nicht erreichbar. Vercel: BACKEND_URL auf die Railway-HTTPS-URL setzen (nur Origin, ohne /api/v1). Railway: GET /health pruefen. Lokal: uvicorn auf Port 8000.";
@@ -83,7 +84,11 @@ async function parse<T>(res: Response): Promise<T> {
 
 async function backendAuthFetch(path: string, init?: RequestInit): Promise<Response> {
   try {
-    return await fetch(`${BASE}${path}`, init);
+    const primary = await fetch(`${AUTH_BASE}${path}`, init);
+    if (primary.status !== 404) {
+      return primary;
+    }
+    return await fetch(`${AUTH_REWRITE_BASE}${path}`, init);
   } catch {
     throw new Error(BACKEND_UNREACHABLE_HINT);
   }

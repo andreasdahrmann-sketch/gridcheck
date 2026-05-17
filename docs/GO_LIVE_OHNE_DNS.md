@@ -2,6 +2,18 @@
 
 **Problem:** `app.gridcheck.de` und `api.gridcheck.de` haben oft **keinen DNS-Eintrag** (NXDOMAIN). Der Code auf `main` ist in Ordnung — es fehlt die erreichbare Infrastruktur.
 
+## Bekannte Prod-URLs (Stand Prüfung)
+
+| Rolle | URL | Status |
+|-------|-----|--------|
+| **Frontend (Vercel)** | https://gridcheck.vercel.app | erreichbar |
+| **Backend (Railway)** | über Proxy: `/api/backend/health` → OK | `BACKEND_URL` in Vercel gesetzt |
+| **Custom Domains** | app./api.gridcheck.de | DNS fehlt (NXDOMAIN) |
+
+Nach Vercel-Redeploy: Auth nutzt `/api/auth/*`, sonst Fallback auf `/api/backend/api/v1/auth/*`.
+
+**Register 503:** Railway → Postgres + `alembic upgrade head` (siehe unten).
+
 Zwei Wege:
 
 | Weg | Dauer | Ergebnis |
