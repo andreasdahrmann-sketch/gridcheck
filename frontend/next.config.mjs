@@ -1,33 +1,30 @@
-﻿/** @type {import('next').NextConfig} */
-/** Build-only fallback when Vercel has no BACKEND_URL yet (rewrites need a valid https origin). */
-const VERCEL_BUILD_PLACEHOLDER_BACKEND = "https://placeholder.railway.app";
-
-let rawBackendUrl = process.env.BACKEND_URL?.trim();
+﻿/**
+ * Rewrites are resolved at build time — BACKEND_URL must be set when `next build` runs on Vercel.
+ * Route Handlers (/api/auth/*, /api/health) read BACKEND_URL again at runtime (serverless).
+ * Set BACKEND_URL for Production and Preview in Vercel (not build-only).
+ */
+/** @type {import("next").NextConfig} */
+const rawBackendUrl = process.env.BACKEND_URL?.trim().replace(/[\r\n]+/g, "");
 
 if (process.env.VERCEL === "1" && !rawBackendUrl) {
-  console.warn(
-    "[next.config] BACKEND_URL fehlt auf Vercel — Platzhalter",
-    VERCEL_BUILD_PLACEHOLDER_BACKEND,
-    "(Auth/API funktionieren erst nach Setzen der Railway-HTTPS-Origin ohne /api/v1).",
+  throw new Error(
+    "BACKEND_URL ist fuer Vercel-Deploys erforderlich (Build und Runtime). Nur Origin, z. B. https://gridcheck-production.up.railway.app",
   );
-  rawBackendUrl = VERCEL_BUILD_PLACEHOLDER_BACKEND;
 }
 
 if (rawBackendUrl && !/^https?:\/\//.test(rawBackendUrl)) {
-  throw new Error("BACKEND_URL muss eine absolute http(s)-URL sein.");
+  throw new Error("BACKEND_URL muss eine absolute http(s)-URL sein. Aktueller Wert: [" + rawBackendUrl + "]");
 }
 
 const isLocalBackendUrl =
   rawBackendUrl && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(rawBackendUrl);
 
-if (rawBackendUrl && !isLocalBackendUrl && rawBackendUrl.startsWith("http://")) {
+const backendOrigin = (rawBackendUrl || "http://localhost:8000").replace(/\/+$/, "");
+
+if (rawBackendUrl && !isLocalBackendUrl && backendOrigin.startsWith("http://")) {
   throw new Error(
     "BACKEND_URL muss https:// verwenden (ausser localhost). http:// kann POST-Rewrites per Redirect brechen.",
   );
-}
-
-if (process.env.VERCEL === "1" && rawBackendUrl && !rawBackendUrl.startsWith("https://")) {
-  throw new Error("BACKEND_URL auf Vercel muss mit https:// beginnen.");
 }
 
 if (rawBackendUrl && /\/api(\/v\d+)?\/?$/i.test(rawBackendUrl)) {
@@ -36,13 +33,16 @@ if (rawBackendUrl && /\/api(\/v\d+)?\/?$/i.test(rawBackendUrl)) {
   );
 }
 
-const BACKEND_URL = (rawBackendUrl || "http://localhost:8000").replace(/\/+$/, "");
-
+/** @type {import("next").NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   async rewrites() {
+    if (!rawBackendUrl || isLocalBackendUrl) return [];
     return [
-      { source: '/api/backend/:path*', destination: `${BACKEND_URL}/:path*` },
+      {
+        source: "/api/backend/:path*",
+        destination: `${backendOrigin}/:path*`,
+      },
     ];
   },
 };

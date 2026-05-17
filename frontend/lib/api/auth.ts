@@ -71,10 +71,22 @@ function resolveAuthErrorMessage(res: Response, body: unknown): string {
   return `API-Anfrage fehlgeschlagen (HTTP ${res.status}).`;
 }
 
+function isBackendUnreachableResponse(res: Response, body: unknown): boolean {
+  if (res.status === 502 || res.status === 504) return true;
+  if (body && typeof body === "object" && "detail" in body) {
+    const detail = (body as { detail?: unknown }).detail;
+    if (detail && typeof detail === "object" && "code" in detail) {
+      const code = (detail as { code?: unknown }).code;
+      return code === "BACKEND_UNREACHABLE" || code === "BACKEND_URL_MISSING";
+    }
+  }
+  return false;
+}
+
 async function parse<T>(res: Response): Promise<T> {
   const body = await readResponseBody(res);
   if (!res.ok) {
-    if (res.status >= 502 && res.status <= 504) {
+    if (isBackendUnreachableResponse(res, body)) {
       throw new Error(BACKEND_UNREACHABLE_HINT);
     }
     throw new Error(resolveAuthErrorMessage(res, body));

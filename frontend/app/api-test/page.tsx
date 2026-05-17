@@ -13,10 +13,44 @@ type ProbeResult = {
   bodyPreview?: string;
 };
 
+type ConfigProbe = {
+  ok: boolean;
+  configured: boolean;
+  host: string | null;
+  upstreamStatus?: number;
+  backend?: unknown;
+  error?: { code?: string; message?: string; hint?: string };
+};
+
 type State =
   | { kind: "loading" }
-  | { kind: "ok"; health: HealthResponse; healthMs: number; registerProbe: ProbeResult }
-  | { kind: "error"; error: ApiError; registerProbe?: ProbeResult | null };
+  | {
+      kind: "ok";
+      health: HealthResponse;
+      healthMs: number;
+      registerProbe: ProbeResult;
+      configProbe: ConfigProbe;
+    }
+  | { kind: "error"; error: ApiError; registerProbe?: ProbeResult | null; configProbe?: ConfigProbe | null };
+
+async function probeConfigEndpoint(): Promise<ConfigProbe> {
+  const res = await fetch("/api/health", { cache: "no-store" });
+  const data = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    config?: { configured?: boolean; host?: string | null };
+    backend?: unknown;
+    upstreamStatus?: number;
+    error?: { code?: string; message?: string; hint?: string };
+  };
+  return {
+    ok: Boolean(data.ok),
+    configured: Boolean(data.config?.configured),
+    host: data.config?.host ?? null,
+    upstreamStatus: data.upstreamStatus,
+    backend: data.backend,
+    error: data.error,
+  };
+}
 
 async function probeRegisterEndpoint(): Promise<ProbeResult> {
   const t0 = performance.now();
@@ -85,7 +119,9 @@ export default function ApiTestPage() {
     setState({ kind: "loading" });
     const t0 = performance.now();
     let registerProbe: ProbeResult | null = null;
+    let configProbe: ConfigProbe | null = null;
     try {
+      configProbe = await probeConfigEndpoint();
       const data = await getHealth();
       registerProbe = await probeRegisterEndpoint();
       setState({
@@ -93,14 +129,16 @@ export default function ApiTestPage() {
         health: data,
         healthMs: Math.round(performance.now() - t0),
         registerProbe,
+        configProbe,
       });
     } catch (e) {
       try {
+        configProbe = configProbe ?? (await probeConfigEndpoint());
         registerProbe = await probeRegisterEndpoint();
       } catch {
         registerProbe = null;
       }
-      setState({ kind: "error", error: e as ApiError, registerProbe });
+      setState({ kind: "error", error: e as ApiError, registerProbe, configProbe });
     }
   }
 
@@ -112,9 +150,27 @@ export default function ApiTestPage() {
     <main style={{ fontFamily: "system-ui, sans-serif", padding: 32, maxWidth: 720 }}>
       <h1 style={{ fontSize: 24, marginBottom: 8 }}>GridCheck — Backend-Verbindungstest</h1>
       <p style={{ color: "#666", marginBottom: 24 }}>
-        Health: <code>/api/backend/health</code> (Rewrite). Register: <code>/api/auth/register</code> (Route Handler →
-        FastAPI)
+        Config: <code>/api/health</code> (Runtime BACKEND_URL + Railway). Rewrite: <code>/api/backend/health</code>.
+        Register: <code>/api/auth/register</code>.
       </p>
+      {(state.kind === "ok" || state.configProbe) && (
+        <section
+          style={{
+            marginBottom: 16,
+            padding: 16,
+            background: state.kind === "ok" && state.configProbe.ok ? "#e8f4fd" : "#fff8e6",
+            border: "1px solid #90caf9",
+            borderRadius: 8,
+          }}
+        >
+          <p style={{ fontWeight: 600, margin: 0 }}>
+            {state.kind === "ok" ? (state.configProbe.ok ? "✅" : "⚠️") : "ℹ️"} Runtime BACKEND_URL
+          </p>
+          <pre style={{ marginTop: 12, background: "#fff", padding: 12, borderRadius: 6, fontSize: 12 }}>
+            {JSON.stringify(state.kind === "ok" ? state.configProbe : state.configProbe, null, 2)}
+          </pre>
+        </section>
+      )}
       {state.kind === "loading" && <p>⏳ Pruefe Backend...</p>}
       {state.kind === "ok" && (
         <>

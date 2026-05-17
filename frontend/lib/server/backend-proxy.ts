@@ -1,9 +1,8 @@
 /** Server-side proxy to FastAPI (used by /api/auth/* route handlers). */
 
-export function getBackendOrigin(): string {
-  const raw = process.env.BACKEND_URL?.trim();
-  return (raw || "http://localhost:8000").replace(/\/+$/, "");
-}
+import { getBackendOrigin } from "@/lib/server/backend-config";
+
+export { getBackendOrigin };
 
 function buildBackendUrl(backendPath: string): string {
   const path = backendPath.startsWith("/") ? backendPath : `/${backendPath}`;
@@ -59,16 +58,38 @@ export async function proxyToBackend(
     init.body = await request.text();
   }
 
-  let upstream: Response;
+  let backendUrl: string;
   try {
-    upstream = await fetch(buildBackendUrl(backendPath), init);
+    backendUrl = buildBackendUrl(backendPath);
   } catch {
     return Response.json(
       {
         detail: {
-          code: "BACKEND_UNREACHABLE",
-          message: "Backend nicht erreichbar",
-          hint: "Vercel BACKEND_URL und Railway /health pruefen.",
+          code: "BACKEND_URL_MISSING",
+          message: "BACKEND_URL fehlt zur Laufzeit auf Vercel",
+          hint: "Vercel Project Settings: BACKEND_URL fuer Production und Preview setzen, dann Redeploy.",
+        },
+      },
+      { status: 502, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(backendUrl, init);
+  } catch {
+    const missingRuntimeUrl =
+      process.env.VERCEL === "1" && !(process.env.BACKEND_URL?.trim());
+    return Response.json(
+      {
+        detail: {
+          code: missingRuntimeUrl ? "BACKEND_URL_MISSING" : "BACKEND_UNREACHABLE",
+          message: missingRuntimeUrl
+            ? "BACKEND_URL fehlt zur Laufzeit auf Vercel"
+            : "Backend nicht erreichbar",
+          hint: missingRuntimeUrl
+            ? "Vercel Project Settings: BACKEND_URL fuer Production und Preview setzen, dann Redeploy."
+            : "Vercel BACKEND_URL und Railway GET /health pruefen. Lokal: uvicorn auf Port 8000.",
         },
       },
       { status: 502, headers: { "Content-Type": "application/json" } },
