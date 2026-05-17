@@ -61,7 +61,8 @@ function RegisterPageContent() {
       setMessage("Registrierung erfolgreich. Bitte im naechsten Schritt einloggen, damit Projekte, History und Paketlogik Ihrem Konto zugeordnet werden.");
       setPassword("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registrierung fehlgeschlagen");
+      const msg = err instanceof Error ? err.message : "Registrierung fehlgeschlagen";
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -239,8 +240,23 @@ function RegisterPageContent() {
                 </div>
               ) : null}
               {error ? (
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                  {error}
+                <div className="space-y-2">
+                  <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                    {error}
+                  </div>
+                  {(error.includes("Backend") ||
+                    error.includes("502") ||
+                    error.includes("503") ||
+                    error.includes("504") ||
+                    error.toLowerCase().includes("api request failed")) && (
+                    <p className="text-xs text-text-dim">
+                      Diagnose:{" "}
+                      <Link href="/api-test" className="text-brand-cyan underline">
+                        /api-test
+                      </Link>
+                      . Ohne Custom-DNS: Vercel-URL + Railway BACKEND_URL — siehe docs/GO_LIVE_OHNE_DNS.md.
+                    </p>
+                  )}
                 </div>
               ) : null}
 

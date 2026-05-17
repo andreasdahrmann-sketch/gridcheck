@@ -2,6 +2,8 @@
 
 Stand: 2026-05-16. Ziel: Register und Login end-to-end (Vercel Frontend → Railway Backend → PostgreSQL).
 
+> **Sofort nutzbar:** Wenn `app.gridcheck.de` / `api.gridcheck.de` nicht aufloesen (NXDOMAIN), zuerst [GO_LIVE_OHNE_DNS.md](./GO_LIVE_OHNE_DNS.md) (lokal oder `*.vercel.app` + Railway). Custom-DNS: [DNS_APP_API.md](./DNS_APP_API.md).
+
 ## 1. Railway (Backend + PostgreSQL)
 
 Pflichtvariablen (Service **backend**):
