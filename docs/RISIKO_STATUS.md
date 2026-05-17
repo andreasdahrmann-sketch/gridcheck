@@ -4,7 +4,7 @@
 
 ---
 
-## 1. GESAMTBEWERTUNG (Stand: 2026-05-16)
+## 1. GESAMTBEWERTUNG (Stand: 2026-05-17)
 
 | Bereich                            | Status          | Prioritaet  |
 |------------------------------------|-----------------|-------------|
@@ -14,6 +14,9 @@
 | Frontend UI                        | VORHANDEN       | -           |
 | Frontend <-> Backend Integration   | TEILWEISE       | KRITISCH    |
 | Deployment produktiv               | TEILWEISE       | KRITISCH    |
+| Backend ENV (JWT/Stripe/SMTP)      | DOKU + SKRIPT   | KRITISCH    |
+| E2E Smoke (smoke_go_live.py)       | ERWEITERT       | MITTEL      |
+| Security-Onepager / AVV            | ENTWURF         | MITTEL      |
 | Mock-Daten entfernt                | TEILWEISE       | KRITISCH    |
 | Echte GIS-/Netzdaten               | FEHLEN          | KRITISCH    |
 | KI-Lernmodul aktiv/trainiert       | GRUNDGERUEST    | MITTEL      |
@@ -30,14 +33,16 @@
 - Massnahme: API-Integration priorisieren. Mock-Daten als [DEMO] markieren.
 - Status: TEILWEISE UMGESETZT
 - Stand 2026-05-16: `analyzeGridcheck` und Projekt-APIs rufen `POST /api/v1/analyze` bzw. `/api/v1/projects` ueber `/api/backend`-Rewrite an. Bearer-Token in `projects`, `analyze`, `billing`, `auth`, `ki`, `ops-followups`, `site-markers`. Prod erfordert `BACKEND_URL` in Vercel (siehe `frontend/.env.example`).
-- Offen: End-to-End-Verifikation in Prod-ENV; kein Fallback auf lokale Demo-Daten im Fehlerfall.
+- Stand 2026-05-17: Prod-Frontend `https://gridcheck.vercel.app`; Health via Proxy OK. Register 503 ohne `alembic upgrade head` auf Railway.
+- Offen: Vollstaendiger Register/Login-Smoke nach ENV + Migration.
 
 ### R-02 - Deployment instabil
 - Wirkung: Keine produktive Demo moeglich.
 - Massnahme: Railway + Vercel stabilisieren. Health-Checks einrichten.
 - Status: TEILWEISE UMGESETZT
 - Stand 2026-05-16: `backend/railway.toml` mit `healthcheckPath=/health`; `frontend/next.config.mjs` fail-fast ohne `BACKEND_URL` auf Vercel; `frontend/vercel.json` mit `npm ci` + `npm run build`.
-- Offen: Credentials/ENV in Railway + Vercel; Smoke `backend/scripts/smoke_go_live.py` gegen Prod-URL.
+- Stand 2026-05-17: `scripts/validate_env.py`, `docs/RAILWAY_ENV_SETUP.md`; Smoke mit `--frontend-url` und Register-Probe.
+- Offen: Railway `JWT_*` + Migrationen; DNS `app`/`api.gridcheck.de`.
 
 ### R-03 - Disclaimer / Haftungsausschluss fehlt im Frontend
 - Wirkung: Rechtliches Risiko. Missverstaendnis: App = verbindliche Netzpruefung.

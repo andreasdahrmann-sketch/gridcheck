@@ -38,15 +38,41 @@ def _fail(label: str, detail: str) -> None:
     print(f"[FAIL] {label}: {detail}", file=sys.stderr)
 
 
+def _register_probe(client: httpx.Client, url: str, label: str) -> bool:
+    payload = {"email": "smoke-probe@example.com", "password": "short", "role": "projektierer"}
+    try:
+        res = client.post(url, json=payload)
+        if res.status_code in (400, 422):
+            _ok(label, f"HTTP {res.status_code} (Route erreichbar)")
+            return True
+        if res.status_code == 409:
+            _ok(label, "HTTP 409 (E-Mail existiert — Route OK)")
+            return True
+        if res.status_code == 503:
+            _fail(label, "HTTP 503 — DB/Migration? alembic upgrade head")
+            return False
+        res.raise_for_status()
+        _ok(label, f"HTTP {res.status_code}")
+        return True
+    except Exception as exc:
+        _fail(label, str(exc))
+        return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="GridCheck API smoke checks (staging/go-live).")
     parser.add_argument("--base-url", default="http://localhost:8000", help="Backend root URL ohne trailing slash")
+    parser.add_argument(
+        "--frontend-url",
+        help="Optional: Vercel-URL; prueft /api/backend/health und /api/auth/register",
+    )
     parser.add_argument("--email", help="Optional: Login fuer geschuetzte Endpoints")
     parser.add_argument("--password", help="Passwort zu --email")
     parser.add_argument("--timeout", type=float, default=30.0)
     args = parser.parse_args()
 
     base = args.base_url.rstrip("/")
+    frontend = args.frontend_url.rstrip("/") if args.frontend_url else None
     failures = 0
     token: str | None = None
 
@@ -61,6 +87,25 @@ def main() -> int:
         except Exception as exc:
             _fail("GET /health", str(exc))
             failures += 1
+
+        if not _register_probe(client, f"{base}/api/v1/auth/register", "POST /api/v1/auth/register (probe)"):
+            failures += 1
+
+        if frontend:
+            try:
+                fh = client.get(f"{frontend}/api/backend/health")
+                fh.raise_for_status()
+                _ok("Frontend proxy /api/backend/health", f"HTTP {fh.status_code}")
+            except Exception as exc:
+                _fail("Frontend proxy /api/backend/health", str(exc))
+                failures += 1
+            for path in ("/api/auth/register", "/api/backend/api/v1/auth/register"):
+                if not _register_probe(
+                    client,
+                    f"{frontend}{path}",
+                    f"POST {path} (via Frontend)",
+                ):
+                    failures += 1
 
         if args.email:
             if not args.password:
