@@ -14,24 +14,60 @@ type TokenResponse = {
   token_type: string;
 };
 
-const BASE = "/api/backend/api/v1/auth";
+/** Same-origin route handlers (app/api/auth/*) proxy server-side to FastAPI. */
+const BASE = "/api/auth";
 
 const BACKEND_UNREACHABLE_HINT =
   "Backend nicht erreichbar. Vercel: BACKEND_URL auf die Railway-HTTPS-URL setzen (nur Origin, ohne /api/v1). Railway: GET /health pruefen. Lokal: uvicorn auf Port 8000.";
 
 async function readResponseBody(res: Response): Promise<unknown> {
   const contentType = res.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) {
-    return res.json().catch(() => ({}));
-  }
   const text = await res.text().catch(() => "");
+
+  if (contentType.includes("application/json")) {
+    if (!text) return {};
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      return {
+        detail: {
+          message: `Ungueltige JSON-Antwort (HTTP ${res.status})`,
+          hint: text.slice(0, 200),
+        },
+      };
+    }
+  }
+
   if (!text) return {};
   return {
     detail: {
       message: `Unerwartete Antwort vom Server (HTTP ${res.status})`,
-      hint: text.slice(0, 160),
+      hint: text.slice(0, 200),
     },
   };
+}
+
+function resolveAuthErrorMessage(res: Response, body: unknown): string {
+  const parsed = extractApiErrorMessage(body, "");
+  if (parsed) return parsed;
+
+  if (res.status === 503) {
+    return (
+      extractApiErrorMessage(body, "") ||
+      "Datenbank nicht erreichbar oder Schema nicht migriert (alembic upgrade head auf Railway)."
+    );
+  }
+  if (res.status === 500) {
+    return "Serverfehler beim Backend. Railway-Logs pruefen und Alembic-Migrationen ausfuehren (alembic upgrade head).";
+  }
+  if (res.status === 400) {
+    return "Anfrage vom Backend abgelehnt (HTTP 400). TRUSTED_HOSTS muss den Host aus BACKEND_URL enthalten.";
+  }
+  if (res.status === 404) {
+    return "Auth-Endpoint nicht gefunden. BACKEND_URL nur als Origin setzen (ohne /api/v1) und Vercel neu deployen.";
+  }
+
+  return `API-Anfrage fehlgeschlagen (HTTP ${res.status}).`;
 }
 
 async function parse<T>(res: Response): Promise<T> {
@@ -40,7 +76,7 @@ async function parse<T>(res: Response): Promise<T> {
     if (res.status >= 502 && res.status <= 504) {
       throw new Error(BACKEND_UNREACHABLE_HINT);
     }
-    throw new Error(extractApiErrorMessage(body, "API request failed"));
+    throw new Error(resolveAuthErrorMessage(res, body));
   }
   return body as T;
 }

@@ -19,21 +19,50 @@ export function bearerAuthHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function readNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/** Maps FastAPI, gateway (Railway/Vercel) and proxy error JSON to a user-facing message. */
 export function extractApiErrorMessage(body: unknown, fallback: string): string {
   if (!body || typeof body !== "object") return fallback;
-  const detail = (body as { detail?: unknown }).detail;
-  if (typeof detail === "string") return detail;
-  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
-    const message = (detail as { message?: unknown }).message;
-    if (typeof message === "string") return message;
-    const hint = (detail as { hint?: unknown }).hint;
-    if (typeof hint === "string") return hint;
+
+  const record = body as Record<string, unknown>;
+
+  const topLevelMessage = readNonEmptyString(record.message);
+  if (topLevelMessage) return topLevelMessage;
+
+  const topLevelError = readNonEmptyString(record.error);
+  if (topLevelError) return topLevelError;
+
+  if (record.error && typeof record.error === "object" && !Array.isArray(record.error)) {
+    const nestedMessage = readNonEmptyString((record.error as { message?: unknown }).message);
+    if (nestedMessage) return nestedMessage;
   }
+
+  const detail = record.detail;
+  const detailString = readNonEmptyString(detail);
+  if (detailString) return detailString;
+
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    const detailRecord = detail as Record<string, unknown>;
+    const message = readNonEmptyString(detailRecord.message);
+    if (message) return message;
+    const hint = readNonEmptyString(detailRecord.hint);
+    if (hint) return hint;
+    const code = readNonEmptyString(detailRecord.code);
+    if (code) return code.replace(/_/g, " ");
+  }
+
   if (Array.isArray(detail) && detail.length > 0) {
     const first = detail[0];
-    if (first && typeof first === "object" && "msg" in first && typeof first.msg === "string") {
-      return first.msg;
+    if (first && typeof first === "object" && "msg" in first) {
+      const msg = readNonEmptyString((first as { msg?: unknown }).msg);
+      if (msg) return msg;
     }
   }
+
   return fallback;
 }

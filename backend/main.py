@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -26,6 +28,20 @@ app = FastAPI(
     version=settings.app_version,
     description="Pre-Netzanschluss-Check mit N-1 Analyse, Diagnose und KI-Lernmodul",
 )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_unavailable_handler(_request: Request, _exc: SQLAlchemyError) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": {
+                "code": "DATABASE_UNAVAILABLE",
+                "message": "Datenbank nicht erreichbar oder Schema nicht migriert",
+                "hint": "Railway: DATABASE_URL pruefen, dann `alembic upgrade head` ausfuehren.",
+            }
+        },
+    )
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
