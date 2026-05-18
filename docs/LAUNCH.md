@@ -18,22 +18,37 @@ Dann zwei Terminals (Backend :8000, Frontend :3000 mit `nvm use 20`).
 | Was | URL / Aktion |
 |-----|----------------|
 | **App** | https://gridcheck.vercel.app |
-| **Vercel** | `BACKEND_URL` = Railway-HTTPS-Origin (ohne `/api/v1`) |
-| **Railway** | Variablen aus `docs/RAILWAY_ENV_SETUP.md` |
+| **Backend (Railway)** | `https://gridcheck-production.up.railway.app` — **ohne** `:8080` (Port nur intern) |
+| **Vercel** | `BACKEND_URL=https://gridcheck-production.up.railway.app` (nur Origin, kein `/api/v1`) → **Redeploy** |
+| **Railway** | Variablen aus `railway-variables.generated.txt` / `docs/RAILWAY_ENV_SETUP.md` |
 | **Migration** | `releaseCommand` in `backend/railway.toml` → `alembic upgrade head` beim Deploy |
-| **Health** | `/health` zeigt `database: ok` wenn DB steht |
+| **Health** | `GET /health` → 200; mit `APP_ENV=prod` zusätzlich `"database":"ok"` |
 
-### Vercel — Pflicht-Variablen (Build + Runtime)
+### Du musst in Vercel (Production)
 
-Im Vercel-Projekt (**Root Directory:** `frontend/`, **Node:** 20) unter *Settings → Environment Variables*:
+**Settings → Environment Variables:**
 
-| Variable | Environments | Wert / Regeln |
-|----------|--------------|---------------|
-| **`BACKEND_URL`** | Production, Preview, Development | Railway-**HTTPS**-Origin **ohne** Pfad-Suffix, z. B. `https://gridcheck-production.up.railway.app` — **nicht** `http://`, **nicht** `/api` oder `/api/v1`, **nicht** die Vercel-Frontend-URL |
+```
+BACKEND_URL=https://gridcheck-production.up.railway.app
+```
 
-Ohne `BACKEND_URL` kann der **Build** mit einem Platzhalter durchlaufen; **Register/Login und `/api/backend/*` funktionieren erst**, wenn `BACKEND_URL` gesetzt ist und ein Redeploy gelaufen ist.
+Danach **Deployments → Redeploy** (sonst nutzt die Live-App noch den alten Build).
 
-Optional (UI): `NEXT_PUBLIC_APP_NAME`, `NEXT_PUBLIC_APP_VERSION` — siehe `frontend/.env.example`.
+### Du musst in Railway (Backend-Service)
+
+Aus Vorlage `railway-variables.generated.txt` (Werte **nicht** committen):
+
+```
+JWT_SECRET=<48 Zeichen Zufall>
+JWT_REFRESH_SECRET=<anderer 48 Zeichen Zufall>
+DATABASE_URL=<von Postgres-Service verlinken>
+APP_ENV=prod
+CORS_ORIGIN_REGEX=^https://[a-z0-9-]+\.vercel\.app$
+CORS_ORIGINS=https://gridcheck.vercel.app
+TRUSTED_HOSTS=*.up.railway.app,*.vercel.app
+```
+
+Ohne `APP_ENV=prod` antwortet `/health` ohne `database`-Feld (nur `status` + `version`).
 
 ### Railway-Variablen (Minimum)
 
@@ -53,7 +68,14 @@ JWT erzeugen: `.\scripts\bootstrap-local.ps1` schreibt Beispiel-`.env` — Werte
 
 ```powershell
 cd backend
-python scripts\smoke_go_live.py --base-url https://<RAILWAY-HOST> --frontend-url https://gridcheck.vercel.app
+python scripts\smoke_go_live.py --base-url https://gridcheck-production.up.railway.app --frontend-url https://gridcheck.vercel.app
+```
+
+Direkt:
+
+```powershell
+Invoke-WebRequest -Uri "https://gridcheck-production.up.railway.app/health" -UseBasicParsing
+Invoke-WebRequest -Uri "https://gridcheck.vercel.app/api/backend/health" -UseBasicParsing
 ```
 
 Register-Probe **422** = OK. **503** = Migration/DB (Railway redeploy nach ENV).

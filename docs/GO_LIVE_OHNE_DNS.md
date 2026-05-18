@@ -7,8 +7,17 @@
 | Rolle | URL | Status |
 |-------|-----|--------|
 | **Frontend (Vercel)** | https://gridcheck.vercel.app | erreichbar |
-| **Backend (Railway)** | über Proxy: `/api/backend/health` → OK | `BACKEND_URL` in Vercel gesetzt |
+| **Backend (Railway)** | https://gridcheck-production.up.railway.app | `/health` → 200; Register-Probe → 422 (Route OK) |
+| **Proxy (Vercel)** | https://gridcheck.vercel.app/api/backend/health | 200 (wenn `BACKEND_URL` gesetzt + Redeploy) |
 | **Custom Domains** | app./api.gridcheck.de | DNS fehlt (NXDOMAIN) |
+
+**Vercel Production (du musst setzen + Redeploy):**
+
+```
+BACKEND_URL=https://gridcheck-production.up.railway.app
+```
+
+Kein `:8080` in der öffentlichen URL.
 
 Nach Vercel-Redeploy: Auth nutzt `/api/auth/*`, sonst Fallback auf `/api/backend/api/v1/auth/*`.
 
@@ -71,15 +80,17 @@ Diagnose: http://localhost:3000/api-test
 
 ### 1. Railway – Backend-URL kopieren
 
-Railway → Service **backend** → **Settings → Networking** → öffentliche HTTPS-URL, z. B.:
+Railway → Service **backend** → **Settings → Networking** → öffentliche HTTPS-URL:
 
-`https://gridcheck-production-xxxx.up.railway.app`
+`https://gridcheck-production.up.railway.app`
 
 **Health testen:**
 
 ```powershell
-Invoke-WebRequest -Uri "https://<RAILWAY-HOST>/health" -UseBasicParsing
+Invoke-WebRequest -Uri "https://gridcheck-production.up.railway.app/health" -UseBasicParsing
 ```
+
+Erwartung: `{"status":"ok",...}`. Feld `"database":"ok"` nur mit `APP_ENV=prod` und gültiger `DATABASE_URL`.
 
 ### 2. Railway – Umgebungsvariablen
 
@@ -104,7 +115,7 @@ cd backend && alembic upgrade head
 Vercel → Projekt → **Settings → Environment Variables** (Production):
 
 ```env
-BACKEND_URL=https://<RAILWAY-HOST>
+BACKEND_URL=https://gridcheck-production.up.railway.app
 ```
 
 - Nur **Origin**, kein `/api/v1`
@@ -118,15 +129,18 @@ Vercel-URL notieren, z. B. `https://gridcheck-xxx.vercel.app`
 
 | URL | Erwartung |
 |-----|-----------|
-| `https://<RAILWAY>/health` | 200 |
-| `https://<VERCEL>/api-test` | Health OK, Register-Probe 400/422 |
-| `https://<VERCEL>/register` | Erfolg mit starkem Passwort |
+| `https://gridcheck-production.up.railway.app/health` | 200 |
+| `https://gridcheck.vercel.app/api/backend/health` | 200 |
+| `https://gridcheck.vercel.app/api-test` | Health OK, Register-Probe 400/422 |
+| `https://gridcheck.vercel.app/register` | Erfolg mit starkem Passwort |
 
 **Prüfskript:**
 
 ```powershell
-.\scripts\go-live-check.ps1 -FrontendUrl "https://<VERCEL>" -BackendUrl "https://<RAILWAY>"
+.\scripts\go-live-check.ps1 -FrontendUrl "https://gridcheck.vercel.app" -BackendUrl "https://gridcheck-production.up.railway.app"
 ```
+
+**Railway-Variablen:** Vorlage `railway-variables.generated.txt` im Repo-Root (gitignored) — `JWT_SECRET`, `JWT_REFRESH_SECRET`, `DATABASE_URL`, `APP_ENV=prod`, CORS, `TRUSTED_HOSTS`.
 
 ---
 
