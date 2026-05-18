@@ -150,6 +150,27 @@ def test_load_settings_accepts_cors_origin_regex_in_staging(monkeypatch: pytest.
     assert settings.cors_origins == []
 
 
+def test_normalize_database_url_converts_postgres_scheme() -> None:
+    assert (
+        config_module.normalize_database_url("postgres://user:pass@host:5432/db")
+        == "postgresql://user:pass@host:5432/db"
+    )
+    assert (
+        config_module.normalize_database_url("postgresql://user:pass@host:5432/db")
+        == "postgresql://user:pass@host:5432/db"
+    )
+
+
+def test_load_settings_normalizes_railway_postgres_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    _reset_env(monkeypatch)
+    _set_base_env(monkeypatch, app_env="dev")
+    monkeypatch.setenv("DATABASE_URL", "postgres://user:pass@host:5432/gridcheck")
+
+    settings = config_module.load_settings()
+
+    assert settings.database_url == "postgresql://user:pass@host:5432/gridcheck"
+
+
 def test_load_settings_rejects_invalid_cors_origin_regex(monkeypatch: pytest.MonkeyPatch) -> None:
     _reset_env(monkeypatch)
     _set_base_env(monkeypatch, app_env="staging")

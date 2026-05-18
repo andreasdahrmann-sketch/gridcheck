@@ -15,6 +15,14 @@ def _is_postgres_url(value: str) -> bool:
     return lowered.startswith("postgresql://") or lowered.startswith("postgresql+") or lowered.startswith("postgres://")
 
 
+def normalize_database_url(value: str) -> str:
+    """Railway/Heroku liefern oft postgres://; SQLAlchemy 2 erwartet postgresql://."""
+    trimmed = value.strip()
+    if trimmed.lower().startswith("postgres://"):
+        return "postgresql://" + trimmed[len("postgres://") :]
+    return trimmed
+
+
 def _validate_prefixed_value(name: str, value: str | None, prefixes: tuple[str, ...]) -> None:
     if not value:
         return
@@ -151,7 +159,7 @@ def load_settings() -> Settings:
     load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
     app_env = os.getenv("APP_ENV", "dev").strip().lower() or "dev"
     app_version = os.getenv("APP_VERSION", "dev").strip() or "dev"
-    database_url = os.getenv("DATABASE_URL", "").strip()
+    database_url = normalize_database_url(os.getenv("DATABASE_URL", "").strip())
     cors_csv = os.getenv("CORS_ORIGINS", "").strip()
     cors_origin_regex = os.getenv("CORS_ORIGIN_REGEX", "").strip() or None
     log_level = os.getenv("LOG_LEVEL", "INFO").strip() or "INFO"
