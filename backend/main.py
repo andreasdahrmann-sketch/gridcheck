@@ -20,6 +20,7 @@ from api.ops_followups import router as ops_followups_router
 from api.projects import router as projects_router
 from api.site_markers import router as site_markers_router
 from api.users import router as users_router
+from api.analytics import router as analytics_router
 from api.contact import router as contact_router
 from api.v2_reports import router_reports
 
@@ -30,18 +31,30 @@ app = FastAPI(
 )
 
 
+def _database_error_payload(exc: SQLAlchemyError) -> dict[str, str]:
+    raw = str(getattr(exc, "__cause__", None) or exc).lower()
+    if "does not exist" in raw or "undefinedtable" in raw or "no such table" in raw:
+        return {
+            "code": "DATABASE_SCHEMA_MISSING",
+            "message": "Datenbank-Schema nicht migriert (Tabellen fehlen)",
+            "hint": "Railway Backend-Service: Release-Phase `alembic upgrade head` ausfuehren oder Shell: `cd backend && alembic upgrade head`.",
+        }
+    if "password authentication failed" in raw or "could not connect" in raw or "connection refused" in raw:
+        return {
+            "code": "DATABASE_UNAVAILABLE",
+            "message": "Datenbank nicht erreichbar (Verbindung fehlgeschlagen)",
+            "hint": "Railway: Postgres-Service mit Backend verknuepfen, DATABASE_URL=${{Postgres.DATABASE_URL}} setzen, Service neu deployen.",
+        }
+    return {
+        "code": "DATABASE_UNAVAILABLE",
+        "message": "Datenbank nicht erreichbar oder Schema nicht migriert",
+        "hint": "Railway: DATABASE_URL pruefen, dann `alembic upgrade head` ausfuehren.",
+    }
+
+
 @app.exception_handler(SQLAlchemyError)
-async def database_unavailable_handler(_request: Request, _exc: SQLAlchemyError) -> JSONResponse:
-    return JSONResponse(
-        status_code=503,
-        content={
-            "detail": {
-                "code": "DATABASE_UNAVAILABLE",
-                "message": "Datenbank nicht erreichbar oder Schema nicht migriert",
-                "hint": "Railway: DATABASE_URL pruefen, dann `alembic upgrade head` ausfuehren.",
-            }
-        },
-    )
+async def database_unavailable_handler(_request: Request, exc: SQLAlchemyError) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": _database_error_payload(exc)})
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -84,6 +97,7 @@ app.include_router(projects_router)
 app.include_router(site_markers_router)
 app.include_router(users_router)
 app.include_router(contact_router)
+app.include_router(analytics_router)
 app.include_router(router_reports, prefix="/api")
 
 # Legacy-Compatibility (existing clients), gated via feature flag.
@@ -98,23 +112,22 @@ def root():
 
 @app.get("/health")
 def health():
-    payload: dict[str, str] = {"status": "ok", "version": app.version}
-    if settings.app_env in {"staging", "prod", "production"}:
-        try:
-            from sqlalchemy import text
+    payload: dict[str, str] = {"status": "ok", "version": app.version, "env": settings.app_env}
+    try:
+        from sqlalchemy import text
 
-            from db.database import SessionLocal
+        from db.database import SessionLocal
 
-            with SessionLocal() as session:
-                session.execute(text("SELECT 1"))
-            payload["database"] = "ok"
-        except Exception as exc:
-            payload["status"] = "degraded"
-            payload["database"] = "error"
-            payload["database_hint"] = (
-                "DATABASE_URL pruefen und `alembic upgrade head` auf Railway ausfuehren."
-            )
-            payload["database_detail"] = str(exc)[:180]
+        with SessionLocal() as session:
+            session.execute(text("SELECT 1"))
+        payload["database"] = "ok"
+    except Exception as exc:
+        payload["status"] = "degraded"
+        payload["database"] = "error"
+        payload["database_hint"] = (
+            "DATABASE_URL pruefen und `alembic upgrade head` auf Railway ausfuehren."
+        )
+        payload["database_detail"] = str(exc)[:180]
     return payload
 
 
