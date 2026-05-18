@@ -14,6 +14,21 @@
 
 Ohne `JWT_SECRET` / `JWT_REFRESH_SECRET` startet die App in Prod nicht zuverlässig.
 
+## Falls Registrierung `DATABASE_SCHEMA_MISSING` meldet
+
+Ursache oft: `alembic stamp head` auf alter DB (Alembic sagt „head“, Spalte heißt noch `hashed_password`).
+
+**Einmalig reparieren** (löscht alle Daten in `public` — nur für leere Test-DB):
+
+```powershell
+cd backend
+$env:DATABASE_URL="postgresql+psycopg2://USER:PASS@HOST:PORT/railway"  # DATABASE_PUBLIC_URL vom Postgres-Service
+$env:ALLOW_DB_RESET="1"
+python scripts/repair_prod_schema.py
+```
+
+Danach Register-Test wie unten.
+
 ## Nach Git-Push (startCommand mit Migrationen)
 
 Railway deployt neu. Im **Deploy-Log** muss stehen:
