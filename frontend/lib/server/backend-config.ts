@@ -1,7 +1,19 @@
 /** Server-only BACKEND_URL helpers (Route Handlers, diagnostics). */
 
-export function getConfiguredBackendUrl(): string | null {
+/** Project-specific production default when Vercel omits BACKEND_URL (GridCheck prod Railway only). */
+export const VERCEL_PROD_BACKEND_FALLBACK = "https://gridcheck-production.up.railway.app";
+
+function readBackendUrlFromEnv(): string | null {
   const raw = process.env.BACKEND_URL?.trim().replace(/[\r\n]+/g, "");
+  if (raw) return raw;
+  if (process.env.VERCEL === "1") {
+    return VERCEL_PROD_BACKEND_FALLBACK;
+  }
+  return null;
+}
+
+export function getConfiguredBackendUrl(): string | null {
+  const raw = readBackendUrlFromEnv();
   if (!raw) return null;
   if (!/^https?:\/\//.test(raw)) return null;
   return raw.replace(/\/+$/, "");
@@ -14,13 +26,6 @@ export function isLocalBackendOrigin(origin: string): boolean {
 export function getBackendOrigin(): string {
   const configured = getConfiguredBackendUrl();
   if (configured) return configured;
-
-  if (process.env.VERCEL === "1") {
-    throw new Error(
-      "BACKEND_URL fehlt zur Laufzeit auf Vercel. In Project Settings fuer Production und Preview setzen (nur Origin, z. B. https://….up.railway.app), dann Redeploy.",
-    );
-  }
-
   return "http://localhost:8000";
 }
 
@@ -30,7 +35,9 @@ export function getBackendConfigStatus(): {
   host: string | null;
   isLocal: boolean;
   vercel: boolean;
+  usingFallback: boolean;
 } {
+  const envSet = Boolean(process.env.BACKEND_URL?.trim());
   const configured = getConfiguredBackendUrl();
   if (!configured) {
     return {
@@ -39,6 +46,7 @@ export function getBackendConfigStatus(): {
       host: null,
       isLocal: false,
       vercel: process.env.VERCEL === "1",
+      usingFallback: false,
     };
   }
   let host: string | null = null;
@@ -53,5 +61,6 @@ export function getBackendConfigStatus(): {
     host,
     isLocal: isLocalBackendOrigin(configured),
     vercel: process.env.VERCEL === "1",
+    usingFallback: process.env.VERCEL === "1" && !envSet,
   };
 }

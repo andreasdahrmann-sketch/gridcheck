@@ -153,18 +153,30 @@ export default function ApiTestPage() {
         Config: <code>/api/health</code> (Runtime BACKEND_URL + Railway). Rewrite: <code>/api/backend/health</code>.
         Register: <code>/api/auth/register</code>.
       </p>
-      {(state.kind === "ok" || state.configProbe) && (
+      {(state.kind === "ok" || (state.kind === "error" && state.configProbe)) && (
         <section
           style={{
             marginBottom: 16,
             padding: 16,
-            background: state.kind === "ok" && state.configProbe.ok ? "#e8f4fd" : "#fff8e6",
+            background:
+              state.kind === "ok" && state.configProbe.ok
+                ? "#e8f4fd"
+                : state.kind === "error" && state.configProbe?.ok
+                  ? "#e8f4fd"
+                  : "#fff8e6",
             border: "1px solid #90caf9",
             borderRadius: 8,
           }}
         >
           <p style={{ fontWeight: 600, margin: 0 }}>
-            {state.kind === "ok" ? (state.configProbe.ok ? "✅" : "⚠️") : "ℹ️"} Runtime BACKEND_URL
+            {state.kind === "ok"
+              ? state.configProbe.ok
+                ? "✅"
+                : "⚠️"
+              : state.configProbe?.ok
+                ? "✅"
+                : "ℹ️"}{" "}
+            Runtime BACKEND_URL
           </p>
           <pre style={{ marginTop: 12, background: "#fff", padding: 12, borderRadius: 6, fontSize: 12 }}>
             {JSON.stringify(state.kind === "ok" ? state.configProbe : state.configProbe, null, 2)}

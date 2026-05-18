@@ -8,7 +8,7 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { register } from "@/lib/api/auth";
+import { isAuthInfrastructureError, register } from "@/lib/api/auth";
 import { getPasswordPolicyChecks, isPasswordPolicySatisfied } from "@/lib/password-policy";
 import { getPurchaseIntentProfile, normalizePurchaseIntent } from "@/lib/purchase-intents";
 
@@ -244,17 +244,13 @@ function RegisterPageContent() {
                   <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                     {error}
                   </div>
-                  {(error.includes("Backend") ||
-                    error.includes("502") ||
-                    error.includes("503") ||
-                    error.includes("504") ||
-                    error.toLowerCase().includes("api request failed")) && (
+                  {isAuthInfrastructureError(error) && (
                     <p className="text-xs text-text-dim">
                       Diagnose:{" "}
                       <Link href="/api-test" className="text-brand-cyan underline">
                         /api-test
                       </Link>
-                      . Ohne Custom-DNS: Vercel-URL + Railway BACKEND_URL — siehe docs/GO_LIVE_OHNE_DNS.md.
+                      . Vercel: BACKEND_URL=https://gridcheck-production.up.railway.app — siehe docs/LAUNCH.md.
                     </p>
                   )}
                 </div>

@@ -19,7 +19,20 @@ const AUTH_BASE = "/api/auth";
 const AUTH_REWRITE_BASE = "/api/backend/api/v1/auth";
 
 const BACKEND_UNREACHABLE_HINT =
-  "Backend nicht erreichbar. Vercel: BACKEND_URL auf die Railway-HTTPS-URL setzen (nur Origin, ohne /api/v1). Railway: GET /health pruefen. Lokal: uvicorn auf Port 8000.";
+  "Backend nicht erreichbar. Vercel: BACKEND_URL=https://gridcheck-production.up.railway.app setzen (nur Origin), dann Redeploy. Railway: GET /health pruefen. Lokal: uvicorn auf Port 8000.";
+
+const BACKEND_URL_MISSING_HINT =
+  "BACKEND_URL fehlt auf Vercel. In Project Settings setzen: BACKEND_URL=https://gridcheck-production.up.railway.app (nur Origin, ohne /api/v1), dann Redeploy.";
+
+function readDetailCode(body: unknown): string | null {
+  if (!body || typeof body !== "object" || !("detail" in body)) return null;
+  const detail = (body as { detail?: unknown }).detail;
+  if (detail && typeof detail === "object" && "code" in detail) {
+    const code = (detail as { code?: unknown }).code;
+    return typeof code === "string" ? code : null;
+  }
+  return null;
+}
 
 async function readResponseBody(res: Response): Promise<unknown> {
   const contentType = res.headers.get("content-type") ?? "";
@@ -49,14 +62,45 @@ async function readResponseBody(res: Response): Promise<unknown> {
 }
 
 function resolveAuthErrorMessage(res: Response, body: unknown): string {
+  const code = readDetailCode(body);
   const parsed = extractApiErrorMessage(body, "");
+
+  if (code === "BACKEND_URL_MISSING") return BACKEND_URL_MISSING_HINT;
+  if (code === "BACKEND_UNREACHABLE") return BACKEND_UNREACHABLE_HINT;
+  if (code === "LOGIN_INVALID") {
+    return parsed || "E-Mail oder Passwort ist falsch.";
+  }
+  if (code === "EMAIL_EXISTS") {
+    return parsed || "Diese E-Mail ist bereits registriert. Bitte einloggen oder eine andere E-Mail verwenden.";
+  }
+  if (code === "PASSWORD_TOO_WEAK") {
+    return parsed || "Passwort erfuellt die Mindestanforderungen nicht.";
+  }
+  if (code === "USER_INACTIVE") {
+    return parsed || "Ihr Konto ist deaktiviert. Bitte den Administrator kontaktieren.";
+  }
+  if (code === "DATABASE_SCHEMA_MISSING" || code === "DATABASE_UNAVAILABLE") {
+    const detail =
+      body &&
+      typeof body === "object" &&
+      "detail" in body &&
+      body.detail &&
+      typeof body.detail === "object" &&
+      !Array.isArray(body.detail)
+        ? (body.detail as { message?: unknown; hint?: unknown })
+        : null;
+    const message =
+      typeof detail?.message === "string" && detail.message.trim()
+        ? detail.message.trim()
+        : parsed || "Datenbank nicht erreichbar oder Schema nicht migriert.";
+    const hint = typeof detail?.hint === "string" ? detail.hint.trim() : "";
+    if (hint && !message.includes(hint)) return `${message} ${hint}`;
+    return message;
+  }
   if (parsed) return parsed;
 
   if (res.status === 503) {
-    return (
-      extractApiErrorMessage(body, "") ||
-      "Datenbank nicht erreichbar oder Schema nicht migriert (alembic upgrade head auf Railway)."
-    );
+    return "Datenbank nicht erreichbar oder Schema nicht migriert. Railway: DATABASE_URL pruefen und alembic upgrade head ausfuehren.";
   }
   if (res.status === 500) {
     return "Serverfehler beim Backend. Railway-Logs pruefen und Alembic-Migrationen ausfuehren (alembic upgrade head).";
@@ -67,31 +111,47 @@ function resolveAuthErrorMessage(res: Response, body: unknown): string {
   if (res.status === 404) {
     return "Auth-Endpoint nicht gefunden. BACKEND_URL nur als Origin setzen (ohne /api/v1) und Vercel neu deployen.";
   }
+  if (res.status === 401) {
+    return "Anmeldung fehlgeschlagen. E-Mail und Passwort pruefen.";
+  }
 
   return `API-Anfrage fehlgeschlagen (HTTP ${res.status}).`;
 }
 
 function isBackendUnreachableResponse(res: Response, body: unknown): boolean {
-  if (res.status === 502 || res.status === 504) return true;
-  if (body && typeof body === "object" && "detail" in body) {
-    const detail = (body as { detail?: unknown }).detail;
-    if (detail && typeof detail === "object" && "code" in detail) {
-      const code = (detail as { code?: unknown }).code;
-      return code === "BACKEND_UNREACHABLE" || code === "BACKEND_URL_MISSING";
-    }
-  }
-  return false;
+  const code = readDetailCode(body);
+  if (code === "BACKEND_UNREACHABLE" || code === "BACKEND_URL_MISSING") return true;
+  return res.status === 502 || res.status === 504;
 }
 
 async function parse<T>(res: Response): Promise<T> {
   const body = await readResponseBody(res);
   if (!res.ok) {
+    const code = readDetailCode(body);
+    if (code === "BACKEND_URL_MISSING") {
+      throw new Error(BACKEND_URL_MISSING_HINT);
+    }
     if (isBackendUnreachableResponse(res, body)) {
       throw new Error(BACKEND_UNREACHABLE_HINT);
     }
     throw new Error(resolveAuthErrorMessage(res, body));
   }
   return body as T;
+}
+
+/** User-facing hint for register/login forms when backend/proxy errors occur. */
+export function isAuthInfrastructureError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("backend") ||
+    lower.includes("backend_url") ||
+    lower.includes("datenbank") ||
+    lower.includes("schema nicht migriert") ||
+    lower.includes("alembic") ||
+    lower.includes("502") ||
+    lower.includes("503") ||
+    lower.includes("504")
+  );
 }
 
 async function backendAuthFetch(path: string, init?: RequestInit): Promise<Response> {

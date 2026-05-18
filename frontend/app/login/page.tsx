@@ -8,7 +8,7 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { login } from "@/lib/api/auth";
+import { isAuthInfrastructureError, login } from "@/lib/api/auth";
 import { getPurchaseIntentProfile, normalizePurchaseIntent } from "@/lib/purchase-intents";
 
 const cardClass = "rounded-[28px] border border-white/10 bg-bg-card/80 p-6 shadow-[0_12px_42px_rgba(0,0,0,0.18)]";
@@ -180,8 +180,19 @@ function LoginPageContent() {
               </div>
 
               {error ? (
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                  {error}
+                <div className="space-y-2">
+                  <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                    {error}
+                  </div>
+                  {isAuthInfrastructureError(error) ? (
+                    <p className="text-xs text-text-dim">
+                      Diagnose:{" "}
+                      <Link href="/api-test" className="text-brand-cyan underline">
+                        /api-test
+                      </Link>
+                      . Vercel: BACKEND_URL=https://gridcheck-production.up.railway.app — siehe docs/LAUNCH.md.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
 

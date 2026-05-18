@@ -18,21 +18,21 @@ Dann zwei Terminals (Backend :8000, Frontend :3000 mit `nvm use 20`).
 | Was | URL / Aktion |
 |-----|----------------|
 | **App** | https://gridcheck.vercel.app |
-| **Backend (Railway)** | `https://gridcheck-production.up.railway.app` — **ohne** `:8080` (Port nur intern) |
-| **Vercel** | `BACKEND_URL=https://gridcheck-production.up.railway.app` (nur Origin, kein `/api/v1`) → **Redeploy** |
+| **Backend (Railway)** | https://gridcheck-production.up.railway.app — **ohne** `:8080` (Port nur intern) |
+| **Vercel `BACKEND_URL`** | **Exakt:** `BACKEND_URL=https://gridcheck-production.up.railway.app` (nur Origin, kein `/api/v1`) → danach **Redeploy** |
 | **Railway** | Variablen aus `railway-variables.generated.txt` / `docs/RAILWAY_ENV_SETUP.md` |
 | **Migration** | `releaseCommand` in `backend/railway.toml` → `alembic upgrade head` beim Deploy |
 | **Health** | `GET /health` → 200; mit `APP_ENV=prod` zusätzlich `"database":"ok"` |
 
-### Du musst in Vercel (Production)
+### Du musst in Vercel (Production **und** Preview)
 
-**Settings → Environment Variables:**
+**Settings → Environment Variables** (Name exakt `BACKEND_URL`, Wert nur Origin):
 
-```
-BACKEND_URL=https://gridcheck-production.up.railway.app
-```
+| Name | Value (exakt) |
+|------|----------------|
+| `BACKEND_URL` | `https://gridcheck-production.up.railway.app` |
 
-Danach **Deployments → Redeploy** (sonst nutzt die Live-App noch den alten Build).
+Ohne diese Variable schlagen **neue** Deploys fehl oder Login/Register liefern „Backend nicht erreichbar“. Der Frontend-Build hat einen **Notfall-Fallback** auf dieselbe Railway-URL — trotzdem **immer** in Vercel setzen und **Redeploy** auslösen.
 
 ### Du musst in Railway (Backend-Service)
 
