@@ -92,7 +92,7 @@
   {% if report.auflagen %}
   <ul>{% for w in report.auflagen %}<li>{{ w }}</li>{% endfor %}</ul>
   {% else %}
-  <p>Keine Auflagen gemeldet.</p>
+  <p>{% if report.empfohlene_massnahmen %}Keine separaten Auflagen aus Warnungen – Bedingungen und nächste Schritte siehe «Empfohlene Maßnahmen».{% else %}Keine Auflagen gemeldet.{% endif %}</p>
   {% endif %}
 
   <h2>Empfohlene Maßnahmen</h2>
@@ -148,7 +148,7 @@
     </tbody>
   </table>
 
-  <p class="muted">Vorläufige Analyse. Keine verbindliche Netzanschlusszusage.</p>
+  <p class="muted">Vorläufige Analyse. Keine verbindliche Netzanschlusszusage. Keine Kapazitätsgarantie. Freie Netzkapazität nur mit belastbarem Datenstand des VNB.</p>
   {% if report.disclaimers %}
   <ul class="muted">{% for d in report.disclaimers %}<li>{{ d }}</li>{% endfor %}</ul>
   {% endif %}

@@ -178,12 +178,12 @@ class TestSpannungN1:
 # 5. N1-KLASSE + KONFIDENZ
 # ======================================================================
 class TestN1Klasse:
-    def test_alles_geprueft_ist_n1_3(self):
+    def test_alles_geprueft_ohne_dso_ist_n1_2(self):
         r = bestimme_n1_klasse(
             {"bewertung": "GRUEN"}, {"bewertung": "GRUEN"},
             {"bewertung": "GRUEN"}, {"bewertung": "GRUEN"}, {"bewertung": "GRUEN"},
         )
-        assert r == "N1-3"
+        assert r == "N1-2"
 
     def test_nur_topo_und_leitung_ist_n1_2(self):
         r = bestimme_n1_klasse(
@@ -259,8 +259,8 @@ class TestAnalysiere:
         spannung_n1 = {"delta_u_prozent": 3.5}
         r = analysiere_n1(eingabe, thermisch_n1, spannung_n1)
         assert r["gesamt"]["bewertung"] == "GRUEN"
-        assert r["gesamt"]["n1_klasse"] == "N1-3"
-        assert r["gesamt"]["konfidenz"] >= 0.7
+        assert r["gesamt"]["n1_klasse"] == "N1-2"
+        assert r["gesamt"]["konfidenz"] >= 0.4
 
     def test_engpass_wird_erkannt(self):
         eingabe = {

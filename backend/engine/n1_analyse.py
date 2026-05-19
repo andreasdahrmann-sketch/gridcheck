@@ -11,7 +11,7 @@ Betriebsmittel-/Abgangsreserve und weiterem Screening:
 
 Die N1-Klasse N1-0..N1-4 beschreibt bewusst die Nachweistiefe und nicht die
 Qualitaet des Ergebnisses. Ohne verifizierte Netzbetreiberdaten bleibt die
-Analyse konservativ im MVP maximal bei N1-3.
+externe Aussage im MVP maximal bei N1-2 (siehe 06-arbeitsweise-gridcheck.mdc).
 """
 from __future__ import annotations
 
@@ -648,12 +648,17 @@ def bestimme_n1_klasse(
     if dso_daten_vorhanden and topo_geprueft and pfad_geprueft and trafo_geprueft and spannung_geprueft:
         return "N1-4"
     if topo_geprueft and pfad_geprueft and trafo_geprueft and spannung_geprueft:
-        return "N1-3"
-    if topo_geprueft and pfad_geprueft:
+        klasse = "N1-3"
+    elif topo_geprueft and pfad_geprueft:
+        klasse = "N1-2"
+    elif topo_geprueft:
+        klasse = "N1-1"
+    else:
+        klasse = "N1-0"
+    # MVP ohne DSO-Daten: maximal N1-2 behaupten (06-arbeitsweise-gridcheck.mdc).
+    if not dso_daten_vorhanden and klasse == "N1-3":
         return "N1-2"
-    if topo_geprueft:
-        return "N1-1"
-    return "N1-0"
+    return klasse
 
 
 def berechne_konfidenz(n1_klasse: str, anzahl_default_annahmen: int) -> float:
@@ -833,7 +838,7 @@ def analysiere_n1(
                 "feld": "n1_datengrundlage",
                 "wert": eingabe.get("n1_datengrundlage"),
                 "quelle": "default",
-                "begruendung": "Keine verifizierten Netzbetreiberdaten - Screening bleibt konservativ vorlaeufig und erreicht maximal N1-3.",
+                "begruendung": "Keine verifizierten Netzbetreiberdaten - Screening bleibt konservativ vorlaeufig und erreicht maximal N1-2.",
             }
         )
 

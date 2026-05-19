@@ -72,6 +72,15 @@ def _bulleted_block(story: list[Any], style: ParagraphStyle, items: list[str], e
         story.append(_p(empty_label, style))
 
 
+def _auflagen_empty_label(report: dict[str, Any]) -> str:
+    if report.get("empfohlene_massnahmen"):
+        return (
+            "Keine separaten Auflagen aus Warnungen – "
+            "Bedingungen und nächste Schritte siehe «Empfohlene Maßnahmen»."
+        )
+    return "Keine Auflagen gemeldet."
+
+
 def build_stakeholder_report_pdf(report: dict[str, Any]) -> bytes:
     """Map a stakeholder report dict (from build_*_report) to a PDF byte string."""
     buf = io.BytesIO()
@@ -206,7 +215,12 @@ def build_stakeholder_report_pdf(report: dict[str, Any]) -> bytes:
         _bulleted_block(story, body, list(report.get("process_view") or []), "")
 
     story.append(_p("Auflagen", _SECTION_TITLE_STYLE))
-    _bulleted_block(story, body, list(report.get("auflagen") or []), "Keine Auflagen gemeldet.")
+    _bulleted_block(
+        story,
+        body,
+        list(report.get("auflagen") or []),
+        _auflagen_empty_label(report),
+    )
 
     story.append(_p("Empfohlene Maßnahmen", _SECTION_TITLE_STYLE))
     _bulleted_block(

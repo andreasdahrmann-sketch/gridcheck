@@ -8,6 +8,7 @@ PV_MS_DEMO = {
     "p_kw": 5000,
     "leistung_mw": 5.0,
     "plz": "04109",
+    "ort": "Leipzig",
     "anschlussart": "Einspeisung",
     "cos_phi": 0.95,
     "nennspannung": 20,
@@ -26,6 +27,7 @@ BESS_GRENZWERTIG_DEMO = {
     "p_kw": 10000,
     "leistung_mw": 10.0,
     "plz": "30159",
+    "ort": "Hannover",
     "anschlussart": "Speicher",
     "cos_phi": 0.95,
     "nennspannung": 20,
@@ -48,6 +50,7 @@ NOGO_THERMIK_DEMO = {
     "p_kw": 250,
     "leistung_mw": 0.25,
     "plz": "44137",
+    "ort": "Dortmund",
     "anschlussart": "Einspeisung",
     "cos_phi": 0.95,
     "nennspannung": 0.4,
@@ -70,6 +73,8 @@ def test_demo_bess_grenzwertig_trafo_engpass():
     assert r["status"] == "OK"
     assert r["n1"]["engpass_komponente"] == "trafo"
     assert r["n1"]["bewertung"] == "ROT"
+    assert r["n1"]["n1_klasse"] == "N1-2"
+    assert r["fazit"]["entscheidung"] == "C"
 
 
 def test_demo_nogo_thermik_entscheidung_c():

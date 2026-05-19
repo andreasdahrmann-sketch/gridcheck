@@ -76,11 +76,11 @@ class TestN1Integration:
         assert r["status"] == "OK"
         assert r["n1"]["bewertung"] == "ROT"
         assert r["n1"]["n1_sicher"] is False
-        assert r["n1"]["n1_klasse"] == "N1-3"
+        assert r["n1"]["n1_klasse"] == "N1-2"
         assert r["n1"]["engpass_komponente"] == "trafo"
         assert "Engpass trafo" in r["n1"]["detail_text"]
         assert r["scores"]["versorgungssicherheit"] == 10
-        assert any("N-1-Screening als N1-3" in note for note in r["transparenz"]["confidence_notes"])
+        assert any("N-1-Screening als N1-2" in note for note in r["transparenz"]["confidence_notes"])
         assert any("Umspannwerk" in text or "Trafo" in text for text in r["empfehlungen"])
 
     def test_abgangsreserve_erscheint_in_n1_detail_und_nachweisen(self, basis_pv_ms):

@@ -15,9 +15,9 @@ export interface DemoCase {
 export const DEMO_CASES: DemoCase[] = [
   {
     id: "demo-pv-ms-auflagen",
-    label: "[DEMO] PV 5 MW / MS – machbar mit Auflagen",
+    label: "[DEMO] PV 5 MW / MS – vorläufig C (Screening)",
     beschreibung:
-      "Freiflächen-PV 5 MW am MS-Ring mit Restkapazität; zeigt typische Auflagen, N-1-Hinweise und Massnahmenplan.",
+      "Freiflächen-PV 5 MW am MS-Ring; Engine liefert vorläufig Entscheidung C mit N-1-Hinweisen, Empfehlungen und Auflagenkontext (Demo ohne NB-Daten).",
     kundentyp: "projektierer",
     input: {
       anlagentyp: "solar",
@@ -36,9 +36,9 @@ export const DEMO_CASES: DemoCase[] = [
   },
   {
     id: "demo-bess-grenzwertig",
-    label: "[DEMO] BESS 10 MW / MS – grenzwertig",
+    label: "[DEMO] BESS 10 MW / MS – vorläufig C (Trafo)",
     beschreibung:
-      "Grosser Speicher mit hoher Trafoauslastung im Umspannwerk; N-1- und Trafo-Engpass werden sichtbar.",
+      "Grosser Speicher mit hoher Trafoauslastung; Engine zeigt Trafo-Engpass und kritische N-1-Bewertung (Demo ohne verifizierte NB-Daten).",
     kundentyp: "speicherbetreiber",
     input: {
       anlagentyp: "batterie",
@@ -67,9 +67,9 @@ export const DEMO_CASES: DemoCase[] = [
   },
   {
     id: "demo-nogo-thermik",
-    label: "[DEMO] PV 250 kW / NS – No-Go Thermik",
+    label: "[DEMO] PV 250 kW / NS – vorläufig C (Thermik)",
     beschreibung:
-      "Kurze NS-Leitung mit hoher thermischer Auslastung; typischer No-Go-Hinweis bei Spannungsfall und Leitung.",
+      "Kurze NS-Leitung mit thermischem und Spannungs-Engpass; Engine liefert Entscheidung C (No-Go-Screening, keine NB-Zusage).",
     kundentyp: "projektierer",
     input: {
       anlagentyp: "solar",
