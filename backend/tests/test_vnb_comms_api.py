@@ -52,6 +52,52 @@ def _register_nb(client: TestClient, email: str, password: str = "Passwort123!")
     assert login.status_code == 200, login.text
 
 
+def _promote_to_admin(client: TestClient, email: str) -> None:
+    db = client._gridcheck_session_factory()  # type: ignore[attr-defined]
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        assert user is not None
+        user.role = "admin"
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_vnb_comms_admin_has_read_write_without_vnb_approval():
+    _reset_rate_limit_state()
+    client = build_client()
+    try:
+        reg = client.post(
+            "/api/v1/auth/register",
+            json={"email": "admin-comms@example.com", "password": "Passwort123!", "role": "endkunde"},
+        )
+        assert reg.status_code == 200, reg.text
+        _promote_to_admin(client, "admin-comms@example.com")
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"email": "admin-comms@example.com", "password": "Passwort123!"},
+        )
+        assert login.status_code == 200, login.text
+
+        listing = client.get("/api/v1/vnb/comms/threads")
+        assert listing.status_code == 200, listing.text
+
+        create = client.post(
+            "/api/v1/vnb/comms/threads",
+            headers=_csrf_headers(client),
+            json={
+                "title": "Admin Moderation Test",
+                "category": "kapazitaetshinweis",
+                "body": "Administrativer Hinweis zur Thread-Uebersicht.",
+                "target_vnb_region": "mitte",
+            },
+        )
+        assert create.status_code == 200, create.text
+        assert create.json()["title"] == "Admin Moderation Test"
+    finally:
+        _close_client(client)
+
+
 def test_vnb_comms_requires_verified_netzbetreiber():
     _reset_rate_limit_state()
     client = build_client()

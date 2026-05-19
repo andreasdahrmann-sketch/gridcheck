@@ -8,6 +8,7 @@ export type AuthUser = {
   full_name?: string | null;
   vnb_verification_status?: "none" | "pending" | "approved";
   netzbetreiber_verified?: boolean;
+  vnb_dashboard_access?: boolean;
 };
 
 type TokenResponse = {

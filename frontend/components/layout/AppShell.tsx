@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Building2,
   FileText,
   FolderKanban,
   Map,
@@ -16,8 +17,10 @@ import { Header } from "@/components/Header";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import UpgradeProBanner from "@/components/billing/UpgradeProBanner";
 import { Button } from "@/components/ui/button";
+import { me, type AuthUser } from "@/lib/api/auth";
+import { canAccessVnbDashboard } from "@/lib/vnb-access";
 
-const SIDEBAR_LINKS = [
+const BASE_SIDEBAR_LINKS = [
   { href: "/projects", label: "Projekte", icon: FolderKanban },
   { href: "/projektierer", label: "Analyse", icon: Search },
   { href: "/map", label: "Karte", icon: Map },
@@ -25,21 +28,51 @@ const SIDEBAR_LINKS = [
   { href: "/settings", label: "Einstellungen", icon: Settings },
 ] as const;
 
+const VNB_SIDEBAR_LINK = { href: "/vnb", label: "VNB", icon: Building2 } as const;
+
 function isActivePath(pathname: string, href: string) {
   if (href === "/projects") return pathname.startsWith("/projects");
   if (href === "/projektierer") {
     return pathname.startsWith("/projektierer") || pathname.startsWith("/check");
   }
+  if (href === "/vnb") return pathname.startsWith("/vnb");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    me()
+      .then((nextUser) => {
+        if (active) setUser(nextUser);
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const sidebarLinks = useMemo(() => {
+    if (!user || !canAccessVnbDashboard(user)) {
+      return [...BASE_SIDEBAR_LINKS];
+    }
+    return [
+      BASE_SIDEBAR_LINKS[0],
+      BASE_SIDEBAR_LINKS[1],
+      VNB_SIDEBAR_LINK,
+      ...BASE_SIDEBAR_LINKS.slice(2),
+    ];
+  }, [user]);
 
   const sidebar = (
     <nav className="flex flex-col gap-1 p-3" aria-label="App-Navigation">
-      {SIDEBAR_LINKS.map((item) => {
+      {sidebarLinks.map((item) => {
         const active = isActivePath(pathname, item.href);
         const Icon = item.icon;
         return (

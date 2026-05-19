@@ -2,7 +2,7 @@
 
 ## Ziel
 
-Das Netzbetreiber-Dashboard und alle VNB-spezifischen API-Pfade sind nur fuer **freigeschaltete** Konten mit Rolle `netzbetreiber` erreichbar. Alle anderen Nutzer erhalten HTTP 403 mit Code `VNB_ACCESS_DENIED`.
+Das Netzbetreiber-Dashboard und alle VNB-spezifischen API-Pfade sind fuer **freigeschaltete** Konten mit Rolle `netzbetreiber` und fuer **Administratoren** (`role=admin`) erreichbar. Alle anderen Nutzer erhalten HTTP 403 mit Code `VNB_ACCESS_DENIED` bzw. bei NB-Austausch `VNB_COMMS_FORBIDDEN` / `VNB_VERIFICATION_PENDING`.
 
 ## Datenmodell
 
@@ -14,7 +14,14 @@ Tabelle `users`, Spalte `vnb_verification_status`:
 | `pending` | Registrierung als Netzbetreiber, Identitaet wird geprueft |
 | `approved` | Freigeschaltet — VNB-Dashboard und VNB-APIs erlaubt |
 
-Zusaetzlich liefert `/api/v1/auth/me` das berechnete Feld `netzbetreiber_verified` (`true` nur bei Rolle `netzbetreiber` und Status `approved`).
+Zusaetzlich liefert `/api/v1/auth/me`:
+
+| Feld | Bedeutung |
+|------|-----------|
+| `netzbetreiber_verified` | `true` nur bei Rolle `netzbetreiber` und Status `approved` |
+| `vnb_dashboard_access` | `true` bei freigeschaltetem Netzbetreiber **oder** Admin |
+
+Admins sehen das VNB-Dashboard ohne Pending-Gate und ohne VNB-Freischaltung; sie schalten andere Netzbetreiber ueber Admin-Endpoints frei.
 
 **Migration:** `20260519_02_vnb_verification_status`
 
@@ -50,13 +57,22 @@ Voraussetzung: Benutzer existiert und hat Rolle `netzbetreiber`.
 - `POST /api/v2/reports/vnb`
 - `POST /api/v1/ki/feedback` mit `quelle=netzbetreiber`
 
-Administratoren (`role=admin`) duerfen VNB-Pfade zu Testzwecken nutzen (Bypass).
+### Admin-Override
+
+| Bereich | Admin-Zugang |
+|---------|----------------|
+| VNB-Dashboard (`/vnb`, Stakeholder-VNB, Reports, KI-Feedback NB) | Vollzugriff ohne `vnb_verification_status=approved` |
+| NB-Austausch `/api/v1/vnb/comms/*` | Lesen und Schreiben (Moderation / Oversight) |
+| Freischaltung | `POST /api/v1/admin/users/{id}/approve-netzbetreiber` (nur Admin) |
+
+Implementierung: `backend/core/vnb_access.py` (`user_has_vnb_dashboard_access`, `require_verified_netzbetreiber_comms`).
 
 ## Frontend
 
 - Route `/vnb` und Layout `app/vnb/layout.tsx` mit `ProtectedVnbRoute`
-- Header-Link „VNB“ nur bei `netzbetreiber_verified`
-- Startseite: Tab „Netzbetreiber-Dashboard“ nur fuer freigeschaltete Nutzer
+- Header-Link „VNB“ und Sidebar-Eintrag bei `canAccessVnbDashboard` (Admin **oder** `netzbetreiber_verified`)
+- Admins: kein Pending-Sperrbildschirm
+- Startseite: Tab „Netzbetreiber-Dashboard“ fuer Admins und freigeschaltete Netzbetreiber
 
 ### Nutzertexte (403 / Sperrbildschirm)
 

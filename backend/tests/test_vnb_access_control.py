@@ -73,6 +73,53 @@ def _minimal_netzbetreiber_payload() -> dict:
     }
 
 
+def _promote_to_admin(client: TestClient, email: str) -> None:
+    db = client._gridcheck_session_factory()  # type: ignore[attr-defined]
+    try:
+        user = db.query(User).filter(User.email == email).first()
+        assert user is not None
+        user.role = "admin"
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_admin_allowed_on_netzbetreiber_stakeholder_route():
+    client = build_client()
+    try:
+        _register(client, "admin-vnb@example.com", "projektierer")
+        _promote_to_admin(client, "admin-vnb@example.com")
+        token = _login(client, "admin-vnb@example.com")
+        me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert me.status_code == 200, me.text
+        assert me.json()["vnb_dashboard_access"] is True
+        assert me.json()["netzbetreiber_verified"] is False
+        res = client.post(
+            "/api/v1/stakeholder/netzbetreiber",
+            json=_minimal_netzbetreiber_payload(),
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert res.status_code == 200, res.text
+    finally:
+        _close_client(client)
+
+
+def test_admin_allowed_on_vnb_comms_threads():
+    client = build_client()
+    try:
+        _register(client, "admin-comms@example.com", "endkunde")
+        _promote_to_admin(client, "admin-comms@example.com")
+        token = _login(client, "admin-comms@example.com")
+        res = client.get(
+            "/api/v1/vnb/comms/threads",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert res.status_code == 200, res.text
+        assert res.json() == []
+    finally:
+        _close_client(client)
+
+
 def test_endkunde_denied_on_netzbetreiber_stakeholder_route():
     client = build_client()
     try:

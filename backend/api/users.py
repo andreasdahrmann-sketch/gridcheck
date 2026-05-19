@@ -20,6 +20,7 @@ class MeResponse(BaseModel):
     full_name: str | None
     vnb_verification_status: str = "none"
     netzbetreiber_verified: bool = False
+    vnb_dashboard_access: bool = False
 
 
 def _me_response(user: User) -> MeResponse:
@@ -31,6 +32,7 @@ def _me_response(user: User) -> MeResponse:
         full_name=user.full_name,
         vnb_verification_status=str(fields["vnb_verification_status"]),
         netzbetreiber_verified=bool(fields["netzbetreiber_verified"]),
+        vnb_dashboard_access=bool(fields["vnb_dashboard_access"]),
     )
 
 

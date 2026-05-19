@@ -10,7 +10,9 @@ export type VnbAccessState =
 
 export function resolveVnbAccessState(user: AuthUser | null | undefined): VnbAccessState {
   if (!user) return "not_registered";
-  if (user.role === "admin" || user.netzbetreiber_verified) return "verified";
+  if (user.vnb_dashboard_access || user.role === "admin" || user.netzbetreiber_verified) {
+    return "verified";
+  }
   if (user.role !== "netzbetreiber") return "wrong_role";
   if (user.vnb_verification_status === "pending") return "pending";
   return "not_registered";

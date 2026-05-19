@@ -53,6 +53,7 @@ class UserResponse(BaseModel):
     full_name: str | None
     vnb_verification_status: str = "none"
     netzbetreiber_verified: bool = False
+    vnb_dashboard_access: bool = False
 
 
 def _user_response(user: User) -> UserResponse:
@@ -64,6 +65,7 @@ def _user_response(user: User) -> UserResponse:
         full_name=user.full_name,
         vnb_verification_status=str(fields["vnb_verification_status"]),
         netzbetreiber_verified=bool(fields["netzbetreiber_verified"]),
+        vnb_dashboard_access=bool(fields["vnb_dashboard_access"]),
     )
 
 

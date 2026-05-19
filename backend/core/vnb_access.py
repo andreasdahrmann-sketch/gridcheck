@@ -34,6 +34,10 @@ def _read_status(user: User, *, db: Session | None = None) -> str:
     return VNB_STATUS_NONE
 
 
+def user_is_admin(user: User) -> bool:
+    return str(getattr(user, "role", "") or "").strip().lower() == "admin"
+
+
 def user_is_verified_netzbetreiber(user: User, *, db: Session | None = None) -> bool:
     role = str(getattr(user, "role", "") or "").strip().lower()
     if role != "netzbetreiber":
@@ -41,22 +45,26 @@ def user_is_verified_netzbetreiber(user: User, *, db: Session | None = None) -> 
     return _read_status(user, db=db) == VNB_STATUS_APPROVED
 
 
+def user_has_vnb_dashboard_access(user: User, *, db: Session | None = None) -> bool:
+    """VNB-Dashboard und VNB-APIs: freigeschaltete Netzbetreiber oder Admin."""
+    return user_is_admin(user) or user_is_verified_netzbetreiber(user, db=db)
+
+
 def user_to_vnb_access_fields(user: User, *, db: Session | None = None) -> dict[str, str | bool]:
     status = _read_status(user, db=db)
     return {
         "vnb_verification_status": status,
         "netzbetreiber_verified": user_is_verified_netzbetreiber(user, db=db),
+        "vnb_dashboard_access": user_has_vnb_dashboard_access(user, db=db),
     }
 
 
 def assert_verified_netzbetreiber(user: User, *, db: Session | None = None) -> User:
-    role = str(getattr(user, "role", "") or "").strip().lower()
-    if role == "admin":
-        return user
-    if user_is_verified_netzbetreiber(user, db=db):
+    if user_has_vnb_dashboard_access(user, db=db):
         return user
 
     status = _read_status(user, db=db)
+    role = str(getattr(user, "role", "") or "").strip().lower()
     if role != "netzbetreiber":
         message = (
             "Dieses Dashboard ist nur fuer Netzbetreiber. "
@@ -98,8 +106,8 @@ def require_verified_netzbetreiber_comms(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> User:
-    """NB-Austausch: nur freigeschaltete Netzbetreiber, kein Admin-Bypass."""
-    if user_is_verified_netzbetreiber(current_user, db=db):
+    """NB-Austausch: freigeschaltete Netzbetreiber und Admins (Moderation/Oversight)."""
+    if user_has_vnb_dashboard_access(current_user, db=db):
         return current_user
 
     status = _read_status(current_user, db=db)
