@@ -84,7 +84,14 @@ def password_hash_needs_upgrade(hashed_password: str) -> bool:
 def _jwt_secret(is_refresh: bool = False) -> str:
     raw = settings.jwt_refresh_secret if is_refresh else settings.jwt_secret
     if not raw:
-        raise RuntimeError("JWT secret is not configured")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "AUTH_JWT_NOT_CONFIGURED",
+                "message": "JWT-Signatur ist nicht konfiguriert",
+                "hint": "JWT_SECRET und JWT_REFRESH_SECRET setzen (je min. 32 Zeichen, unterschiedliche Werte).",
+            },
+        )
     return raw
 
 

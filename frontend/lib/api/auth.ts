@@ -79,6 +79,12 @@ function resolveAuthErrorMessage(res: Response, body: unknown): string {
   if (code === "USER_INACTIVE") {
     return parsed || "Ihr Konto ist deaktiviert. Bitte den Administrator kontaktieren.";
   }
+  if (code === "AUTH_JWT_NOT_CONFIGURED") {
+    return (
+      parsed ||
+      "JWT-Signatur ist auf dem Backend nicht konfiguriert. Railway: JWT_SECRET und JWT_REFRESH_SECRET setzen (je min. 32 Zeichen, unterschiedliche Werte), APP_ENV=production, dann Redeploy."
+    );
+  }
   if (code === "DATABASE_SCHEMA_MISSING" || code === "DATABASE_UNAVAILABLE") {
     const detail =
       body &&
@@ -148,6 +154,9 @@ export function isAuthInfrastructureError(message: string): boolean {
     lower.includes("datenbank") ||
     lower.includes("schema nicht migriert") ||
     lower.includes("alembic") ||
+    lower.includes("jwt_secret") ||
+    lower.includes("jwt-signatur") ||
+    lower.includes("auth_jwt_not_configured") ||
     lower.includes("502") ||
     lower.includes("503") ||
     lower.includes("504")
