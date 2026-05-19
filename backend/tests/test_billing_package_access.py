@@ -207,13 +207,31 @@ def test_stripe_webhooks_create_payment_and_subscription_entitlements(monkeypatc
                     "status": "complete",
                     "metadata": {
                         "user_id": str(user_id),
-                        "offer_id": "premium_pre_check",
+                        "offer_id": "professional_anschlussstrategie",
                     },
+                    "line_items": {"data": [{"price": {"id": "price_professional_test"}}]},
                 }
             },
         }
         first = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
         assert first.status_code == 200, first.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "stripe-hooks@example.com").first()
+            assert user is not None
+            assert user.plan_tier == "professional"
+            assert user.billing_status == "purchased"
+            assert user.stripe_price_id == "price_professional_test"
+            professional_entitlement = (
+                db.query(BillingEntitlement)
+                .filter(
+                    BillingEntitlement.user_id == user.id,
+                    BillingEntitlement.offer_id == "professional_anschlussstrategie",
+                )
+                .first()
+            )
+            assert professional_entitlement is not None
+            assert professional_entitlement.status == "active"
 
         future_period_end = int((datetime.now(timezone.utc) + timedelta(days=30)).timestamp())
         FakeWebhook.next_event = {
@@ -244,7 +262,9 @@ def test_stripe_webhooks_create_payment_and_subscription_entitlements(monkeypatc
                 .all()
             )
             assert len(entitlements) == 2
-            assert entitlements[0].offer_id == "premium_pre_check"
+            assert user.plan_tier == "pro"
+            assert user.billing_status == "active"
+            assert entitlements[0].offer_id == "professional_anschlussstrategie"
             assert entitlements[0].status == "active"
             assert entitlements[1].offer_id == "pro_lizenz"
             assert entitlements[1].status == "active"

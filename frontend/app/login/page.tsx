@@ -9,6 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isAuthInfrastructureError, login } from "@/lib/api/auth";
+import {
+  isSelfServeCheckoutPlan,
+  normalizeCheckoutPlan,
+  offerIdForCheckoutPlan,
+  settingsCheckoutHref,
+} from "@/lib/billing-plans";
 import { getPurchaseIntentProfile, normalizePurchaseIntent } from "@/lib/purchase-intents";
 
 const cardClass = "rounded-[28px] border border-white/10 bg-bg-card/80 p-6 shadow-[0_12px_42px_rgba(0,0,0,0.18)]";
@@ -22,10 +28,19 @@ function LoginPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const intent = normalizePurchaseIntent(searchParams.get("intent"));
+  const checkoutPlan = normalizeCheckoutPlan(searchParams.get("plan"));
+  const intent = normalizePurchaseIntent(searchParams.get("intent") ?? checkoutPlan);
   const intentProfile = getPurchaseIntentProfile(intent);
-  const nextTarget = searchParams.get("next") || (intent === "upgrade" || intent === "pro" ? "/settings" : "/projects");
-  const registerHref = `/register?intent=${encodeURIComponent(intent)}&next=${encodeURIComponent(nextTarget)}`;
+  const defaultNext =
+    checkoutPlan && isSelfServeCheckoutPlan(checkoutPlan)
+      ? settingsCheckoutHref(checkoutPlan)
+      : intent === "upgrade" || intent === "pro"
+        ? "/settings"
+        : "/projects";
+  const nextTarget = searchParams.get("next") || defaultNext;
+  const registerParams = new URLSearchParams({ intent, next: nextTarget });
+  if (checkoutPlan) registerParams.set("plan", checkoutPlan);
+  const registerHref = `/register?${registerParams.toString()}`;
   const contactHref = `/contact?intent=${encodeURIComponent(intent)}`;
 
   async function onSubmit(e: FormEvent) {
@@ -75,6 +90,11 @@ function LoginPageContent() {
               </div>
               <p className="mt-3 text-sm leading-6 text-white/90">{intentProfile.summary}</p>
               <p className="mt-2 text-xs leading-5 text-text-muted">Naechster Schritt nach Login: {intentProfile.nextStep}</p>
+              {checkoutPlan && offerIdForCheckoutPlan(checkoutPlan) ? (
+                <p className="mt-2 text-xs leading-5 text-brand-cyan">
+                  Gewaehltes Paket: {checkoutPlan}. Nach dem Login wird Stripe Checkout gestartet.
+                </p>
+              ) : null}
               <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <Link
                   href="/projektierer"

@@ -7,8 +7,11 @@ GridCheck v2 - Diagnose-Endpoint
 - Liefert das vollstaendige Engine-Output-Dict (kein Informationsverlust)
 """
 
+import logging
 from datetime import datetime
 from typing import Any, Dict, Literal
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -33,6 +36,7 @@ from services.visibility_service import derive_stakeholder_path, sanitize_analys
 from services.v1_analysis_service import run_v1_analysis
 
 router_v2 = APIRouter(tags=["analyse"])
+router_analysis_compat = APIRouter(prefix="/api/analysis", tags=["analyse-compat"])
 
 
 class ProjectComponentPayload(BaseModel):
@@ -370,6 +374,24 @@ def analyze_v2(
         source=source,
     )
     db.commit()
+
+    try:
+        from services.email_service import send_analysis_complete_email
+
+        project_name = None
+        if project_id is not None:
+            project = project_service.get_project(db, current_user, int(project_id))
+            project_name = project.name
+        send_analysis_complete_email(
+            to_email=current_user.email,
+            full_name=current_user.full_name,
+            project_name=project_name,
+            run_id=run.id,
+            decision_code=result.get("entscheidung") or result.get("decision_code"),
+        )
+    except Exception:
+        logger.exception("analysis_complete_email_failed run_id=%s user_id=%s", run.id, current_user.id)
+
     response_payload = {
         **result,
         "history": {"analysis_run_id": run.id},
@@ -383,6 +405,18 @@ def analyze_v2(
         "billing": build_billing_overview(db, current_user),
     }
     return sanitize_analysis_result(response_payload, stakeholder_path=stakeholder_path)
+
+
+@router_analysis_compat.post("/run", response_model=None)
+def analyze_run_compat(
+    request: Request,
+    req: AnalyzeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf),
+) -> Dict[str, Any]:
+    """Compatibility alias for clients expecting POST /api/analysis/run."""
+    return analyze_v2(request, req, db, current_user, _)
 
 
 @router_v2.get("/analysis/history", response_model=list[AnalysisHistoryItemResponse])

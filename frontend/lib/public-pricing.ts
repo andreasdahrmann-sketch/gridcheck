@@ -1,3 +1,5 @@
+import { registerHrefForPlan } from "@/lib/billing-plans";
+
 export type PublicPricingTier = {
   id: string;
   name: string;
@@ -36,7 +38,7 @@ export const PUBLIC_PRICING_TIERS: PublicPricingTier[] = [
       "Pay-per-Use ohne laufende Lizenz",
       "Hybrid-, Speicher- und Trassenlogik bewusst begrenzt",
     ],
-    cta: { label: "Paket in Einstellungen", href: "/settings" },
+    cta: { label: "Basic buchen", href: registerHrefForPlan("basic") },
   },
   {
     id: "premium",
@@ -50,7 +52,7 @@ export const PUBLIC_PRICING_TIERS: PublicPricingTier[] = [
       "Self-Serve ohne operativen Follow-up",
     ],
     featured: true,
-    cta: { label: "Premium vergleichen", href: "/settings" },
+    cta: { label: "Premium buchen", href: registerHrefForPlan("premium") },
   },
   {
     id: "professional",
@@ -63,7 +65,7 @@ export const PUBLIC_PRICING_TIERS: PublicPricingTier[] = [
       "Operativer Nachlauf statt stiller Self-Serve-Abschluss",
       "Kein Express-SLA und kein VNB-Pilot inklusive",
     ],
-    cta: { label: "Professional anfragen", href: "/contact?intent=professional" },
+    cta: { label: "Professional buchen", href: registerHrefForPlan("professional") },
   },
   {
     id: "pro",
@@ -77,7 +79,7 @@ export const PUBLIC_PRICING_TIERS: PublicPricingTier[] = [
       "Professional und Express bleiben separate Pfade",
     ],
     featured: true,
-    cta: { label: "Pro abstimmen", href: "/contact?intent=pro" },
+    cta: { label: "Pro Lizenz buchen", href: registerHrefForPlan("pro") },
   },
   {
     id: "vnb_pilot",
@@ -104,5 +106,5 @@ export const EXPRESS_ADDON = {
 export const PRICING_COMPARISON_ROWS = [
   { label: "Zielgruppe", free: "Erstscreening", basic: "Einzelvorhaben", premium: "Komplexe Einzelfaelle", pro: "Projektpipeline", professional: "Kritische Einzelfaelle", pilot: "Netzbetreiber" },
   { label: "Scope", free: "Basis", basic: "Basis-Report", premium: "Premium-Report", pro: "Premium inkl.", professional: "Professional + Follow-up", pilot: "Abgestimmt" },
-  { label: "Checkout", free: "In App", basic: "Self-Serve", premium: "Self-Serve", pro: "Abo", professional: "Kontakt", pilot: "Kontakt" },
+  { label: "Checkout", free: "In App", basic: "Stripe", premium: "Stripe", pro: "Stripe Abo", professional: "Stripe", pilot: "Kontakt" },
 ] as const;

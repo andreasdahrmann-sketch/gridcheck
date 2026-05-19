@@ -183,6 +183,23 @@ def test_analyze_v2_rejects_storage_without_power_or_energy():
     assert "Speicher" in str(r.json()["detail"])
 
 
+def test_analysis_run_compat_alias_matches_v1_analyze(monkeypatch: pytest.MonkeyPatch):
+    """POST /api/analysis/run mirrors POST /api/v1/analyze routing and auth."""
+    monkeypatch.setattr(
+        analyze_v2_api,
+        "run_v1_analysis",
+        lambda payload: {"status": "OK", "revision": {"hash": "a" * 64}},
+    )
+    monkeypatch.setattr(
+        analyze_v2_api,
+        "persist_completed_analysis_run",
+        lambda *args, **kwargs: type("Run", (), {"id": 1})(),
+    )
+    r = client.post("/api/analysis/run", json=_v2_payload(), headers=_auth_headers())
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "OK"
+
+
 def test_analyze_v2_rejects_dso_verified_without_network_basis():
     r = _post_analyze(
         _v2_payload(

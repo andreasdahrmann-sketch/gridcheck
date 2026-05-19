@@ -10,6 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { isAuthInfrastructureError, register } from "@/lib/api/auth";
 import { getPasswordPolicyChecks, isPasswordPolicySatisfied } from "@/lib/password-policy";
+import {
+  isSelfServeCheckoutPlan,
+  normalizeCheckoutPlan,
+  offerIdForCheckoutPlan,
+  settingsCheckoutHref,
+} from "@/lib/billing-plans";
 import { getPurchaseIntentProfile, normalizePurchaseIntent } from "@/lib/purchase-intents";
 import { formSelectClass as selectClass } from "@/lib/form-classes";
 
@@ -26,9 +32,16 @@ function RegisterPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const intent = normalizePurchaseIntent(searchParams.get("intent"));
+  const checkoutPlan = normalizeCheckoutPlan(searchParams.get("plan"));
+  const intent = normalizePurchaseIntent(searchParams.get("intent") ?? checkoutPlan);
   const intentProfile = getPurchaseIntentProfile(intent);
-  const nextTarget = searchParams.get("next") || (intent === "upgrade" || intent === "pro" ? "/settings" : "/projects");
+  const defaultNext =
+    checkoutPlan && isSelfServeCheckoutPlan(checkoutPlan)
+      ? settingsCheckoutHref(checkoutPlan)
+      : intent === "upgrade" || intent === "pro"
+        ? "/settings"
+        : "/onboarding";
+  const nextTarget = searchParams.get("next") || defaultNext;
   const loginHref = `/login?intent=${encodeURIComponent(intent)}&next=${encodeURIComponent(nextTarget)}`;
   const [role, setRole] = useState(intent === "vnb-pilot" ? "netzbetreiber" : "projektierer");
 
@@ -57,7 +70,7 @@ function RegisterPageContent() {
     setIsSubmitting(true);
     try {
       await register({ email: email.trim(), password, role, full_name: fullName.trim() || undefined });
-      setMessage("Registrierung erfolgreich. Bitte im naechsten Schritt einloggen, damit Projekte, History und Paketlogik Ihrem Konto zugeordnet werden.");
+      setMessage("Registrierung erfolgreich. Bitte einloggen – danach fuehrt Sie die Einfuehrung zu Ihrer ersten Analyse.");
       setPassword("");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Registrierung fehlgeschlagen";
@@ -95,6 +108,11 @@ function RegisterPageContent() {
               </div>
               <p className="mt-3 text-sm leading-6 text-white/90">{intentProfile.summary}</p>
               <p className="mt-2 text-xs leading-5 text-text-muted">Nach Registrierung und Login: {intentProfile.nextStep}</p>
+              {checkoutPlan && offerIdForCheckoutPlan(checkoutPlan) ? (
+                <p className="mt-2 text-xs leading-5 text-brand-cyan">
+                  Gewaehltes Paket: {checkoutPlan}. Nach dem Login startet Stripe Checkout in den Einstellungen.
+                </p>
+              ) : null}
             </div>
 
             <div className="grid gap-3 md:grid-cols-3">

@@ -12,7 +12,7 @@ from api.routes import router
 
 init_sentry()
 from api.stakeholders import router as stakeholder_router
-from api.analyze_v2 import router_v2
+from api.analyze_v2 import router_analysis_compat, router_v2
 from api.v1_projektierer import router as v1_projektierer_router
 from api.v1_geo import router as v1_geo_router
 from api.v1_ki_feedback import router as v1_ki_router
@@ -87,6 +87,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
 
 # v2 zuerst: dieselbe Pfadfamilie (/api/v1/analyze...) darf nie vom Legacy-/Persist-Router ueberschrieben werden.
 app.include_router(router_v2, prefix="/api/v1")
+app.include_router(router_analysis_compat)
 app.include_router(router)
 app.include_router(stakeholder_router, prefix="/api/v1")
 app.include_router(v1_projektierer_router)

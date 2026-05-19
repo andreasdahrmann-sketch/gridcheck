@@ -1090,6 +1090,37 @@ def test_analyze_v2_accepts_planner_n1_context():
         _close_client(client)
 
 
+def test_persist_analyze_route_is_rate_limited(monkeypatch):
+    client = build_client()
+    try:
+        _reset_rate_limit_state()
+        monkeypatch.setattr("core.rate_limit._get_redis_client", lambda: None)
+        monkeypatch.setattr(
+            "api.routes._run_persist_analysis",
+            lambda req, db, user: {"project_id": 1, "score": 80.0},
+        )
+        tokens = _register_and_login(client, "persist-rate-limit@example.com")
+        _reset_rate_limit_state()
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+        payload = {
+            "projektname": "Rate Limit Persist",
+            "plz": "10115",
+            "anlagentyp": "pv",
+            "leistung_kw": 500,
+            "spannungsebene": "20",
+        }
+        for _ in range(8):
+            response = client.post("/api/v1/analyze/persist", headers=headers, json=payload)
+            assert response.status_code == 200, response.text
+
+        limited = client.post("/api/v1/analyze/persist", headers=headers, json=payload)
+        assert limited.status_code == 429, limited.text
+        assert limited.json()["detail"]["code"] == "RATE_LIMITED"
+    finally:
+        _reset_rate_limit_state()
+        _close_client(client)
+
+
 def test_forgot_password_always_returns_ok():
     client = build_client()
     try:

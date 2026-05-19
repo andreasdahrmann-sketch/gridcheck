@@ -20,6 +20,11 @@ import {
   type BillingStatus,
 } from "@/lib/api/billing";
 import {
+  isSelfServeCheckoutPlan,
+  normalizeCheckoutPlan,
+  offerIdForCheckoutPlan,
+} from "@/lib/billing-plans";
+import {
   findOfferById,
   getOfferDisplayName,
   getOfferProfile,
@@ -115,6 +120,7 @@ function contactHrefForOffer(offerId: string) {
 export default function BillingAndHistoryPanel({ cardClass, isAdmin = false }: { cardClass: string; isAdmin?: boolean }) {
   const [notice, setNotice] = useState<Notice>(null);
   const [handledReturnKey, setHandledReturnKey] = useState<string | null>(null);
+  const [handledCheckoutPlanKey, setHandledCheckoutPlanKey] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -195,6 +201,28 @@ export default function BillingAndHistoryPanel({ cardClass, isAdmin = false }: {
     return { total: items.length, completed };
   }, [historyQuery.data]);
 
+  const recentAnalyses = useMemo(() => {
+    const items = [...(historyQuery.data ?? [])];
+    const rank = (status: string) => {
+      if (status === "completed") return 0;
+      if (status === "failed" || status === "validation_failed" || status === "engine_failed") return 2;
+      return 1;
+    };
+    return items.sort((a, b) => {
+      const byStatus = rank(a.status) - rank(b.status);
+      if (byStatus !== 0) return byStatus;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [historyQuery.data]);
+
+  function runStatusBadgeClass(status: string) {
+    if (status === "completed") return "border-emerald-400/20 bg-emerald-500/10 text-emerald-200";
+    if (status === "failed" || status === "validation_failed" || status === "engine_failed") {
+      return "border-red-500/30 bg-red-500/10 text-red-300";
+    }
+    return "border-amber-300/20 bg-amber-300/10 text-amber-100";
+  }
+
   useEffect(() => {
     const billingState = searchParams.get("billing");
     const sessionId = searchParams.get("session_id");
@@ -227,6 +255,44 @@ export default function BillingAndHistoryPanel({ cardClass, isAdmin = false }: {
       }
     }
   }, [checkoutSessionMutation, handledReturnKey, pathname, queryClient, router, searchParams]);
+
+  useEffect(() => {
+    const plan = normalizeCheckoutPlan(searchParams.get("plan"));
+    const wantsCheckout = searchParams.get("checkout") === "1";
+    if (!plan || !wantsCheckout || !isSelfServeCheckoutPlan(plan)) {
+      return;
+    }
+    const offerId = offerIdForCheckoutPlan(plan);
+    if (!offerId) {
+      return;
+    }
+    const key = `${plan}:${offerId}`;
+    if (handledCheckoutPlanKey === key || checkoutMutation.isPending) {
+      return;
+    }
+    if (!billingQuery.isSuccess) {
+      return;
+    }
+    const offer = billingQuery.data.catalog.offers.find((item) => item.offer_id === offerId);
+    if (!offer?.checkout_enabled) {
+      setNotice({
+        tone: "error",
+        text: "Stripe Checkout ist fuer dieses Paket in der aktuellen Umgebung nicht konfiguriert.",
+      });
+      router.replace(pathname);
+      return;
+    }
+    setHandledCheckoutPlanKey(key);
+    checkoutMutation.mutate(offerId);
+  }, [
+    billingQuery.data,
+    billingQuery.isSuccess,
+    checkoutMutation,
+    handledCheckoutPlanKey,
+    pathname,
+    router,
+    searchParams,
+  ]);
 
   function startCheckout(offerId: string) {
     checkoutMutation.mutate(offerId);
@@ -844,13 +910,13 @@ export default function BillingAndHistoryPanel({ cardClass, isAdmin = false }: {
               <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4 text-sm text-red-300">
                 Analyse-History konnte nicht geladen werden.
               </div>
-            ) : (historyQuery.data ?? []).length === 0 ? (
+            ) : recentAnalyses.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-6 text-sm text-text-muted">
                 Noch keine gespeicherten Analysen vorhanden.
               </div>
             ) : (
               <div className="space-y-3">
-                {(historyQuery.data ?? []).map((item) => {
+                {recentAnalyses.map((item) => {
                   const offer = findOfferById(
                     billingQuery.data?.catalog.offers,
                     billingQuery.data?.catalog.addons,
@@ -862,6 +928,11 @@ export default function BillingAndHistoryPanel({ cardClass, isAdmin = false }: {
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`rounded-full border px-3 py-1 text-xs ${runStatusBadgeClass(item.status)}`}
+                            >
+                              {getRunStatusLabel(item.status)}
+                            </span>
                             <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs text-white">
                               Run #{item.id}
                             </span>

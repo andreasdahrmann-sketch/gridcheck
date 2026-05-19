@@ -428,6 +428,27 @@ def _ensure_subscription_entitlement(db: Session, user: User) -> BillingEntitlem
     return entitlement
 
 
+def _apply_payment_purchase_user_state(
+    user: User,
+    *,
+    offer_id: str,
+    stripe_price_id: str | None,
+) -> None:
+    """Sync user billing fields after a successful one-off Stripe Checkout."""
+    if stripe_price_id:
+        user.stripe_price_id = stripe_price_id
+    if offer_id not in PAYMENT_OFFER_IDS:
+        return
+    if user.billing_status in PAID_ACCESS_STATUSES:
+        return
+    offer = _offer_lookup(offer_id)
+    scope = str(offer.get("package_scope") or "").strip().lower()
+    if scope in {"basic", "premium", "professional"}:
+        user.plan_tier = scope
+    user.billing_status = "purchased"
+    user.updated_at = _utcnow()
+
+
 def _issue_payment_entitlement(
     db: Session,
     user: User,
@@ -1864,6 +1885,7 @@ def _sync_checkout_session_completion(
                 stripe_price_id=price_id,
                 status="active",
             )
+        _apply_payment_purchase_user_state(user, offer_id=offer_id, stripe_price_id=price_id)
         synced = True
     elif offer_id in ADDON_OFFER_IDS and payment_status == "paid":
         if not _payment_entitlement_exists(db, checkout_session_id, offer_id):

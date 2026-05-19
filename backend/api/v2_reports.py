@@ -42,6 +42,7 @@ from engine.stakeholder_reports.vnb import build_vnb_report
 from services import project_service
 from services.conversion_tracking_service import track_report_exported
 from services.billing_service import (
+    ensure_analysis_allowed,
     enforce_package_rights,
     package_access_context,
     persist_completed_analysis_run,
@@ -334,6 +335,7 @@ def _resolve_engine_result(
         return result, stakeholder_path
 
     assert req.analyze_request is not None
+    ensure_analysis_allowed(db, current_user)
     request_payload = req.analyze_request.model_dump(exclude_none=False)
     project_id = request_payload.get("project_id")
     if project_id is not None:
