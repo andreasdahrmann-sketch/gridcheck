@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPageShell, LegalSection, PlaceholderNotice } from "@/components/layout/LegalPageShell";
+import { legalCompany } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Datenschutz | GridCheck",
@@ -17,13 +18,15 @@ export default function DatenschutzPage() {
 
       <LegalSection title="Verantwortlicher">
         <p>
-          [Firmenname – Platzhalter]
+          {legalCompany.name}
           <br />
-          [Anschrift]
+          {legalCompany.street}
+          <br />
+          {legalCompany.city}
           <br />
           E-Mail:{" "}
-          <a href="mailto:datenschutz@example.com" className="text-brand-cyan hover:underline">
-            datenschutz@example.com
+          <a href={`mailto:${legalCompany.privacyEmail}`} className="text-brand-cyan hover:underline">
+            {legalCompany.privacyEmail}
           </a>
         </p>
       </LegalSection>
@@ -96,8 +99,8 @@ export default function DatenschutzPage() {
       <LegalSection title="Kontakt Datenschutz">
         <p>
           Anfragen richten Sie bitte an:{" "}
-          <a href="mailto:datenschutz@example.com" className="text-brand-cyan hover:underline">
-            datenschutz@example.com
+          <a href={`mailto:${legalCompany.privacyEmail}`} className="text-brand-cyan hover:underline">
+            {legalCompany.privacyEmail}
           </a>
         </p>
       </LegalSection>

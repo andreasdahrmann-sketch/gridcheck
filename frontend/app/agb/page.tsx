@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPageShell, LegalSection, PlaceholderNotice } from "@/components/layout/LegalPageShell";
+import { legalCompany } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "AGB | GridCheck",
@@ -17,9 +18,15 @@ export default function AgbPage() {
 
       <LegalSection title="Geltungsbereich">
         <p>
-          Diese AGB regeln die Nutzung der GridCheck Plattform durch Unternehmerinnen, Unternehmer und – soweit
-          zulaessig – Verbraucherinnen und Verbraucher. Abweichende Bedingungen der Nutzer gelten nur bei
-          ausdruecklicher schriftlicher Zustimmung.
+          Diese AGB regeln die Nutzung der GridCheck Plattform ({legalCompany.name}, {legalCompany.legalForm}) durch
+          Unternehmerinnen, Unternehmer und – soweit zulaessig – Verbraucherinnen und Verbraucher. Abweichende
+          Bedingungen der Nutzer gelten nur bei ausdruecklicher schriftlicher Zustimmung.
+        </p>
+        <p>
+          Kontakt:{" "}
+          <a href={`mailto:${legalCompany.contactEmail}`} className="text-brand-cyan hover:underline">
+            {legalCompany.contactEmail}
+          </a>
         </p>
       </LegalSection>
 

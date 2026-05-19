@@ -49,7 +49,8 @@ export function LegalSection({ title, children }: { title: string; children: Rea
 export function PlaceholderNotice() {
   return (
     <p className="rounded-2xl border border-brand-orange/30 bg-brand-orange/10 px-4 py-3 text-sm leading-6 text-brand-orange">
-      [Platzhalter – vor Live mit echten Firmendaten ersetzen]
+      [BITTE RECHTLICH PRUEFEN] Platzhalter – vor Live mit echten Firmendaten, AV-Vertraegen und finaler
+      Rechtsberatung ersetzen.
     </p>
   );
 }
