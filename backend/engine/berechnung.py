@@ -1818,6 +1818,16 @@ def berechne_netzanschluss(eingabe, dry_run=False, revision_context=None):
         'norm_version': _norm_version_label(u_kv),
         'norm_registry_stand': APP_VERSION_NORMSTAND,
     }
+    try:
+        from engine.grid_calculation_v2 import calculate_grid_connection_from_engine
+
+        result['grid_calculation_v2'] = calculate_grid_connection_from_engine(eingabe)
+    except Exception as exc:
+        result['grid_calculation_v2'] = {
+            'status': 'FEHLER',
+            'message': 'Grid-Berechnung v2 konnte nicht ausgefuehrt werden.',
+            'detail': str(exc),
+        }
     ctx = revision_context if isinstance(revision_context, dict) else {}
     try:
         rev = speichere_revision(

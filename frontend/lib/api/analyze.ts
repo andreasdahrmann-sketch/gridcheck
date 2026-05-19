@@ -10,6 +10,7 @@ import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
 import type { BillingStatus } from "@/lib/api/billing";
 import { bearerAuthHeaders } from "@/lib/api/session";
 import { formatConnectionType, resolveCosPhiDefault } from "@/lib/gridcheck-engine";
+import { parseGridCalculationV2 } from "@/lib/schemas/grid-calculation";
 import type { PowerLimitHintResult, TechnicalDetailsResult } from "@/types";
 
 type ApiErrorDetail = {
@@ -511,6 +512,8 @@ function mapResponseToUi(res: any, input: GridCheckInput): GridCheckResult {
     input.richtung ??
     res?.eingabe?.anschlussart;
 
+  const grid_calculation_v2 = parseGridCalculationV2(res?.grid_calculation_v2);
+
   return {
     machbar: String(res?.fazit?.entscheidung ?? "C") !== "C",
     machbarkeit_stufe: mapFazitToStufe(res?.fazit?.entscheidung),
@@ -518,6 +521,7 @@ function mapResponseToUi(res: any, input: GridCheckInput): GridCheckResult {
     warnings: engineWarnings,
     connection_type_label: formatConnectionType(String(connectionTypeRaw ?? "")),
     technical_details,
+    grid_calculation_v2: grid_calculation_v2 ?? undefined,
     power_limit_hints,
     empfehlungen: Array.isArray(res?.empfehlungen) ? res.empfehlungen : [],
     p_max_kW: Number((res?.pqs?.p_mw ?? input.anschlussleistung_kw / 1000) * 1000),
@@ -780,6 +784,7 @@ export function buildAnalyzePayload(input: GridCheckInput): Record<string, unkno
     bestehende_einspeisung_mw: 0,
     temperatur_c: 20,
     topologie: backendTopologie,
+    leitungsart: input.leitungsart ?? "kabel",
     restkapazitaet_ms_mva: finitePositive(input.restkapazitaet_ms_mva),
     umschaltzeit_min: finiteNonNegative(input.umschaltzeit_min),
     n1_datengrundlage: input.n1_datengrundlage ?? "unknown",

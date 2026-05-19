@@ -14,6 +14,7 @@ export type Topologie =
   | "doppelstich"
   | "vermascht"
   | "unbekannt";
+export type Leitungsart = "kabel" | "freileitung";
 export type ConfidenceLevel = "A" | "B" | "C" | "D";
 export type MachbarkeitStufe = "gruen" | "gelb" | "orange" | "rot";
 export type Kostenklasse = "gering" | "mittel" | "hoch" | "sehr_hoch";
@@ -136,6 +137,7 @@ export interface GridCheckInput {
   cos_phi: number;
   spannungsebene: Spannungsebene;
   topologie: Topologie;
+  leitungsart?: Leitungsart;
   entfernung_km?: number;
   kabeltyp?: string;
   sk_min_mva?: number;
@@ -469,6 +471,9 @@ export interface PowerLimitHintResult {
   ueber_typischem_richtwert?: boolean;
 }
 
+/** Engine block `grid_calculation_v2` — authoritative calculation in Python backend. */
+export type { GridCalculationV2 } from "@/lib/schemas/grid-calculation";
+
 export interface GridCheckResult {
   machbar: boolean;
   machbarkeit_stufe: MachbarkeitStufe;
@@ -477,6 +482,7 @@ export interface GridCheckResult {
   empfehlungen: string[];
   connection_type_label?: string;
   technical_details?: TechnicalDetailsResult;
+  grid_calculation_v2?: import("@/lib/schemas/grid-calculation").GridCalculationV2;
   power_limit_hints?: PowerLimitHintResult;
   p_max_kW: number;
   q_max_kvar: number;

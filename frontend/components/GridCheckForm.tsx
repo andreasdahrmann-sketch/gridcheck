@@ -48,6 +48,7 @@ import {
   hasNetzplanResult,
   resolveCosPhiDefault,
 } from "@/lib/gridcheck-engine";
+import GridCalculationV2Panel from "./GridCalculationV2Panel";
 import { readUserPreferences } from "@/lib/user-preferences";
 import DemoCaseLoader, { type DemoCase } from "./DemoCaseLoader";
 import DemoModeBanner from "./DemoModeBanner";
@@ -961,6 +962,37 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
               <input type="number" step="0.1" className={inputClass} value={input.trafo_uk_pct ?? ""} onChange={e => updateInput({ trafo_uk_pct: e.target.value ? Number(e.target.value) : undefined })} placeholder="auto" />
             </div>
             <div>
+              <label className={labelClass}>Trafo-Bestandsauslastung (%)</label>
+              <input
+                type="number"
+                step="1"
+                min={0}
+                max={150}
+                className={inputClass}
+                value={input.vorbelastung_pct ?? ""}
+                onChange={(e) =>
+                  updateInput({ vorbelastung_pct: e.target.value ? Number(e.target.value) : undefined })
+                }
+                placeholder="VNB/Planer"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Optional — für ONT-Screening; ohne Angabe keine Trafo-Auslastung in %.
+              </p>
+            </div>
+            <div>
+              <label className={labelClass}>Leitungsführung</label>
+              <select
+                className={inputClass}
+                value={input.leitungsart ?? "kabel"}
+                onChange={(e) =>
+                  updateInput({ leitungsart: e.target.value as GridCheckInput["leitungsart"] })
+                }
+              >
+                <option value="kabel">Erdkabel</option>
+                <option value="freileitung">Freileitung</option>
+              </select>
+            </div>
+            <div>
               <label className={labelClass}>VNB-Kapazitätsangabe (kW)</label>
               <input
                 type="number"
@@ -1159,6 +1191,15 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
           </div>
         ) : null}
 
+        {result.grid_calculation_v2 ? (
+          <GridCalculationV2Panel
+            data={result.grid_calculation_v2}
+            sectionClass={sectionClass}
+            sectionTitle={sectionTitle}
+            fmt={fmt}
+          />
+        ) : null}
+
         {result.technical_details ? (
           <div className={sectionClass}>
             <h3 className={sectionTitle}>Technische Details (vorläufig)</h3>
@@ -1181,7 +1222,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
                   {fmt(
                     result.technical_details.kurzschluss?.ik_referenz_ka ??
                       result.technical_details.kurzschluss?.ik_max_ka ??
-                      result.kurzschluss.ik_max_ka,
+                      result.kurzschluss.ik_max_kA,
                     1,
                   )}{" "}
                   kA
@@ -1226,7 +1267,6 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
             </div>
           </div>
         ) : null}
-        </div>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
