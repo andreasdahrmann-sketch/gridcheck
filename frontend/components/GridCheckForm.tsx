@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type {
@@ -12,6 +12,9 @@ import VnbBanner from "./VnbBanner";
 import { AnalysisDisclaimer } from "@/components/legal/AnalysisDisclaimer";
 import NetzplanVisualization from "./NetzplanVisualization";
 import BillingUpgradePrompt from "./BillingUpgradePrompt";
+import DemoCaseLoader, { findDemoCaseById, type DemoCase } from "./DemoCaseLoader";
+import DemoModeBanner from "./DemoModeBanner";
+import ConfidenceSummaryPanel from "./ConfidenceSummaryPanel";
 import ProductDecisionGuide from "./billing/ProductDecisionGuide";
 import N1AssessmentPanel from "./N1AssessmentPanel";
 import { analyzeGridcheck, AnalyzeApiError, exportStakeholderPdf } from "../lib/api/analyze";
@@ -51,9 +54,9 @@ const CUSTOMER_LABELS: Record<CustomerType, string> = {
 };
 
 const CUSTOMER_DESC: Record<CustomerType, string> = {
-  projektierer: "Prüfung ob Netzanschluss technisch machbar ist.",
+  projektierer: "PrÃ¼fung ob Netzanschluss technisch machbar ist.",
   speicherbetreiber: "Bewertung inkl. Speicherdimensionierung.",
-  netzbetreiber: "N-1 Analyse, Engpasserkennung, Kapazitätsbewertung.",
+  netzbetreiber: "N-1 Analyse, Engpasserkennung, KapazitÃ¤tsbewertung.",
   investor: "Standort-, Risiko- und Kostenbandbreite fuer Invest- und DD-Entscheidungen.",
 };
 
@@ -129,8 +132,10 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
   const [isStartingCheckout, setIsStartingCheckout] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<string>("free");
   const [packageSelectionTouched, setPackageSelectionTouched] = useState(false);
+  const [activeDemoId, setActiveDemoId] = useState<string | null>(null);
 
   const ct = meta.kundentyp as CustomerType;
+  const activeDemoCase = findDemoCaseById(activeDemoId);
   const stakeholderPath = resolveStakeholderProductPath({
     kundentyp: meta.kundentyp,
     stakeholder_context: input.stakeholder_context,
@@ -138,8 +143,14 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
   const stakeholderCopy = getStakeholderProductCopy(stakeholderPath);
   const showDeepTechnicalDetails = canViewDeepTechnicalDetails(stakeholderPath);
 
-  const updateInput = (patch: Partial<GridCheckInput>) => setInput(prev => ({ ...prev, ...patch }));
-  const updateMeta = (patch: Partial<MetaData>) => setMeta(prev => ({ ...prev, ...patch }));
+  const updateInput = (patch: Partial<GridCheckInput>) => {
+    setActiveDemoId(null);
+    setInput((prev) => ({ ...prev, ...patch }));
+  };
+  const updateMeta = (patch: Partial<MetaData>) => {
+    setActiveDemoId(null);
+    setMeta((prev) => ({ ...prev, ...patch }));
+  };
 
   const buildCombinedInput = (): GridCheckInput => ({
     ...input,
@@ -286,6 +297,19 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
     } catch {
       // Ignore transient refresh errors and keep the last known UI state.
     }
+  };
+
+  const handleDemoSelect = (demo: DemoCase) => {
+    setActiveDemoId(demo.id);
+    setInput((prev) => ({ ...prev, ...demo.input }));
+    setMeta((prev) => ({
+      ...prev,
+      kundentyp: (demo.kundentyp as CustomerType) || prev.kundentyp,
+      ort: demo.input.ort ?? prev.ort,
+      projektname: demo.label.replace("[DEMO] ", ""),
+    }));
+    setAnalysisError(null);
+    setStep(1);
   };
 
   const handleUpgradeCheckout = async (offerId = "pro_lizenz") => {
@@ -482,6 +506,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
     setAnalysisRunId(createAnalysisRunId());
     setSelectedOfferId("free");
     setPackageSelectionTouched(false);
+    setActiveDemoId(null);
     window.localStorage.removeItem(DRAFT_STORAGE_KEY);
   };
 
@@ -569,6 +594,14 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
         <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
           {stakeholderCopy.visibilityNote}
         </div>
+
+        <DemoCaseLoader onSelect={handleDemoSelect} />
+        {activeDemoCase ? (
+          <DemoModeBanner
+            title={activeDemoCase.label.replace("[DEMO] ", "")}
+            description={activeDemoCase.beschreibung}
+          />
+        ) : null}
 
         <div className={sectionClass}>
           <h3 className={sectionTitle}>Zugang & Tarif</h3>
@@ -680,7 +713,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
                       <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
                         <div className="text-xs uppercase tracking-[0.18em] text-gray-500">Lieferumfang</div>
                         <p className="mt-2 text-sm font-semibold text-white">
-                          {getPackageScopeLabel(selectedPackageScope)} ·{" "}
+                          {getPackageScopeLabel(selectedPackageScope)} Â·{" "}
                           {getReportScopeLabel(selectedAnalysisOption?.report_scope)}
                         </p>
                         <p className="mt-2 text-xs leading-5 text-gray-400">{selectedPackageProfile.deliverable}</p>
@@ -829,7 +862,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
             <div>
               <label className={labelClass}>Erzeugungstyp</label>
               <select className={selectClass} value={meta.erzeugungstyp} onChange={e => updateMeta({ erzeugungstyp: e.target.value })}>
-                <option value="">-- Wählen --</option>
+                <option value="">-- WÃ¤hlen --</option>
                 {ERZEUGUNGS_OPTIONEN[ct]?.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
@@ -899,7 +932,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
               <input type="number" step="0.1" className={inputClass} value={input.trafo_uk_pct ?? ""} onChange={e => updateInput({ trafo_uk_pct: e.target.value ? Number(e.target.value) : undefined })} placeholder="auto" />
             </div>
             <div>
-              <label className={labelClass}>Freie Kapazität (kW)</label>
+              <label className={labelClass}>Freie KapazitÃ¤t (kW)</label>
               <input type="number" className={inputClass} value={input.netzkapazitaet_kw ?? ""} onChange={e => updateInput({ netzkapazitaet_kw: e.target.value ? Number(e.target.value) : undefined })} placeholder="auto" />
             </div>
           </div>
@@ -978,7 +1011,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
           ? "kritischer N-1-Hinweis"
           : "vorlaeufig / offen";
     const scoreRows = [
-      { label: "Kapazität", val: result.teil_scores.kapazitaet, max: 25 },
+      { label: "KapazitÃ¤t", val: result.teil_scores.kapazitaet, max: 25 },
       { label: "Spannung", val: result.teil_scores.spannung, max: 25 },
       { label: "Kurzschluss", val: result.teil_scores.kurzschluss, max: 20 },
       { label: "N-1 Sicherheit", val: result.teil_scores.n1, max: 15 },
@@ -1007,6 +1040,13 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
     return (
       <div className="mx-auto max-w-5xl space-y-6">
         <AnalysisDisclaimer />
+        {activeDemoCase ? (
+          <DemoModeBanner
+            title={activeDemoCase.label.replace("[DEMO] ", "")}
+            description={activeDemoCase.beschreibung}
+          />
+        ) : null}
+        <ConfidenceSummaryPanel result={result} />
         {/* Header */}
         <div className="rounded-[28px] border border-gray-700 bg-gray-900/60 p-5 md:p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -1026,9 +1066,6 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
                 {stufeLabels[result.machbarkeit_stufe]}
               </span>
               <span className={`text-3xl font-bold ${scoreColor}`}>{result.score}/100</span>
-              <span className="text-sm text-gray-400">
-                Confidence: {result.daten_confidence} / KI {fmt(result.ki.konfidenz_prozent, 0)}%
-              </span>
             </div>
           </div>
 
@@ -1115,14 +1152,14 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
                 <p>Hoch: <span className="text-white font-semibold">{costBand ? costBand.hoch.toLocaleString("de-DE") : "offen"} EUR</span></p>
                 {costBand?.confidence ? <p>Confidence: {costBand.confidence}%</p> : null}
                 {costBand?.source ? <p>Quelle: {costBand.source}</p> : null}
-                {costBand?.drivers?.length ? <p>Risikotreiber: {costBand.drivers.join(" · ")}</p> : null}
+                {costBand?.drivers?.length ? <p>Risikotreiber: {costBand.drivers.join(" Â· ")}</p> : null}
               </div>
             </div>
             <div className={sectionClass}>
               <h3 className={sectionTitle}>Due-Diligence-Hinweise</h3>
               <ul className="space-y-2 text-sm text-gray-300">
                 <li>Standortbasis: {combinedInput.project_location?.address_hint || combinedInput.ort || combinedInput.plz || "noch grob"}</li>
-                <li>Netz-/N-1-Risiko: {result.n1.n1_klasse ?? "N1-0"} · {n1Headline}</li>
+                <li>Netz-/N-1-Risiko: {result.n1.n1_klasse ?? "N1-0"} Â· {n1Headline}</li>
                 <li>Stakeholder-Fit: {result.erweiterte_scores.stakeholder_fit}/100</li>
                 <li>{stakeholderCopy.visibilityNote}</li>
               </ul>
@@ -1378,7 +1415,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
                   <p>
                     Bandbreite (indikativ):{" "}
                     <span className="text-white font-semibold">
-                      {costBand.niedrig.toLocaleString("de-DE")} – {costBand.hoch.toLocaleString("de-DE")} EUR
+                      {costBand.niedrig.toLocaleString("de-DE")} â€“ {costBand.hoch.toLocaleString("de-DE")} EUR
                     </span>
                   </p>
                   <p>Basiswert: {costBand.basis.toLocaleString("de-DE")} EUR</p>
@@ -1491,13 +1528,13 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
           <div className={sectionClass}>
             <h3 className={sectionTitle}>KI-Lernprofil (unterstuetzend)</h3>
             <p className="mb-2 text-xs text-gray-500">
-              Assoziative Einordnung aus historischem Feedback – ersetzt keine deterministische Normpruefung.
+              Assoziative Einordnung aus historischem Feedback â€“ ersetzt keine deterministische Normpruefung.
             </p>
             <div className="space-y-2 text-sm text-gray-300">
               <p>KI-Konfidenz: <span className="text-white font-semibold">{fmt(result.ki.konfidenz_prozent, 0)}%</span></p>
               <p>Aehnliche Faelle: {result.ki.aehnliche_faelle}</p>
-              <p>Kalibrierung: {result.ki.kalibrierung.status} · Faktor {fmt(result.ki.kalibrierung.kalibrierungsfaktor, 2)}</p>
-              <p>Feedback-Loop: {result.ki.feedback_loop.status} · Samples {result.ki.feedback_loop.samples_total}</p>
+              <p>Kalibrierung: {result.ki.kalibrierung.status} Â· Faktor {fmt(result.ki.kalibrierung.kalibrierungsfaktor, 2)}</p>
+              <p>Feedback-Loop: {result.ki.feedback_loop.status} Â· Samples {result.ki.feedback_loop.samples_total}</p>
               <p>Bestaetigungsquote: {fmt(result.ki.feedback_loop.bestaetigungsquote * 100, 0)}%</p>
               <p>Verknuepfte Revisionen: {result.ki.feedback_loop.linked_samples}</p>
               <p className={result.ki.anomalie_check.is_anomaly ? "text-yellow-300" : "text-gray-400"}>
