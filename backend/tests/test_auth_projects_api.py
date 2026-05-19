@@ -961,7 +961,7 @@ def test_freemium_paywall_and_billing_catalog(monkeypatch):
 
         paywalled = client.post("/api/v1/analyze", headers=headers, json=payload)
         assert paywalled.status_code == 402, paywalled.text
-        assert paywalled.json()["detail"]["code"] == "ANALYSIS_PAYWALL_REQUIRED"
+        assert paywalled.json()["detail"]["code"] == "FREE_TIER_LIMIT"
         assert paywalled.json()["detail"]["billing"]["upgrade_required"] is True
         assert "pro_lizenz" in paywalled.json()["detail"]["billing"]["recommended_offer_ids"]
 
@@ -1088,3 +1088,18 @@ def test_analyze_v2_accepts_planner_n1_context():
         assert "Abgangsreserve / Betriebsmittelpfad" in body["n1"]["nachweise_vorhanden"]
     finally:
         _close_client(client)
+
+
+def test_forgot_password_always_returns_ok():
+    client = build_client()
+    try:
+        known = client.post("/api/v1/auth/forgot-password", json={"email": "billing@example.com"})
+        unknown = client.post("/api/v1/auth/forgot-password", json={"email": "does-not-exist@example.com"})
+        assert known.status_code == 200, known.text
+        assert unknown.status_code == 200, unknown.text
+        assert known.json()["status"] == "ok"
+        assert unknown.json()["status"] == "ok"
+    finally:
+        _close_client(client)
+
+

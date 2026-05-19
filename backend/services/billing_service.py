@@ -576,9 +576,13 @@ def _paywall_detail(db: Session, user: User) -> dict[str, Any]:
             "hint": "Bitte Billing Portal oeffnen oder stattdessen ein separates One-off-Paket waehlen.",
             "billing": overview,
         }
+    limit = overview.get("free_checks_limit", settings.free_checks_limit)
     return {
-        "code": "ANALYSIS_PAYWALL_REQUIRED",
-        "message": "Die 3 kostenlosen Checks sind aufgebraucht. Bitte ein Angebot buchen oder auf Pro wechseln.",
+        "code": "FREE_TIER_LIMIT",
+        "message": (
+            f"Das Free-Kontingent ({limit} abgeschlossene Checks) ist aufgebraucht. "
+            "Bitte ein Angebot buchen oder auf Pro wechseln."
+        ),
         "hint": "Upgrade ueber Einstellungen > Tarif & Analyse-History starten.",
         "billing": overview,
     }

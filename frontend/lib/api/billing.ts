@@ -211,6 +211,7 @@ export async function createBillingCheckout(offerId = "pro_lizenz") {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...bearerAuthHeaders(),
       ...(csrf ? { "X-CSRF-Token": csrf } : {}),
     },
     body: JSON.stringify({ offer_id: offerId }),
@@ -223,7 +224,10 @@ export async function createBillingPortal() {
   const res = await fetch(`${BILLING_BASE}/portal`, {
     method: "POST",
     credentials: "include",
-    headers: { ...(csrf ? { "X-CSRF-Token": csrf } : {}) },
+    headers: {
+      ...bearerAuthHeaders(),
+      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+    },
   });
   return parse<{ url: string }>(res);
 }
@@ -232,6 +236,7 @@ export async function getBillingCheckoutSessionStatus(sessionId: string) {
   const res = await fetch(`${BILLING_BASE}/checkout-session?session_id=${encodeURIComponent(sessionId)}`, {
     credentials: "include",
     cache: "no-store",
+    headers: { ...bearerAuthHeaders() },
   });
   return parse<BillingCheckoutSessionStatus>(res);
 }
@@ -240,6 +245,7 @@ export async function listAnalysisHistory(limit = 20) {
   const res = await fetch(`${ANALYSIS_BASE}/history?limit=${limit}`, {
     credentials: "include",
     cache: "no-store",
+    headers: { ...bearerAuthHeaders() },
   });
   return parse<AnalysisHistoryItem[]>(res);
 }
