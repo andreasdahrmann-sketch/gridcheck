@@ -207,6 +207,24 @@ export async function me() {
   return parse<AuthUser>(res);
 }
 
+export async function requestPasswordReset(email: string) {
+  const res = await backendAuthFetch("/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim() }),
+  });
+  return parse<{ status: string; message: string }>(res);
+}
+
+export async function resetPassword(payload: { token: string; password: string }) {
+  const res = await backendAuthFetch("/reset-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return parse<{ status: string; message: string }>(res);
+}
+
 export async function logout() {
   const csrf = getCsrfTokenFromCookie();
   const res = await backendAuthFetch("/logout", {
