@@ -269,6 +269,17 @@ _COMMON_RESULT_SPEC: FieldSpec = {
     "n1": _N1_SUMMARY_SPEC,
     "n1_prescreen_ok": True,
     "n1_prescreen_detail": True,
+    "technical_details": {
+        "spannungsfall": True,
+        "kurzschluss": True,
+        "leitung": True,
+        "trasse": True,
+    },
+    "power_limit_hints": True,
+}
+
+_GRID_V2_RESULT_SPEC: FieldSpec = {
+    "grid_calculation_v2": True,
 }
 
 _COST_RESULT_SPEC: FieldSpec = {
@@ -312,8 +323,12 @@ _TECHNICAL_RESULT_SPEC: FieldSpec = {
     },
 }
 
-_PROJECT_RESULT_SPEC = _merge_specs(_COMMON_RESULT_SPEC, _COST_RESULT_SPEC, _TECHNICAL_RESULT_SPEC)
-_VNB_RESULT_SPEC = _merge_specs(_COMMON_RESULT_SPEC, _TECHNICAL_RESULT_SPEC)
+_PROJECT_RESULT_SPEC = _merge_specs(
+    _COMMON_RESULT_SPEC, _COST_RESULT_SPEC, _TECHNICAL_RESULT_SPEC, _GRID_V2_RESULT_SPEC
+)
+_VNB_RESULT_SPEC = _merge_specs(
+    _COMMON_RESULT_SPEC, _TECHNICAL_RESULT_SPEC, _GRID_V2_RESULT_SPEC
+)
 _INVEST_RESULT_SPEC = _merge_specs(_COMMON_RESULT_SPEC, _COST_RESULT_SPEC)
 
 

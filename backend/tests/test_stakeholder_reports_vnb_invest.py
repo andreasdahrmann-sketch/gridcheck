@@ -163,6 +163,8 @@ def test_vnb_pdf_bytes_smoke():
 def test_vnb_build_render_smoke():
     report = build_vnb_report(_engine_result_base())
     html = render_vnb_html(report)
+    assert len(report["technical_review_table"]) >= 1
+    assert report["signature_section"]["fields"]
     assert report["report_type"] == "vnb"
     assert report["report_scope"] == "professional"
     assert report["report_scope_label"] == "Professional Anschlussstrategie"
@@ -230,6 +232,18 @@ def test_invest_build_render_without_kosten():
     assert "Standortbewertung" in html
     assert "Due-Diligence-orientierte Sicht" in html
     assert "Sichtbarkeitsgrenze" in html
+
+
+def test_invest_kpi_and_timeline():
+    er = _engine_result_base()
+    er["grid_calculation_v2"] = {
+        "projektierer_perspective": {
+            "process_timeline": {"estimated_total": "8-16 Wochen", "phases": []},
+        }
+    }
+    report = build_invest_report(er)
+    assert len(report["kpi_summary"]) >= 3
+    assert report["process_timeline"]
 
 
 def test_invest_build_render_with_kosten():

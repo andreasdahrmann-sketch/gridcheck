@@ -4,6 +4,11 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from compliance import APP_VERSION_NORMSTAND, get_normen_fuer_spannungsebene
+from engine.stakeholder_reports.content_blocks import (
+    build_process_timeline_lines,
+    build_vnb_signature_section,
+    build_vnb_technical_review_table,
+)
 from engine.stakeholder_reports.scope_meta import resolve_report_scope_meta
 
 
@@ -54,6 +59,9 @@ class VnbReportDTO:
     includes_transparency_section: bool
     includes_visualization_note: bool
     operational_boundary_note: str | None
+    technical_review_table: list[dict[str, str]]
+    signature_section: dict[str, Any]
+    process_timeline: list[str]
 
 
 VNB_NB_CHECKLISTE_HINWEIS = (
@@ -293,5 +301,8 @@ def build_vnb_report(engine_result: dict[str, Any]) -> dict[str, Any]:
             if scope_meta.ops_followup_required
             else None
         ),
+        technical_review_table=build_vnb_technical_review_table(engine_result),
+        signature_section=build_vnb_signature_section(),
+        process_timeline=build_process_timeline_lines(engine_result),
     )
     return asdict(dto)

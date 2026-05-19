@@ -104,6 +104,34 @@ def test_build_gridcheck_report_data_core_keys():
     assert data["audit"]["inputHash"] == "c" * 64
 
 
+def test_mapper_merges_grid_calculation_v2_perspective():
+    raw = _minimal_engine_ok()
+    raw["grid_calculation_v2"] = {
+        "feasibility": {"status": "conditional", "summary": "V2-Screening: bedingt"},
+        "projektierer_perspective": {
+            "plant_type_label": "Photovoltaik",
+            "ac_kw": 800,
+            "process_timeline": {"estimated_total": "4-8 Wochen"},
+            "bkz_hint": {"hint": "BKZ Band mittel"},
+        },
+        "eeg_feed_in_screening": {
+            "applicable": True,
+            "hints": ["Fernsteuerbarkeit abstimmen"],
+        },
+    }
+    data = build_gridcheck_report_data_from_engine_result(
+        raw,
+        stakeholder_type="project_developer",
+        project_id="42",
+        project_name="Demo",
+    )
+    findings = data["assessment"]["keyFindings"]
+    assert any("Photovoltaik" in f for f in findings)
+    assert any("V2-Screening" in f for f in findings)
+    assert any("Zeitplan" in s for s in data["assessment"]["nextSteps"])
+    assert any("EEG" in w for w in data["assessment"]["warnings"])
+
+
 def test_stakeholder_type_for_legacy():
     assert (
         stakeholder_type_for_legacy_report_type("projektierer") == "project_developer"

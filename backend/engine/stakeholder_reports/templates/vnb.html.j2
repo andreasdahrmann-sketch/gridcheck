@@ -79,6 +79,23 @@
     </tbody>
   </table>
 
+  {% if report.technical_review_table %}
+  <h2>Technische Kenngrößen — VNB-Prüfmatrix</h2>
+  <table>
+    <thead><tr><th>Kenngröße</th><th>Screening</th><th>VNB-Prüfung</th></tr></thead>
+    <tbody>
+      {% for row in report.technical_review_table %}
+      <tr><td>{{ row.kenngroesse }}</td><td>{{ row.screening }}</td><td>{{ row.vnb_pruefung }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if report.process_timeline %}
+  <h2>Prozess-Zeitplan (Referenz)</h2>
+  <ul>{% for line in report.process_timeline %}<li>{{ line }}</li>{% endfor %}</ul>
+  {% endif %}
+
   <h2>N-1 Status</h2>
   <ul>
     <li>{{ report.n1_status }}</li>
@@ -147,6 +164,16 @@
       {% endfor %}
     </tbody>
   </table>
+
+  {% if report.signature_section %}
+  <h2>{{ report.signature_section.title }}</h2>
+  <ul>
+    {% for field in report.signature_section.fields %}
+    <li>{{ field.label }}: {{ field.placeholder }}</li>
+    {% endfor %}
+  </ul>
+  <p class="muted">{{ report.signature_section.disclaimer }}</p>
+  {% endif %}
 
   <p class="muted">Vorläufige Analyse. Keine verbindliche Netzanschlusszusage. Keine Kapazitätsgarantie. Freie Netzkapazität nur mit belastbarem Datenstand des VNB.</p>
   {% if report.disclaimers %}

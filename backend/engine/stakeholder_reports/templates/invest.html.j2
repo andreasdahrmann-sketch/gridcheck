@@ -55,6 +55,16 @@
     </li>
   </ul>
 
+  {% if report.kpi_summary %}
+  <h2>KPI-Zusammenfassung</h2>
+  <ul>{% for line in report.kpi_summary %}<li>{{ line }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if report.process_timeline %}
+  <h2>Zeitplan-Indikation</h2>
+  <ul>{% for line in report.process_timeline %}<li>{{ line }}</li>{% endfor %}</ul>
+  {% endif %}
+
   <h2>Standortbewertung</h2>
   <table>
     <thead><tr><th>Block</th><th>Status</th><th>Hinweis</th></tr></thead>

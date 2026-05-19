@@ -4,6 +4,10 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from compliance import APP_VERSION_NORMSTAND, get_normen_fuer_spannungsebene
+from engine.stakeholder_reports.content_blocks import (
+    build_invest_kpi_summary,
+    build_process_timeline_lines,
+)
 from engine.stakeholder_reports.scope_meta import resolve_report_scope_meta
 
 
@@ -54,6 +58,8 @@ class InvestReportDTO:
     includes_transparency_section: bool
     includes_cost_section: bool
     operational_boundary_note: str | None
+    kpi_summary: list[str]
+    process_timeline: list[str]
 
 
 def _spannungsebene_from_kv(u_kv: float) -> str:
@@ -318,5 +324,7 @@ def build_invest_report(engine_result: dict[str, Any]) -> dict[str, Any]:
             if scope_meta.ops_followup_required
             else None
         ),
+        kpi_summary=build_invest_kpi_summary(engine_result),
+        process_timeline=build_process_timeline_lines(engine_result),
     )
     return asdict(dto)

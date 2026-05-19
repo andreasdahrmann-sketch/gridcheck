@@ -63,6 +63,51 @@
     <li>{{ report.n1_detail }}</li>
   </ul>
 
+  {% if report.warnungen %}
+  <h2>Warnungen</h2>
+  <ul>{% for w in report.warnungen %}<li>{{ w }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if report.technical_details_table %}
+  <h2>Technische Kenngrößen (Screening)</h2>
+  <table>
+    <thead><tr><th>Kenngröße</th><th>Wert</th><th>Hinweis</th></tr></thead>
+    <tbody>
+      {% for row in report.technical_details_table %}
+      <tr><td>{{ row.kenngroesse }}</td><td>{{ row.wert }}</td><td>{{ row.hinweis }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if report.process_timeline %}
+  <h2>Zeitplan (heuristisch)</h2>
+  <ul>{% for line in report.process_timeline %}<li>{{ line }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if report.bkz_hint %}
+  <h2>BKZ-Hinweis</h2>
+  <p>{{ report.bkz_hint }}</p>
+  {% endif %}
+
+  {% if report.eeg_checklist %}
+  <h2>EEG §9 — Einspeisemanagement-Checkliste</h2>
+  <ul>{% for item in report.eeg_checklist %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if report.reactive_checklist %}
+  <h2>Blindleistung — Screening</h2>
+  <ul>{% for item in report.reactive_checklist %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if report.projektierer_v2_lines %}
+  <h2>Projektierer-Vorplanung (grid_calculation_v2)</h2>
+  {% if report.grid_calculation_version %}
+  <div class="muted">Version {{ report.grid_calculation_version }}</div>
+  {% endif %}
+  <ul>{% for line in report.projektierer_v2_lines %}<li>{{ line }}</li>{% endfor %}</ul>
+  {% endif %}
+
   <h2>Auflagen</h2>
   {% if report.auflagen %}
   <ul>{% for w in report.auflagen %}<li>{{ w }}</li>{% endfor %}</ul>

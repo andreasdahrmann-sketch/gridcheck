@@ -72,6 +72,37 @@ def _bulleted_block(story: list[Any], style: ParagraphStyle, items: list[str], e
         story.append(_p(empty_label, style))
 
 
+def _append_table(
+    story: list[Any],
+    doc: SimpleDocTemplate,
+    headers: list[str],
+    rows: list[list[str]],
+    *,
+    col_widths: list[float] | None = None,
+) -> None:
+    if not rows:
+        return
+    tbl_data = [headers, *rows]
+    tw = doc.width
+    if col_widths is None:
+        col_widths = [tw / len(headers)] * len(headers)
+    t = Table(tbl_data, colWidths=col_widths)
+    t.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(B.GRAU_ZEBRA)),
+                ("FONTNAME", (0, 0), (-1, 0), B.FONT_BOLD),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor(B.GRAU_LINIE)),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    story.append(t)
+
+
 def _auflagen_empty_label(report: dict[str, Any]) -> str:
     if report.get("empfohlene_massnahmen"):
         return (
@@ -180,6 +211,47 @@ def build_stakeholder_report_pdf(report: dict[str, Any]) -> bytes:
         )
     )
 
+    if rt == "projektierer":
+        warnungen = list(report.get("warnungen") or [])
+        if warnungen:
+            story.append(_p("Warnungen", _SECTION_TITLE_STYLE))
+            _bulleted_block(story, body, warnungen, "Keine Warnungen.")
+
+        tech_table = list(report.get("technical_details_table") or [])
+        if tech_table:
+            story.append(_p("Technische Kenngrößen (Screening)", _SECTION_TITLE_STYLE))
+            _append_table(
+                story,
+                doc,
+                ["Kenngröße", "Wert", "Hinweis"],
+                [
+                    [str(r.get("kenngroesse", "")), str(r.get("wert", "")), str(r.get("hinweis", ""))]
+                    for r in tech_table
+                    if isinstance(r, dict)
+                ],
+            )
+            story.append(Spacer(1, 3 * mm))
+
+        timeline = list(report.get("process_timeline") or [])
+        if timeline:
+            story.append(_p("Zeitplan (heuristisch)", _SECTION_TITLE_STYLE))
+            _bulleted_block(story, body, timeline, "")
+
+        bkz = report.get("bkz_hint")
+        if bkz:
+            story.append(_p("BKZ-Hinweis (§25 NAV, qualitativ)", _SECTION_TITLE_STYLE))
+            story.append(_p(str(bkz), body))
+
+        eeg_items = list(report.get("eeg_checklist") or [])
+        if eeg_items:
+            story.append(_p("EEG §9 — Einspeisemanagement-Checkliste", _SECTION_TITLE_STYLE))
+            _bulleted_block(story, body, eeg_items, "")
+
+        reactive_items = list(report.get("reactive_checklist") or [])
+        if reactive_items:
+            story.append(_p("Blindleistung — Screening-Checkliste", _SECTION_TITLE_STYLE))
+            _bulleted_block(story, body, reactive_items, "")
+
     if rt == "vnb" and report.get("netzbetreiber_checkliste_hinweis"):
         story.append(_p("Checkliste-Netzbetreiber (Hinweis)", _SECTION_TITLE_STYLE))
         story.append(_p(str(report["netzbetreiber_checkliste_hinweis"]), body))
@@ -205,10 +277,40 @@ def build_stakeholder_report_pdf(report: dict[str, Any]) -> bytes:
                             body,
                         )
                     )
+        review_table = list(report.get("technical_review_table") or [])
+        if review_table:
+            story.append(_p("Technische Kenngrößen — VNB-Prüfmatrix", _SECTION_TITLE_STYLE))
+            _append_table(
+                story,
+                doc,
+                ["Kenngröße", "Screening", "VNB-Prüfung"],
+                [
+                    [
+                        str(r.get("kenngroesse", "")),
+                        str(r.get("screening", "")),
+                        str(r.get("vnb_pruefung", "")),
+                    ]
+                    for r in review_table
+                    if isinstance(r, dict)
+                ],
+                col_widths=[doc.width * 0.32, doc.width * 0.28, doc.width * 0.4],
+            )
+            story.append(Spacer(1, 3 * mm))
+        vnb_timeline = list(report.get("process_timeline") or [])
+        if vnb_timeline:
+            story.append(_p("Prozess-Zeitplan (Referenz)", _SECTION_TITLE_STYLE))
+            _bulleted_block(story, body, vnb_timeline, "")
 
     story.append(_p("N-1 Status", _SECTION_TITLE_STYLE))
     story.append(_p(str(report.get("n1_status", "")), body))
     story.append(_p(str(report.get("n1_detail", "")), body))
+
+    v2_lines = list(report.get("projektierer_v2_lines") or [])
+    if rt == "projektierer" and v2_lines:
+        story.append(_p("Projektierer-Vorplanung (grid_calculation_v2)", _SECTION_TITLE_STYLE))
+        if report.get("grid_calculation_version"):
+            story.append(_p(f"Version: {report.get('grid_calculation_version')}", muted))
+        _bulleted_block(story, body, v2_lines, "Keine v2-Details.")
 
     if rt == "vnb" and report.get("process_view"):
         story.append(_p("Status- / Prozesssicht", _SECTION_TITLE_STYLE))
@@ -255,6 +357,14 @@ def build_stakeholder_report_pdf(report: dict[str, Any]) -> bytes:
         story.append(_p(str(report.get("scope_boundary_note")), body))
 
     if rt == "invest":
+        kpi = list(report.get("kpi_summary") or [])
+        if kpi:
+            story.append(_p("KPI-Zusammenfassung", _SECTION_TITLE_STYLE))
+            _bulleted_block(story, body, kpi, "")
+        inv_timeline = list(report.get("process_timeline") or [])
+        if inv_timeline:
+            story.append(_p("Zeitplan-Indikation", _SECTION_TITLE_STYLE))
+            _bulleted_block(story, body, inv_timeline, "")
         ki = report.get("kosten_indikation")
         if isinstance(ki, dict) and ki:
             story.append(_p("Kosten-Indikation", _SECTION_TITLE_STYLE))
@@ -361,6 +471,21 @@ def build_stakeholder_report_pdf(report: dict[str, Any]) -> bytes:
     if report.get("visibility_boundary_note"):
         story.append(_p("Sichtbarkeitsgrenze", _SECTION_TITLE_STYLE))
         story.append(_p(str(report.get("visibility_boundary_note")), body))
+
+    if rt == "vnb":
+        sig = report.get("signature_section")
+        if isinstance(sig, dict) and sig.get("fields"):
+            story.append(_p(str(sig.get("title") or "VNB-Prüfung / Freigabe"), _SECTION_TITLE_STYLE))
+            for field in sig.get("fields") or []:
+                if isinstance(field, dict):
+                    story.append(
+                        _p(
+                            f"{field.get('label', '')}: {field.get('placeholder', '')}",
+                            body,
+                        )
+                    )
+            if sig.get("disclaimer"):
+                story.append(_p(str(sig["disclaimer"]), muted))
 
     story.append(Spacer(1, 4 * mm))
     story.append(

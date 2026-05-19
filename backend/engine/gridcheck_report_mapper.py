@@ -256,6 +256,54 @@ def _cost_items_from_kosten(kosten: dict[str, Any]) -> list[dict[str, Any]]:
     return items
 
 
+def _merge_grid_v2_into_assessment(
+    payload: dict[str, Any], engine_result: dict[str, Any]
+) -> None:
+    """Enrich canonical report assessment from grid_calculation_v2 + projektierer_perspective."""
+    v2 = engine_result.get("grid_calculation_v2")
+    if not isinstance(v2, dict):
+        return
+    assessment = payload.get("assessment")
+    if not isinstance(assessment, dict):
+        return
+
+    persp = v2.get("projektierer_perspective")
+    if isinstance(persp, dict):
+        plant = persp.get("plant_type_label") or persp.get("plant_type")
+        if plant:
+            line = f"Anlagentyp (Screening): {plant}"
+            if persp.get("ac_kw") is not None:
+                line += f", AC {_f(persp.get('ac_kw')):.0f} kW"
+            if line not in assessment.get("keyFindings", []):
+                assessment.setdefault("keyFindings", []).append(line)
+        tl = persp.get("process_timeline") or {}
+        if isinstance(tl, dict) and tl.get("estimated_total"):
+            step = f"Zeitplan (heuristisch): {tl['estimated_total']}"
+            if step not in assessment.get("nextSteps", []):
+                assessment.setdefault("nextSteps", []).append(step)
+        bkz = persp.get("bkz_hint") or {}
+        if isinstance(bkz, dict) and bkz.get("hint"):
+            hint = str(bkz["hint"])
+            if hint not in assessment.get("assumptions", []):
+                assessment.setdefault("assumptions", []).append(hint)
+
+    feasibility = v2.get("feasibility")
+    if isinstance(feasibility, dict):
+        status = feasibility.get("status")
+        summary = feasibility.get("summary")
+        if summary and summary not in assessment.get("keyFindings", []):
+            assessment.setdefault("keyFindings", []).append(str(summary))
+        elif status:
+            assessment.setdefault("keyFindings", []).append(f"grid_calculation_v2: {status}")
+
+    eeg = v2.get("eeg_feed_in_screening")
+    if isinstance(eeg, dict) and eeg.get("applicable"):
+        for hint in (eeg.get("hints") or [])[:3]:
+            text = f"EEG: {hint}"
+            if text not in assessment.get("warnings", []):
+                assessment.setdefault("warnings", []).append(text)
+
+
 def _sources_from_engine(
     engine_result: dict[str, Any],
     *,
@@ -690,6 +738,8 @@ def build_gridcheck_report_data_from_engine_result(
         payload["assessment"]["keyFindings"].append(
             _s(stakeholder_bw.get("konflikt_summary"))
         )
+
+    _merge_grid_v2_into_assessment(payload, engine_result)
 
     return payload
 

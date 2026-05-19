@@ -184,6 +184,45 @@ def test_normen_snapshot_contains_ms_rules():
     assert "VDE-AR-N 4110" in ids
 
 
+def test_projektierer_report_includes_technical_and_v2_sections():
+    er = _engine_result()
+    er["technical_details"] = {
+        "spannungsfall": {"delta_u_prozent": 2.1, "bewertung": "GRUEN"},
+        "kurzschluss": {"ik_referenz_ka": 12.0, "vorlaeufig": True},
+        "leitung": {"querschnitt_mm2": 240, "typ": "NA2XS2Y"},
+        "trasse": {"entfernung_km": 1.2, "heuristisch": True},
+    }
+    er["grid_calculation_v2"] = {
+        "calculation_version": "v2-test",
+        "projektierer_perspective": {
+            "plant_type_label": "Photovoltaik",
+            "ac_kw": 500,
+            "feed_in_management_class": "remote_control",
+            "process_timeline": {
+                "estimated_total": "4-8 Wochen",
+                "phases": [{"phase": "VNB-Prüfung NS", "duration_weeks": "2-4"}],
+            },
+            "bkz_hint": {"hint": "BKZ qualitativ: mittleres Band"},
+        },
+        "eeg_feed_in_screening": {
+            "applicable": True,
+            "feed_in_management_class": "remote_control",
+            "hints": ["Fernsteuerbarkeit prüfen"],
+        },
+    }
+    report = build_projektierer_report(er)
+    assert len(report["technical_details_table"]) >= 3
+    assert report["warnungen"] == ["Leitungslast nahe Grenzwert"]
+    assert any("EEG" in item for item in report["eeg_checklist"])
+    assert report["bkz_hint"]
+    assert report["process_timeline"]
+    html = render_projektierer_html(report)
+    assert "Technische Kenngrößen" in html
+    assert "EEG" in html
+    pdf = build_stakeholder_report_pdf(report)
+    assert pdf.startswith(b"%PDF")
+
+
 def test_persist_report_revision_smoke(isolierte_report_revisionen):
     report = build_projektierer_report(_engine_result())
     html = render_projektierer_html(report)
