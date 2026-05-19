@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { buildSiteMarkerHref } from "@/lib/app-flow";
 import { AnalyzeApiError, analyzeGridcheck, exportStakeholderPdf } from "@/lib/api/analyze";
+import { downloadBlobFile } from "@/lib/download-blob";
 import {
   createBillingCheckout,
   getBillingStatus,
@@ -383,29 +384,32 @@ export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { pr
   }
 
   async function onExportPdf() {
+    if (!result) {
+      setAnalysisError("Bitte zuerst eine Analyse durchfuehren, bevor der PDF-Report exportiert wird.");
+      return;
+    }
     setIsExporting(true);
     setAnalysisError(null);
     setPaywallBilling(null);
     try {
-      const stakeholder =
-        projectStakeholderPath;
+      const stakeholder = projectStakeholderPath;
       const exportScope = selectedAnalysisOption?.report_scope ?? selectedPackageScope ?? "report";
-      const blob = await exportStakeholderPdf(buildProjectInput(), stakeholder, {
+      const { blob, filename } = await exportStakeholderPdf(buildProjectInput(), stakeholder, {
         requestedOfferId: selectedOfferId === "free" ? "free" : selectedOfferId,
+        analysisRunId: result.history?.analysis_run_id,
       });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `project-${projectId}-${stakeholder}-${exportScope}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      downloadBlobFile(
+        blob,
+        filename || `project-${projectId}-${stakeholder}-${exportScope}.pdf`,
+      );
     } catch (err) {
       if (err instanceof AnalyzeApiError) {
         setAnalysisError(err.message);
+        if (err.status === 401) {
+          await queryClient.invalidateQueries({ queryKey: ["auth-me"] });
+        }
       } else {
-        setAnalysisError("Projekt-Report konnte nicht exportiert werden.");
+        setAnalysisError("Projekt-Report konnte nicht exportiert werden. Bitte erneut versuchen.");
       }
     } finally {
       setIsExporting(false);
@@ -474,7 +478,7 @@ export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { pr
                 <Button
                   type="button"
                   onClick={onExportPdf}
-                  disabled={!result || isExporting || !canRunAnalysis}
+                  disabled={!result || isExporting}
                   className="h-11 rounded-xl bg-brand-cyan px-5 text-black hover:bg-brand-cyan/90 disabled:opacity-60"
                 >
                   <FileDown className="mr-2 h-4 w-4" />

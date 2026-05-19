@@ -29,7 +29,8 @@ export class AnalyzeApiError extends Error {
 }
 
 const BASE = "/api/backend/api/v1";
-const REPORT_BASE = "/api/backend/api/v2/reports";
+/** Same-origin route handler streams PDF bytes reliably on Vercel. */
+const REPORT_EXPORT_BASE = "/api/reports";
 
 function hasValue(value: unknown) {
   return value !== undefined && value !== null && value !== "";
@@ -157,7 +158,43 @@ function formatApiErrorMessage(status: number, detail: unknown) {
   }
 
   if (detail && typeof detail === "object") {
-    const errorObject = detail as { fehler?: unknown; message?: unknown; hint?: unknown };
+    const errorObject = detail as {
+      code?: unknown;
+      fehler?: unknown;
+      message?: unknown;
+      hint?: unknown;
+    };
+    const code = typeof errorObject.code === "string" ? errorObject.code : "";
+    if (code === "CSRF_INVALID") {
+      return "Sicherheitspruefung fehlgeschlagen. Bitte Seite neu laden, erneut einloggen und den PDF-Export noch einmal starten.";
+    }
+    if (code === "REPORT_PDF_QUALITY_FAILED") {
+      const hint = typeof errorObject.hint === "string" ? errorObject.hint : "";
+      return hint
+        ? `PDF-Export blockiert: ${hint}`
+        : "PDF-Export blockiert: Reportdaten erfuellen die Qualitaetspruefung nicht. Bitte Analyse mit vollstaendigen Eingaben wiederholen.";
+    }
+    if (code === "REPORT_STAKEHOLDER_FORBIDDEN") {
+      return [
+        typeof errorObject.message === "string" ? errorObject.message : "Stakeholder-Pfad passt nicht zum Projekt.",
+        typeof errorObject.hint === "string" ? errorObject.hint : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+    }
+    if (code === "BACKEND_UNREACHABLE") {
+      return [
+        typeof errorObject.message === "string" ? errorObject.message : "Backend nicht erreichbar.",
+        typeof errorObject.hint === "string"
+          ? errorObject.hint
+          : "Bitte kurz warten und den PDF-Export erneut starten.",
+      ]
+        .filter(Boolean)
+        .join(" ");
+    }
+    if (code === "BACKEND_URL_MISSING") {
+      return "Backend-URL fehlt in der Deployment-Konfiguration. Bitte Administrator kontaktieren.";
+    }
     if (Array.isArray(errorObject.fehler) && errorObject.fehler.length > 0) {
       return [String(errorObject.fehler[0]), typeof errorObject.hint === "string" ? errorObject.hint : null]
         .filter(Boolean)
@@ -171,7 +208,10 @@ function formatApiErrorMessage(status: number, detail: unknown) {
   }
 
   if (status === 401) {
-    return "Anmeldung erforderlich. Bitte einloggen und die Analyse erneut starten.";
+    return "Anmeldung erforderlich. Bitte einloggen und den PDF-Export erneut starten.";
+  }
+  if (status === 403) {
+    return "PDF-Export nicht erlaubt. Bitte einloggen oder den passenden Stakeholder-Pfad fuer das Projekt verwenden.";
   }
 
   if (typeof detail === "string") {
@@ -179,6 +219,14 @@ function formatApiErrorMessage(status: number, detail: unknown) {
   }
 
   return `Analyse fehlgeschlagen (HTTP ${status})`;
+}
+
+function formatPdfExportErrorMessage(status: number, detail: unknown) {
+  const message = formatApiErrorMessage(status, detail);
+  if (message.startsWith("Analyse fehlgeschlagen")) {
+    return `PDF-Export fehlgeschlagen (HTTP ${status})`;
+  }
+  return message;
 }
 
 function mapRichtung(r: GridCheckInput["richtung"]): "Einspeisung" | "Entnahme" | "Speicher" {
@@ -881,44 +929,130 @@ export async function analyzeGridcheck(
   return mapResponseToUi(body, input);
 }
 
+function filenameFromContentDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const utf8 = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8?.[1]) {
+    try {
+      return decodeURIComponent(utf8[1].trim());
+    } catch {
+      return utf8[1].trim();
+    }
+  }
+  const plain = header.match(/filename="?([^";]+)"?/i);
+  return plain?.[1]?.trim() ?? null;
+}
+
+async function readPdfExportError(res: Response): Promise<AnalyzeApiError> {
+  const contentType = res.headers.get("content-type") ?? "";
+  let detail: unknown = null;
+  if (contentType.includes("application/json")) {
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      detail = body?.detail ?? body;
+    } catch {
+      detail = null;
+    }
+  } else {
+    try {
+      const text = (await res.text()).trim();
+      if (text) detail = { message: text.slice(0, 240) };
+    } catch {
+      detail = null;
+    }
+  }
+  const structured =
+    detail && typeof detail === "object" && !Array.isArray(detail)
+      ? (detail as ApiErrorDetail)
+      : null;
+  return new AnalyzeApiError(res.status, formatPdfExportErrorMessage(res.status, detail), structured);
+}
+
+async function assertPdfBlob(blob: Blob): Promise<Blob> {
+  const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+  if (header.length >= 4 && header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46) {
+    return blob;
+  }
+  try {
+    const text = await blob.text();
+    const parsed = JSON.parse(text) as { detail?: unknown };
+    throw new AnalyzeApiError(
+      502,
+      formatPdfExportErrorMessage(502, parsed.detail ?? parsed),
+      parsed.detail && typeof parsed.detail === "object" && !Array.isArray(parsed.detail)
+        ? (parsed.detail as ApiErrorDetail)
+        : null,
+    );
+  } catch (err) {
+    if (err instanceof AnalyzeApiError) throw err;
+    throw new AnalyzeApiError(
+      502,
+      "Der Server hat keine gueltige PDF-Datei geliefert. Bitte kurz warten und den Export erneut versuchen.",
+      null,
+    );
+  }
+}
+
+export type StakeholderPdfExportOptions = {
+  requestedOfferId?: string;
+  /** Prefer persisted analysis run when available (revision-safe export). */
+  analysisRunId?: number;
+};
+
+export type StakeholderPdfExportResult = {
+  blob: Blob;
+  filename: string;
+};
+
 export async function exportStakeholderPdf(
   input: GridCheckInput,
   stakeholder: "projektierer" | "vnb" | "invest" = "projektierer",
-  options?: { requestedOfferId?: string }
-): Promise<Blob> {
-  validateAnalyzeInput(input);
-  const csrf = getCsrfTokenFromCookie();
-  const payload = buildAnalyzePayload(input);
-  if (options?.requestedOfferId) {
-    payload.requested_offer_id = options.requestedOfferId;
+  options?: StakeholderPdfExportOptions,
+): Promise<StakeholderPdfExportResult> {
+  if (!options?.analysisRunId) {
+    validateAnalyzeInput(input);
   }
-  const res = await fetch(`${REPORT_BASE}/${stakeholder}?format=pdf`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/pdf",
-      ...bearerAuthHeaders(),
-      ...(csrf ? { "X-CSRF-Token": csrf } : {}),
-    },
-    body: JSON.stringify({ analyze_request: payload }),
-  });
-  if (!res.ok) {
-    let body: unknown = null;
-    try {
-      body = await res.json();
-    } catch {
-      body = null;
+  const csrf = getCsrfTokenFromCookie();
+  const requestBody: Record<string, unknown> = { output_format: "pdf" };
+  if (options?.analysisRunId && options.analysisRunId > 0) {
+    requestBody.analysis_run_id = options.analysisRunId;
+  } else {
+    const payload = buildAnalyzePayload(input);
+    if (options?.requestedOfferId) {
+      payload.requested_offer_id = options.requestedOfferId;
     }
+    requestBody.analyze_request = payload;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${REPORT_EXPORT_BASE}/${stakeholder}?format=pdf`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/pdf",
+        ...bearerAuthHeaders(),
+        ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+      },
+      body: JSON.stringify(requestBody),
+    });
+  } catch {
     throw new AnalyzeApiError(
-      res.status,
-      formatApiErrorMessage(res.status, (body as { detail?: unknown } | null)?.detail),
-      ((body as { detail?: unknown } | null)?.detail &&
-      typeof (body as { detail?: unknown }).detail === "object" &&
-      !Array.isArray((body as { detail?: unknown }).detail)
-        ? ((body as { detail?: ApiErrorDetail }).detail ?? null)
-        : null)
+      0,
+      "Backend nicht erreichbar. Bitte pruefen, ob Sie eingeloggt sind und das Backend unter /api/backend erreichbar ist.",
+      null,
     );
   }
-  return res.blob();
+
+  if (!res.ok) {
+    throw await readPdfExportError(res);
+  }
+
+  const blob = await assertPdfBlob(await res.blob());
+  const scope = options?.requestedOfferId === "free" ? "basic" : options?.requestedOfferId ?? "report";
+  const filename =
+    filenameFromContentDisposition(res.headers.get("content-disposition")) ??
+    `gridcheck-${stakeholder}-${scope}.pdf`;
+  return { blob, filename };
 }
