@@ -247,7 +247,7 @@ export default function NetzbetreiberDashboard() {
                 <SelectTrigger className="w-full bg-slate-900 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-border bg-bg-card text-white">
                   <SelectItem value="alle">Alle Typen</SelectItem>
                   <SelectItem value="solar">Solar</SelectItem>
                   <SelectItem value="wind">Wind</SelectItem>
@@ -264,7 +264,7 @@ export default function NetzbetreiberDashboard() {
                 <SelectTrigger className="w-full bg-slate-900 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-border bg-bg-card text-white">
                   <SelectItem value="alle">Alle</SelectItem>
                   <SelectItem value="NS">NS</SelectItem>
                   <SelectItem value="MS">MS</SelectItem>
@@ -278,7 +278,7 @@ export default function NetzbetreiberDashboard() {
                 <SelectTrigger className="w-full bg-slate-900 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-border bg-bg-card text-white">
                   <SelectItem value="rang">Prioritaet</SelectItem>
                   <SelectItem value="datum">Eingangsdatum</SelectItem>
                   <SelectItem value="leistung">Leistung</SelectItem>

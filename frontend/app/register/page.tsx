@@ -11,12 +11,11 @@ import { Label } from "@/components/ui/label";
 import { isAuthInfrastructureError, register } from "@/lib/api/auth";
 import { getPasswordPolicyChecks, isPasswordPolicySatisfied } from "@/lib/password-policy";
 import { getPurchaseIntentProfile, normalizePurchaseIntent } from "@/lib/purchase-intents";
+import { formSelectClass as selectClass } from "@/lib/form-classes";
 
 const cardClass = "rounded-[28px] border border-white/10 bg-bg-card/80 p-6 shadow-[0_12px_42px_rgba(0,0,0,0.18)]";
 const fieldClass =
   "h-11 rounded-xl border-border/70 bg-white/5 px-3 text-white placeholder:text-text-dim focus-visible:border-brand-cyan/70 focus-visible:ring-brand-cyan/20";
-const selectClass =
-  "h-11 w-full rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70";
 
 function RegisterPageContent() {
   const searchParams = useSearchParams();

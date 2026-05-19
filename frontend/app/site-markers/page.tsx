@@ -522,7 +522,7 @@ function SiteMarkersPageContent() {
                     <label className="space-y-2 text-sm text-text-muted">
                       <span className="block">Asset-Typ</span>
                       <select
-                        className="h-11 w-full rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70"
+                        className="form-select h-11 w-full cursor-pointer rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70"
                         value={assetType}
                         onChange={(event) => setAssetType(event.target.value as SiteMarkerAssetType)}
                       >
@@ -537,7 +537,7 @@ function SiteMarkersPageContent() {
                     <label className="space-y-2 text-sm text-text-muted">
                       <span className="block">Standortquelle</span>
                       <select
-                        className="h-11 w-full rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70"
+                        className="form-select h-11 w-full cursor-pointer rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70"
                         value={locationSource}
                         onChange={(event) => setLocationSource(event.target.value as SiteMarkerLocationSource)}
                       >

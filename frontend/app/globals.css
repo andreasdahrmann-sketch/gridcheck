@@ -45,6 +45,23 @@ textarea {
   font: inherit;
 }
 
+/* Native selects: dark trigger on page, light dropdown list for readable options */
+select {
+  color-scheme: light;
+}
+
+select option,
+select optgroup {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+@layer components {
+  .form-select {
+    color-scheme: light;
+  }
+}
+
 .leaflet-container {
   background: #061a1a;
   font-family: "Inter", system-ui, sans-serif;

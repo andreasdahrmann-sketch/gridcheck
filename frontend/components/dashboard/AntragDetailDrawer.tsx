@@ -249,7 +249,7 @@ export default function AntragDetailDrawer({ antrag, prio, onClose, onChanged }:
               <select
                 value={status}
                 onChange={(e) => setStatusState(e.target.value as AntragStatus)}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                className="form-select w-full cursor-pointer rounded-xl border border-border/70 bg-white/5 px-3 py-2 text-sm text-white focus:border-brand-cyan/70 focus:outline-none"
               >
                 {STATUS_OPTIONS.map((s) => (
                   <option key={s} value={s}>{STATUS_LABEL[s]}</option>
@@ -260,7 +260,7 @@ export default function AntragDetailDrawer({ antrag, prio, onClose, onChanged }:
                 placeholder="Kommentar (optional)"
                 value={statusComment}
                 onChange={(e) => setStatusComment(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-sm text-white"
+                className="form-select w-full cursor-pointer rounded-xl border border-border/70 bg-white/5 px-3 py-2 text-sm text-white focus:border-brand-cyan/70 focus:outline-none"
               />
               <button
                 onClick={handleStatusSave}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-const legalLinks = [
+const footerLinks = [
+  { href: "/preise", label: "Tarife & Preise" },
   { href: "/impressum", label: "Impressum" },
   { href: "/datenschutz", label: "Datenschutz" },
   { href: "/agb", label: "AGB" },
@@ -15,7 +16,7 @@ export function SiteFooter() {
           GridCheck liefert vorlaeufige Netzanschluss-Diagnostik – keine verbindliche Netzanschlusszusage.
         </p>
         <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm" aria-label="Rechtliches und Kontakt">
-          {legalLinks.map((item) => (
+          {footerLinks.map((item) => (
             <Link
               key={item.href}
               href={item.href}

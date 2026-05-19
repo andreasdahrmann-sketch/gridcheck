@@ -436,8 +436,9 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
   const sectionClass = "rounded-2xl border border-gray-700 bg-gray-800/60 p-4 md:p-5";
   const sectionTitle = "mb-3 text-lg font-semibold text-white";
   const labelClass = "mb-1 block text-sm text-gray-300";
-  const inputClass = "w-full rounded-xl border border-gray-600 bg-gray-900 px-3 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none";
-  const selectClass = inputClass;
+  const inputClass =
+    "w-full rounded-xl border border-border/70 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-text-dim focus:border-brand-cyan/70 focus:outline-none focus:ring-1 focus:ring-brand-cyan/25";
+  const selectClass = `${inputClass} form-select cursor-pointer`;
   const fmt = (n: number, d = 1) => Number(n).toFixed(d);
   const decisionFromResult = (value: GridCheckResult): "A" | "B" | "C" => {
     if (value.machbarkeit_stufe === "gruen") return "A";
