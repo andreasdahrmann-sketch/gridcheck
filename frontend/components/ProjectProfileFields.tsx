@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import AddressGeocoder, { type AddressGeocodeSelection } from "@/components/mapbox/AddressGeocoder";
 import type {
   EnvironmentalRouteInput,
   GridCheckInput,
@@ -123,6 +125,9 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
   const projectLocation: ProjectLocationInput = value.project_location ?? {};
   const umspannwerk: UmspannwerkInput = value.umspannwerk ?? {};
   const activeCustomerType = value.kundentyp ?? stakeholderContext.customer_type ?? "";
+  const [showAdvancedCoords, setShowAdvancedCoords] = useState(
+    Boolean(projectLocation.latitude != null || projectLocation.longitude != null),
+  );
 
   const patch = (delta: Partial<ProjectProfileValue>) => onChange({ ...value, ...delta });
   const patchStakeholder = (delta: Partial<StakeholderContextInput>) =>
@@ -280,16 +285,26 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
         <h3 className={titleClass}>Standortpraezisierung</h3>
         <div className={`grid ${compact ? "md:grid-cols-2" : "md:grid-cols-3"} gap-3`}>
           <div className={compact ? "md:col-span-2" : "md:col-span-3"}>
-            <label className={labelClass}>Adress- oder Flurstueckshinweis</label>
-            <input
-              className={inputClass}
+            <AddressGeocoder
               value={projectLocation.address_hint ?? ""}
-              onChange={(e) => patchLocation({ address_hint: e.target.value || undefined })}
-              placeholder="z.B. Gewerbepark Nord, Musterstrasse 12 oder Gemarkung / Flur"
+              plz={value.plz}
+              ort={value.ort}
+              onChange={(hint) => patchLocation({ address_hint: hint || undefined })}
+              onSelect={(selection: AddressGeocodeSelection) => {
+                patchLocation({
+                  address_hint: selection.address_hint,
+                  latitude: selection.latitude,
+                  longitude: selection.longitude,
+                });
+                if (selection.plz && !value.plz) patch({ plz: selection.plz });
+                if (selection.ort && !value.ort) patch({ ort: selection.ort });
+              }}
             />
           </div>
+          {showAdvancedCoords ? (
+            <div className="grid gap-3 md:grid-cols-2">
           <div>
-            <label className={labelClass}>Breitengrad (optional)</label>
+            <label className={labelClass}>Breitengrad</label>
             <input
               type="number"
               step="0.000001"
@@ -302,7 +317,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
             />
           </div>
           <div>
-            <label className={labelClass}>Laengengrad (optional)</label>
+            <label className={labelClass}>Laengengrad</label>
             <input
               type="number"
               step="0.000001"
@@ -314,6 +329,8 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
               placeholder="z.B. 9.761990"
             />
           </div>
+            </div>
+          ) : null}
           <div>
             <label className={labelClass}>Flaechenrahmen (Radius m, optional)</label>
             <input
@@ -327,10 +344,17 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
               placeholder="z.B. 250"
             />
           </div>
+          <button
+            type="button"
+            className="text-xs font-medium text-brand-cyan underline-offset-2 hover:underline"
+            onClick={() => setShowAdvancedCoords((open) => !open)}
+          >
+            {showAdvancedCoords ? "Erweitert: Koordinaten ausblenden" : "Erweitert: Breiten-/Laengengrad manuell"}
+          </button>
         </div>
         <p className={helperTextClass}>
-          Prioritaet fuer die Kartenlage: exakte Koordinate, dann Adresshinweis mit Ort/PLZ, sonst Ort/PLZ oder nur
-          PLZ. Ohne belastbare Quelle wird die Lage bewusst als ungefaehr markiert.
+          Prioritaet fuer die Kartenlage: Adresssuche bzw. exakte Koordinate, dann Ort/PLZ. Ohne belastbare Quelle wird
+          die Lage bewusst als ungefaehr markiert.
         </p>
       </div>
 

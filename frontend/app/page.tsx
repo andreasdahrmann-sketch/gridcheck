@@ -78,6 +78,11 @@ export default function Home() {
                 Wir zeigen nicht nur, ob ein Anschluss kritisch ist, sondern unter welchen Bedingungen er strategisch
                 besser darstellbar wird.
               </p>
+              <p className="mt-4 max-w-3xl rounded-xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 text-sm leading-6 text-amber-100/90">
+                Hinweis: GridCheck liefert vorlaeufige, nachvollziehbare Diagnostik – keine verbindliche
+                Netzanschlusszusage und keine garantierte Prognosegenauigkeit. Entscheidungen des Netzbetreibers
+                bleiben massgeblich.
+              </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Link
                   href="/projektierer"
@@ -133,6 +138,16 @@ export default function Home() {
               </div>
             ))}
           </div>
+
+          <section className="mt-10 rounded-[28px] border border-dashed border-white/15 bg-black/10 px-6 py-10 text-center">
+            <p className="text-xs font-medium uppercase tracking-[0.22em] text-text-dim">Produktvorschau</p>
+            <p className="mt-3 text-sm text-text-muted">
+              Screenshot der Analyse-Oberflaeche folgt – Platzhalter bis zur finalen Demo-Aufnahme.
+            </p>
+            <div className="mx-auto mt-6 flex h-48 max-w-2xl items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-brand-cyan/10 to-brand-orange/10 text-sm text-text-dim">
+              Demo-Screenshot (in Vorbereitung)
+            </div>
+          </section>
 
           <div className="mt-8 grid gap-4 lg:grid-cols-3">
             {ROLE_CARDS.map((item) => (

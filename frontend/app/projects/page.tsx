@@ -2,8 +2,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -94,9 +94,8 @@ export default function ProjectsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-bg text-white">
-      <Header />
-      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">
+    <>
+      <div className="max-w-5xl">
         <section className="flex flex-col gap-3 border-b border-border/70 pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-brand-cyan">Portfolio</p>
@@ -326,12 +325,31 @@ export default function ProjectsPage() {
           })}
 
           {(projectsQuery.data ?? []).length === 0 && !projectsQuery.isLoading ? (
-            <div className="rounded-2xl border border-border bg-bg-elev px-4 py-8 text-center text-sm text-text-muted">
-              Noch keine Projekte vorhanden. Legen Sie oben das erste Projekt an.
+            <div className="rounded-2xl border border-brand-cyan/20 bg-brand-cyan/5 px-6 py-10 text-center">
+              <p className="text-lg font-semibold text-white">Erste Analyse erstellen</p>
+              <p className="mt-2 text-sm leading-6 text-text-muted">
+                Legen Sie ein Projekt an oder starten Sie direkt den Netzanschluss-Check. Nach der Registrierung
+                fuehrt die Einfuehrung durch die ersten Schritte.
+              </p>
+              <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+                <Link
+                  href="/projektierer"
+                  className="inline-flex h-11 items-center justify-center rounded-xl bg-brand-orange px-5 text-sm font-semibold text-white hover:bg-brand-orangeHover"
+                >
+                  Erste Analyse starten
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+                <Link
+                  href="/onboarding"
+                  className="inline-flex h-11 items-center justify-center rounded-xl border border-white/15 px-5 text-sm font-semibold text-white hover:bg-white/5"
+                >
+                  Einfuehrung ansehen
+                </Link>
+              </div>
             </div>
           ) : null}
         </section>
       </div>
-    </main>
+    </>
   );
 }

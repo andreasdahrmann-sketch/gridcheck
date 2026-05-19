@@ -37,6 +37,11 @@ def _welcome_enabled() -> bool:
     return raw not in {"0", "false", "no", "off"}
 
 
+def _analysis_complete_enabled() -> bool:
+    raw = os.getenv("EMAIL_SEND_ANALYSIS_COMPLETE", "true").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
 def send_transactional_email(
     *,
     to_email: str,
@@ -154,6 +159,40 @@ def send_welcome_email(*, to_email: str, full_name: str | None) -> bool:
         subject="Willkommen bei GridCheck",
         body=body,
         template="welcome",
+    )
+
+
+def send_analysis_complete_email(
+    *,
+    to_email: str,
+    full_name: str | None,
+    project_name: str | None,
+    run_id: int,
+    decision_code: str | None = None,
+) -> bool:
+    if not _analysis_complete_enabled():
+        logger.info(
+            "email_skip template=analysis_complete reason=EMAIL_SEND_ANALYSIS_COMPLETE=false to=%s",
+            to_email,
+        )
+        return True
+
+    greeting = full_name.strip() if full_name and full_name.strip() else "Nutzerin/Nutzer"
+    project_line = project_name.strip() if project_name and project_name.strip() else "Direktcheck"
+    decision_line = decision_code.strip() if decision_code else "n/a"
+    body = (
+        f"Hallo {greeting},\n\n"
+        f"Ihre GridCheck-Analyse (Run #{run_id}) fuer „{project_line}“ ist abgeschlossen.\n"
+        f"Ergebnis-Kennung: {decision_line}.\n\n"
+        "Das Ergebnis finden Sie in Ihrer Analyse-History und im zugehoerigen Projekt.\n"
+        "Hinweis: GridCheck liefert keine verbindliche Netzanschlusszusage.\n\n"
+        "Viele Grüße\nIhr GridCheck-Team"
+    )
+    return send_transactional_email(
+        to_email=to_email,
+        subject="GridCheck – Analyse abgeschlossen",
+        body=body,
+        template="analysis_complete",
     )
 
 

@@ -58,7 +58,7 @@ export default function OnboardingPage() {
                     </Link>
                   </Button>
                 </div>
-              {"</motion>".replace("motion", "div")}
+              </div>
             </li>
           ))}
         </ol>

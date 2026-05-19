@@ -13,7 +13,6 @@ import {
   EyeOff,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -229,9 +228,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-bg text-white">
-      <Header />
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+    <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-4 border-b border-border/70 pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.24em] text-brand-cyan">Account & Workflow</p>
@@ -704,6 +701,5 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
-    </main>
   );
 }

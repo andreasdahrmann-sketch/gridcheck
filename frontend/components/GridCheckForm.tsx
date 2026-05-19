@@ -12,6 +12,7 @@ import VnbBanner from "./VnbBanner";
 import { AnalysisDisclaimer } from "@/components/legal/AnalysisDisclaimer";
 import NetzplanVisualization from "./NetzplanVisualization";
 import BillingUpgradePrompt from "./BillingUpgradePrompt";
+import AnalysisProgressPanel from "@/components/analysis/AnalysisProgressPanel";
 import ProductDecisionGuide from "./billing/ProductDecisionGuide";
 import N1AssessmentPanel from "./N1AssessmentPanel";
 import { analyzeGridcheck, AnalyzeApiError, exportStakeholderPdf } from "../lib/api/analyze";
@@ -40,6 +41,13 @@ import {
   resolveStakeholderProductPath,
 } from "@/lib/stakeholder-product";
 import { buildSiteMarkerHref } from "@/lib/app-flow";
+import {
+  estimateCableLength,
+  formatConnectionType,
+  getPowerLimitHints,
+  hasNetzplanResult,
+  resolveCosPhiDefault,
+} from "@/lib/gridcheck-engine";
 import { readUserPreferences } from "@/lib/user-preferences";
 
 type CustomerType = "projektierer" | "speicherbetreiber" | "netzbetreiber" | "investor";
@@ -138,6 +146,9 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
   });
   const stakeholderCopy = getStakeholderProductCopy(stakeholderPath);
   const showDeepTechnicalDetails = canViewDeepTechnicalDetails(stakeholderPath);
+  const powerLimitHints = getPowerLimitHints(input.spannungsebene, input.anschlussleistung_kw);
+  const cableLengthHint = estimateCableLength(input);
+  const cosPhiHint = resolveCosPhiDefault(input);
 
   const updateInput = (patch: Partial<GridCheckInput>) => setInput(prev => ({ ...prev, ...patch }));
   const updateMeta = (patch: Partial<MetaData>) => setMeta(prev => ({ ...prev, ...patch }));
@@ -875,9 +886,22 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
             <div>
               <label className={labelClass}>Entfernung NVP (km)</label>
               <input type="number" step="0.1" className={inputClass} value={input.entfernung_km ?? ""} onChange={e => updateInput({ entfernung_km: e.target.value ? Number(e.target.value) : undefined })} placeholder="auto" />
+              <p className="mt-1 text-xs text-gray-500">{cableLengthHint.annahme}</p>
             </div>
           </div>
         </div>
+          <p className="mt-3 rounded-xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs leading-5 text-blue-100">
+            <span className="font-semibold">Leistungsrichtwert {powerLimitHints.label}:</span> typisch bis ca.{" "}
+            {powerLimitHints.typicalMaxKw.toLocaleString("de-DE")} kW (Screening bis ca.{" "}
+            {powerLimitHints.screeningUpperKw.toLocaleString("de-DE")} kW). {powerLimitHints.hinweis}
+            {powerLimitHints.ueberTypischemRichtwert ? " Ihre Eingabe liegt über dem typischen Richtwert." : ""}
+          </p>
+          {cosPhiHint.quelle === "rolle_default" ? (
+            <p className="mt-2 text-xs text-gray-500">
+              cos φ Standard für diese Anlagenrolle: {cosPhiHint.cosPhi} (kann im Feld überschrieben werden).
+            </p>
+          ) : null}
+        </motion.div>
 
         <ProjectProfileFields value={input} onChange={(next) => setInput((prev) => ({ ...prev, ...next }))} />
 
@@ -911,6 +935,8 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
             </div>
           </div>
         </div>
+
+        {isAnalyzing ? <AnalysisProgressPanel active className="mb-4" /> : null}
 
         {analysisError && (
           <div className="rounded-2xl border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">

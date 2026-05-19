@@ -7,6 +7,7 @@ import { ArrowLeft, ClipboardList, FileDown, GitCompareArrows, MapPinned, Radar,
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import BillingUpgradePrompt from "@/components/BillingUpgradePrompt";
+import AnalysisProgressPanel from "@/components/analysis/AnalysisProgressPanel";
 import { AnalysisDisclaimer } from "@/components/legal/AnalysisDisclaimer";
 import NetzplanVisualization from "@/components/NetzplanVisualization";
 import ProjectProfileFields from "@/components/ProjectProfileFields";
@@ -548,6 +549,7 @@ export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { pr
             {analysisError}
           </div>
         ) : null}
+        {isAnalyzing ? <AnalysisProgressPanel active className="mt-6" /> : null}
         {effectiveBillingStatus?.upgrade_required && effectiveBillingStatus.subscription_state !== "checkout_pending" ? (
           <div className="mt-6">
             <BillingUpgradePrompt
