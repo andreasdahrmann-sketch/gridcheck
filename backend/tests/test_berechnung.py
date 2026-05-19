@@ -163,3 +163,15 @@ class TestMSSpannungNormKonsistenz:
         assert sp["spannungsebene"] == "MS"
         assert sp["delta_u_hartgrenze_pct"] == 3.0
         assert sp.get("ms_norm_tar")
+
+
+class TestNSSpannungsebene:
+    def test_ns_hartgrenze_3_pct(self, basis_pv_ms):
+        e = dict(basis_pv_ms)
+        e["nennspannung"] = 0.4
+        e["leistung_mw"] = 0.15
+        e["p_kw"] = 150
+        r = berechne_netzanschluss(e)
+        assert r["status"] in ("OK", "WARNUNG")
+        assert r["spannung"]["spannungsebene"] == "NS"
+        assert r["spannung"]["delta_u_hartgrenze_pct"] in (3.0, 5.0)
