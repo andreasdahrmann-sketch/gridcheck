@@ -20,6 +20,7 @@ import {
 const baseNavLinks = [
   { href: "/", label: "Start" },
   { href: "/projektierer", label: "Projektierer" },
+  { href: "/preise", label: "Tarife" },
   { href: "/projects", label: "Projekte" },
   { href: "/site-markers", label: "Vor-Ort-Marker" },
   { href: "/settings", label: "Einstellungen" },
@@ -59,6 +60,7 @@ export function Header() {
     if (pathname.startsWith("/projects")) return "/projects"
     if (pathname.startsWith("/site-markers")) return "/site-markers"
     if (pathname.startsWith("/ops")) return "/ops"
+    if (pathname.startsWith("/preise")) return "/preise"
     if (pathname.startsWith("/settings")) return "/settings"
     if (pathname.startsWith("/contact")) return "/contact"
     return "/"
@@ -71,9 +73,10 @@ export function Header() {
         baseNavLinks[1],
         baseNavLinks[2],
         baseNavLinks[3],
-        { href: "/ops", label: "OPS" },
         baseNavLinks[4],
+        { href: "/ops", label: "OPS" },
         baseNavLinks[5],
+        baseNavLinks[6],
       ]
     }
     return baseNavLinks

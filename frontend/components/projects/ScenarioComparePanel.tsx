@@ -172,7 +172,7 @@ export default function ScenarioComparePanel({ projectId, currentResult }: Props
               <label className="flex-1 text-sm text-text-muted">
                 Szenario A
                 <select
-                  className="mt-1 w-full rounded-xl border border-white/15 bg-gray-900 px-3 py-2 text-white"
+                  className="form-select mt-1 w-full cursor-pointer rounded-xl border border-border/70 bg-white/5 px-3 py-2 text-sm text-white focus:border-brand-cyan/70 focus:outline-none"
                   value={scenarioA || pickA?.name || ""}
                   onChange={(e) => setScenarioA(e.target.value)}
                 >
@@ -186,7 +186,7 @@ export default function ScenarioComparePanel({ projectId, currentResult }: Props
               <label className="flex-1 text-sm text-text-muted">
                 Szenario B
                 <select
-                  className="mt-1 w-full rounded-xl border border-white/15 bg-gray-900 px-3 py-2 text-white"
+                  className="form-select mt-1 w-full cursor-pointer rounded-xl border border-border/70 bg-white/5 px-3 py-2 text-sm text-white focus:border-brand-cyan/70 focus:outline-none"
                   value={scenarioB || pickB?.name || ""}
                   onChange={(e) => setScenarioB(e.target.value)}
                 >

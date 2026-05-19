@@ -192,7 +192,7 @@ export default function ProjectsPage() {
                   inputMode="numeric"
                 />
                 <select
-                  className="h-11 rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70"
+                  className="form-select h-11 w-full cursor-pointer rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70"
                   value={typ}
                   onChange={(e) => setTyp(e.target.value)}
                   required

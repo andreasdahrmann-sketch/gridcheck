@@ -22,7 +22,7 @@ export const DECISION_GUIDE_CARDS: DecisionGuideCard[] = [
     whenToChoose: "Wenn Sie einen Standort oder ein Vorhaben erstmals plausibilisieren wollen.",
     included: "Kompakter Basis-Run fuer fruehe Netzanschluss-Klarheit ohne tiefere Hybrid-, Speicher- oder Trassenlogik.",
     notFor: "Nicht geeignet fuer strategische Anschlussdarstellung oder vertiefte Stakeholder-/Umweltargumentation.",
-    href: "/settings",
+    href: "/preise",
     cta: "Basispfad ansehen",
   },
   {
@@ -32,7 +32,7 @@ export const DECISION_GUIDE_CARDS: DecisionGuideCard[] = [
     whenToChoose: "Wenn Hybrid, Speicher, Trasse und Investoren-/Freigabereife frueh sauber bewertet werden muessen.",
     included: "Vertiefter Self-Serve-Report mit Premium-Scope fuer komplexere Einzelvorhaben.",
     notFor: "Nicht der richtige Pfad, wenn sichtbarer operativer Follow-up oder manuelle Anschlussstrategie noetig ist.",
-    href: "/settings",
+    href: "/preise",
     cta: "Premium vergleichen",
   },
   {
@@ -140,7 +140,7 @@ export function getNextStepGuidance(offerId?: string | null, packageScope?: stri
     summary:
       "Bleibt es beim kompakten Screening, reicht der Basispfad. Sobald mehr Argumentation, Premium-Scope oder laufende Nutzung gebraucht werden, sollten Premium, Pro oder Professional sauber getrennt geprueft werden.",
     actions: [
-      { label: "Tarife ansehen", href: "/settings" },
+      { label: "Tarife ansehen", href: "/preise" },
       { label: "Upgrade anfragen", href: "/contact?intent=upgrade" },
     ],
   };

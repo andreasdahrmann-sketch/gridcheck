@@ -31,6 +31,7 @@ import {
   saveUserPreferences,
   type UserPreferences,
 } from "@/lib/user-preferences";
+import { formSelectClass as selectClass } from "@/lib/form-classes";
 
 type Me = { id: number; email: string; role: string; full_name?: string | null };
 
@@ -44,8 +45,6 @@ type Notice =
 const cardClass = "rounded-[24px] border border-border/70 bg-bg-card/80 shadow-[0_12px_42px_rgba(0,0,0,0.18)]";
 const fieldClass =
   "h-11 rounded-xl border-border/70 bg-white/5 px-3 text-white placeholder:text-text-dim focus-visible:border-brand-cyan/70 focus-visible:ring-brand-cyan/20";
-const selectClass =
-  "flex h-11 w-full rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70";
 
 function PreferenceRow({
   title,

@@ -32,7 +32,8 @@ const sectionClass =
 const titleClass = "mb-3 text-base font-semibold text-white";
 const labelClass = "mb-1 block text-xs uppercase tracking-[0.16em] text-text-dim";
 const inputClass =
-  "w-full rounded-xl border border-border/70 bg-black/10 px-3 py-2.5 text-sm text-white placeholder:text-text-dim focus:border-brand-cyan/60 focus:outline-none";
+  "w-full rounded-xl border border-border/70 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-text-dim focus:border-brand-cyan/60 focus:outline-none focus:ring-1 focus:ring-brand-cyan/25";
+const selectFieldClass = `${inputClass} form-select cursor-pointer`;
 const helperTextClass = "mt-2 text-xs leading-5 text-text-muted";
 const addButtonClass =
   "inline-flex min-h-10 items-center justify-center rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 px-3 py-2 text-sm font-medium text-brand-cyan transition hover:bg-brand-cyan/15";
@@ -173,7 +174,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
           <div>
             <label className={labelClass}>Kundentyp</label>
             <select
-              className={inputClass}
+              className={selectFieldClass}
               value={value.kundentyp ?? stakeholderContext.customer_type ?? ""}
               onChange={(e) => {
                 patch({ kundentyp: e.target.value });
@@ -194,7 +195,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
           <div>
             <label className={labelClass}>Prioritaetsfokus</label>
             <select
-              className={inputClass}
+              className={selectFieldClass}
               value={stakeholderContext.priority_focus ?? "balanced"}
               onChange={(e) =>
                 patchStakeholder({
@@ -212,7 +213,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
           <div>
             <label className={labelClass}>Projektreife</label>
             <select
-              className={inputClass}
+              className={selectFieldClass}
               value={value.projektreife ?? ""}
               onChange={(e) =>
                 patch({
@@ -352,7 +353,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
           <div>
             <label className={labelClass}>Topologie</label>
             <select
-              className={inputClass}
+              className={selectFieldClass}
               value={value.topologie ?? "unbekannt"}
               onChange={(e) => patch({ topologie: e.target.value as GridCheckInput["topologie"] })}
             >
@@ -370,7 +371,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
           <div>
             <label className={labelClass}>Datengrundlage N-1</label>
             <select
-              className={inputClass}
+              className={selectFieldClass}
               value={value.n1_datengrundlage ?? "unknown"}
               onChange={(e) => patch({ n1_datengrundlage: e.target.value as N1DataSource })}
             >
@@ -560,7 +561,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
                     <div>
                       <label className={labelClass}>Datenquelle</label>
                       <select
-                        className={inputClass}
+                        className={selectFieldClass}
                         value={abgang.datenquelle ?? value.n1_datengrundlage ?? "planner_assumption"}
                         onChange={(e) =>
                           updateAbgang(index, { datenquelle: e.target.value as N1DataSource })
@@ -640,7 +641,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
                 <div>
                   <label className={labelClass}>Typ</label>
                   <select
-                    className={inputClass}
+                    className={selectFieldClass}
                     value={component.component_type}
                     onChange={(e) =>
                       updateComponent(index, {
@@ -741,7 +742,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
           <div>
             <label className={labelClass}>Begrenzungskonzept</label>
             <select
-              className={inputClass}
+              className={selectFieldClass}
               value={netzanschlusspunkt.export_limit_mode ?? "none"}
               onChange={(e) =>
                 patchNap({
@@ -809,7 +810,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
           <div>
             <label className={labelClass}>Betriebsart</label>
             <select
-              className={inputClass}
+              className={selectFieldClass}
               value={storageProfile.operation_mode ?? "unknown"}
               onChange={(e) =>
                 patchStorage({
@@ -932,7 +933,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
           <div>
             <label className={labelClass}>Trassenkomplexitaet</label>
             <select
-              className={inputClass}
+              className={selectFieldClass}
               value={environmentalRoute.route_complexity ?? "unbekannt"}
               onChange={(e) =>
                 patchEnvironment({
