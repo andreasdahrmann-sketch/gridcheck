@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { Logo } from "./Logo"
 import { me, logout, type AuthUser } from "@/lib/api/auth"
+import { canAccessVnbDashboard } from "@/lib/vnb-access"
 import { Button } from "@/components/ui/button"
 import { PwaInstallPrompt } from "@/components/mobile/PwaInstallPrompt"
 import {
@@ -63,23 +64,24 @@ export function Header() {
     if (pathname.startsWith("/preise")) return "/preise"
     if (pathname.startsWith("/settings")) return "/settings"
     if (pathname.startsWith("/contact")) return "/contact"
+    if (pathname.startsWith("/vnb")) return "/vnb"
     return "/"
   }, [pathname])
 
   const navLinks = useMemo(() => {
+    const vnbLink = user && canAccessVnbDashboard(user) ? [{ href: "/vnb", label: "VNB" }] : []
+    const core = [
+      baseNavLinks[0],
+      baseNavLinks[1],
+      ...vnbLink,
+      baseNavLinks[2],
+      baseNavLinks[3],
+      baseNavLinks[4],
+    ]
     if (user?.role === "admin") {
-      return [
-        baseNavLinks[0],
-        baseNavLinks[1],
-        baseNavLinks[2],
-        baseNavLinks[3],
-        baseNavLinks[4],
-        { href: "/ops", label: "OPS" },
-        baseNavLinks[5],
-        baseNavLinks[6],
-      ]
+      return [...core, { href: "/ops", label: "OPS" }, baseNavLinks[5], baseNavLinks[6]]
     }
-    return baseNavLinks
+    return [...core, baseNavLinks[5], baseNavLinks[6]]
   }, [user])
 
   async function handleLogout() {

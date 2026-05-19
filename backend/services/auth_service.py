@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from core.auth import create_token, decode_token, hash_password, password_hash_needs_upgrade, verify_password
 from core.security_log import log_security_event
+from core.vnb_access import VNB_STATUS_NONE, VNB_STATUS_PENDING, normalize_vnb_verification_status
 from db.models import PasswordResetToken, User
 
 ACCESS_TTL_MIN = 60
@@ -69,10 +70,12 @@ def register_user(db: Session, *, email: str, password: str, role: str, full_nam
             status_code=409,
             detail={"code": "EMAIL_EXISTS", "message": "E-Mail bereits vorhanden", "hint": "Bitte andere E-Mail nutzen."},
         )
+    vnb_status = VNB_STATUS_PENDING if normalized_role == "netzbetreiber" else VNB_STATUS_NONE
     user = User(
         email=normalized_email,
         password_hash=hash_password(password),
         role=normalized_role,
+        vnb_verification_status=vnb_status,
         full_name=full_name,
     )
     db.add(user)
@@ -212,4 +215,40 @@ def complete_password_reset(db: Session, *, token: str, password: str) -> None:
     reset_row.used_at = now
     db.commit()
     log_security_event("auth_password_reset_completed", user_id=user.id, email=user.email)
+
+
+def approve_netzbetreiber(db: Session, *, user_id: int) -> User:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "USER_NOT_FOUND",
+                "message": "Benutzer nicht gefunden",
+                "hint": "user_id pruefen.",
+            },
+        )
+    role = str(user.role or "").strip().lower()
+    if role != "netzbetreiber":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "VNB_APPROVE_ROLE_INVALID",
+                "message": "Freischaltung ist nur fuer Konten mit Rolle netzbetreiber moeglich.",
+                "hint": "Rolle des Benutzers pruefen oder Rolle zuerst anpassen.",
+            },
+        )
+    from core.vnb_access import VNB_STATUS_APPROVED
+
+    user.vnb_verification_status = VNB_STATUS_APPROVED
+    user.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
+    log_security_event(
+        "vnb_operator_approved",
+        user_id=user.id,
+        email=user.email,
+        vnb_verification_status=normalize_vnb_verification_status(user.vnb_verification_status),
+    )
+    return user
 

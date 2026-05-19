@@ -6,6 +6,8 @@ export type AuthUser = {
   email: string;
   role: string;
   full_name?: string | null;
+  vnb_verification_status?: "none" | "pending" | "approved";
+  netzbetreiber_verified?: boolean;
 };
 
 type TokenResponse = {

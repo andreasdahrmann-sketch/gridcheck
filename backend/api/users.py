@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from core.auth import get_current_user, require_csrf
+from core.vnb_access import user_to_vnb_access_fields
 from db.database import get_db
 from db.models import User
 from services.user_service import change_password, update_me
@@ -17,6 +18,20 @@ class MeResponse(BaseModel):
     email: str
     role: str
     full_name: str | None
+    vnb_verification_status: str = "none"
+    netzbetreiber_verified: bool = False
+
+
+def _me_response(user: User) -> MeResponse:
+    fields = user_to_vnb_access_fields(user)
+    return MeResponse(
+        id=user.id,
+        email=user.email,
+        role=user.role,
+        full_name=user.full_name,
+        vnb_verification_status=str(fields["vnb_verification_status"]),
+        netzbetreiber_verified=bool(fields["netzbetreiber_verified"]),
+    )
 
 
 class UpdateMeRequest(BaseModel):
@@ -30,12 +45,7 @@ class ChangePasswordRequest(BaseModel):
 
 @router.get("/me", response_model=MeResponse)
 def me(current_user: User = Depends(get_current_user)) -> MeResponse:
-    return MeResponse(
-        id=current_user.id,
-        email=current_user.email,
-        role=current_user.role,
-        full_name=current_user.full_name,
-    )
+    return _me_response(current_user)
 
 
 @router.patch("/me", response_model=MeResponse)
@@ -46,7 +56,7 @@ def patch_me(
     _: None = Depends(require_csrf),
 ) -> MeResponse:
     updated = update_me(db, current_user, full_name=req.full_name, role=None)
-    return MeResponse(id=updated.id, email=updated.email, role=updated.role, full_name=updated.full_name)
+    return _me_response(updated)
 
 
 @router.patch("/me/password")

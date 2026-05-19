@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
 import { Header } from "@/components/Header";
+import { ProtectedVnbRoute } from "@/components/auth/ProtectedVnbRoute";
 import NetzbetreiberDashboard from "@/components/dashboard/NetzbetreiberDashboard";
+import { me, type AuthUser } from "@/lib/api/auth";
+import { canAccessVnbDashboard } from "@/lib/vnb-access";
 import { readUserPreferences } from "@/lib/user-preferences";
 
 const GridCheckForm = dynamic(() => import("@/components/GridCheckForm"), {
@@ -49,11 +52,17 @@ const MVP_POINTS = [
 
 export default function Home() {
   const [tab, setTab] = useState<"check" | "dashboard">("check");
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
     const { defaultLandingTab } = readUserPreferences();
-    setTab(defaultLandingTab);
+    setTab(defaultLandingTab === "dashboard" ? "check" : defaultLandingTab);
+    me()
+      .then((nextUser) => setUser(nextUser))
+      .catch(() => setUser(null));
   }, []);
+
+  const showVnbDashboardTab = canAccessVnbDashboard(user);
 
   return (
     <main className="min-h-screen bg-bg text-white">
@@ -196,23 +205,29 @@ export default function Home() {
             >
               Netzanschluss-Check
             </button>
-            <button
-              onClick={() => setTab("dashboard")}
-              className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-medium transition-all sm:flex-none ${
-                tab === "dashboard"
-                  ? "bg-brand-mint text-[#05201C] shadow-lg shadow-brand-mint/25"
-                  : "text-text-muted hover:bg-bg-elev hover:text-white"
-              }`}
-            >
-              Netzbetreiber-Dashboard
-            </button>
+            {showVnbDashboardTab ? (
+              <button
+                onClick={() => setTab("dashboard")}
+                className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-medium transition-all sm:flex-none ${
+                  tab === "dashboard"
+                    ? "bg-brand-mint text-[#05201C] shadow-lg shadow-brand-mint/25"
+                    : "text-text-muted hover:bg-bg-elev hover:text-white"
+                }`}
+              >
+                Netzbetreiber-Dashboard
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         {tab === "check" && <GridCheckForm />}
-        {tab === "dashboard" && <NetzbetreiberDashboard />}
+        {tab === "dashboard" && showVnbDashboardTab ? (
+          <ProtectedVnbRoute>
+            <NetzbetreiberDashboard />
+          </ProtectedVnbRoute>
+        ) : null}
       </div>
     </main>
   );

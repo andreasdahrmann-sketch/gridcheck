@@ -34,6 +34,13 @@ export default function VnbPage() {
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <Link
+                  href="/vnb/kommunikation"
+                  className="inline-flex items-center justify-center rounded-2xl bg-brand-cyan/90 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-brand-cyan"
+                >
+                  NB-Austausch
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+                <Link
                   href="/projects"
                   className="inline-flex items-center justify-center rounded-2xl bg-brand-orange px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-orangeHover"
                 >

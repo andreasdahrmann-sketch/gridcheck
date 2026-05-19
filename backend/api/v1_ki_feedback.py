@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from core.auth import get_current_user, require_admin_user, require_csrf
+from core.vnb_access import assert_verified_netzbetreiber
 from core.errors import AnalysisError
 from db.database import get_db
 from db.models import User
@@ -110,6 +111,8 @@ def post_feedback(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_csrf),
 ):
+    if req.quelle == "netzbetreiber":
+        assert_verified_netzbetreiber(current_user)
     try:
         return create_feedback(
             {

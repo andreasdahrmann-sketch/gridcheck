@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 
 from core.auth import get_current_user, require_csrf
+from core.vnb_access import assert_verified_netzbetreiber
 from db.database import get_db
 from db.models import User
 from services.stakeholder_service import (
@@ -22,9 +23,17 @@ from services.stakeholder_service import (
 router = APIRouter(prefix="/stakeholder", tags=["Stakeholder"])
 
 
-def _require_stakeholder_access(current_user: User, *, allowed_roles: set[str], route_name: str) -> User:
+def _require_stakeholder_access(
+    current_user: User,
+    *,
+    allowed_roles: set[str],
+    route_name: str,
+    require_vnb_verification: bool = False,
+) -> User:
     normalized_role = str(current_user.role or "").strip().lower()
     if normalized_role == "admin" or normalized_role in allowed_roles:
+        if require_vnb_verification:
+            return assert_verified_netzbetreiber(current_user)
         return current_user
     raise HTTPException(
         status_code=403,
@@ -307,6 +316,7 @@ def check_netzbetreiber(
         current_user,
         allowed_roles={"netzbetreiber"},
         route_name="netzbetreiber",
+        require_vnb_verification=True,
     )
     service_data = run_netzbetreiber_check(db, req.model_dump(), actor)
     project_id = service_data["project_id"]

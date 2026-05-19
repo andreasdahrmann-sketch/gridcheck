@@ -81,6 +81,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False, default="endkunde")
+    vnb_verification_status = Column(String, nullable=False, default="none")
     full_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     plan_tier = Column(String, nullable=False, default="free")
@@ -100,6 +101,8 @@ class User(Base):
     conversion_events = relationship("ConversionEvent", back_populates="user")
     billing_entitlements = relationship("BillingEntitlement", foreign_keys="BillingEntitlement.user_id", back_populates="user")
     password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
+    vnb_threads_created = relationship("VnbThread", back_populates="created_by", foreign_keys="VnbThread.created_by_user_id")
+    vnb_messages_sent = relationship("VnbMessage", back_populates="sender", foreign_keys="VnbMessage.sender_user_id")
 
 
 class PasswordResetToken(Base):
@@ -502,6 +505,57 @@ class KiFeedbackRecord(Base):
     revision_hash = Column(String, nullable=True)
     data_json = Column(Text, nullable=False)
 
+    actor = relationship("User", foreign_keys=[actor_user_id])
+
+
+class VnbThread(Base):
+    __tablename__ = "vnb_threads"
+    __table_args__ = (
+        Index("ix_vnb_threads_board_last_message", "board_scope", "last_message_at"),
+        Index("ix_vnb_threads_category", "category"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    board_scope = Column(String(32), nullable=False, default="austausch")
+    title = Column(String(200), nullable=False)
+    category = Column(String(40), nullable=False)
+    target_vnb_region = Column(String(80), nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_message_at = Column(DateTime, nullable=True)
+
+    created_by = relationship("User", back_populates="vnb_threads_created", foreign_keys=[created_by_user_id])
+    messages = relationship("VnbMessage", back_populates="thread", cascade="all, delete-orphan")
+
+
+class VnbMessage(Base):
+    __tablename__ = "vnb_messages"
+    __table_args__ = (Index("ix_vnb_messages_thread_created", "thread_id", "created_at"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    thread_id = Column(Integer, ForeignKey("vnb_threads.id"), nullable=False, index=True)
+    sender_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    thread = relationship("VnbThread", back_populates="messages")
+    sender = relationship("User", back_populates="vnb_messages_sent", foreign_keys=[sender_user_id])
+    audit_entries = relationship("VnbMessageAudit", back_populates="message", cascade="all, delete-orphan")
+
+
+class VnbMessageAudit(Base):
+    __tablename__ = "vnb_message_audit"
+    __table_args__ = (Index("ix_vnb_message_audit_message_created", "message_id", "created_at"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(Integer, ForeignKey("vnb_messages.id"), nullable=False, index=True)
+    event_type = Column(String(40), nullable=False, default="message_created")
+    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    payload_json = Column(Text, nullable=False)
+    checksum = Column(String(64), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    message = relationship("VnbMessage", back_populates="audit_entries")
     actor = relationship("User", foreign_keys=[actor_user_id])
 
 

@@ -11,6 +11,7 @@ from core.config import settings
 from core.rate_limit import enforce_rate_limit
 from db.database import get_db
 from db.models import User
+from core.vnb_access import user_to_vnb_access_fields
 from services.auth_service import (
     complete_password_reset,
     issue_token_pair,
@@ -50,6 +51,20 @@ class UserResponse(BaseModel):
     email: str
     role: str
     full_name: str | None
+    vnb_verification_status: str = "none"
+    netzbetreiber_verified: bool = False
+
+
+def _user_response(user: User) -> UserResponse:
+    fields = user_to_vnb_access_fields(user)
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        role=user.role,
+        full_name=user.full_name,
+        vnb_verification_status=str(fields["vnb_verification_status"]),
+        netzbetreiber_verified=bool(fields["netzbetreiber_verified"]),
+    )
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -65,7 +80,7 @@ class ResetPasswordRequest(BaseModel):
 def register(req: RegisterRequest, db: Session = Depends(get_db)) -> UserResponse:
     enforce_rate_limit(f"auth:register:{req.email.strip().lower()}", limit=10, window_seconds=300)
     user = register_user(db, email=req.email, password=req.password, role=req.role, full_name=req.full_name)
-    return UserResponse(id=user.id, email=user.email, role=user.role, full_name=user.full_name)
+    return _user_response(user)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -150,12 +165,7 @@ def logout(response: Response, _: None = Depends(require_csrf)) -> dict[str, str
 
 @router.get("/me", response_model=UserResponse)
 def me(current_user: User = Depends(get_current_user)) -> UserResponse:
-    return UserResponse(
-        id=current_user.id,
-        email=current_user.email,
-        role=current_user.role,
-        full_name=current_user.full_name,
-    )
+    return _user_response(current_user)
 
 
 @router.post("/forgot-password")

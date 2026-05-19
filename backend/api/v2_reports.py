@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from api.analyze_v2 import AnalyzeRequest
 from core.auth import get_current_user, require_csrf
+from core.vnb_access import assert_verified_netzbetreiber
 from core.rate_limit import enforce_scoped_rate_limit
 from db.database import get_db
 from db.models import (
@@ -711,6 +712,7 @@ def create_vnb_report(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_csrf),
 ) -> dict[str, Any] | Response:
+    assert_verified_netzbetreiber(current_user)
     return _export_stakeholder_report(
         request,
         req,

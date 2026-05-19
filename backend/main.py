@@ -23,8 +23,10 @@ from api.ops_followups import router as ops_followups_router
 from api.projects import router as projects_router
 from api.site_markers import router as site_markers_router
 from api.users import router as users_router
+from api.admin_users import router as admin_users_router
 from api.analytics import router as analytics_router
 from api.contact import router as contact_router
+from api.v1_vnb_comms import router as v1_vnb_comms_router
 from api.v2_reports import router_reports
 
 app = FastAPI(
@@ -100,7 +102,9 @@ app.include_router(ops_followups_router)
 app.include_router(projects_router)
 app.include_router(site_markers_router)
 app.include_router(users_router)
+app.include_router(admin_users_router)
 app.include_router(contact_router)
+app.include_router(v1_vnb_comms_router)
 app.include_router(analytics_router)
 app.include_router(router_reports, prefix="/api")
 
