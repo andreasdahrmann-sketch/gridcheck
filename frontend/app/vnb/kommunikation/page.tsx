@@ -14,8 +14,6 @@ import {
   postVnbThreadMessage,
   VNB_COMMS_CATEGORY_LABELS,
   type VnbCommsCategory,
-  type VnbThreadDetail,
-  type VnbThreadSummary,
 } from "@/lib/api/vnb-comms";
 
 const CATEGORIES: VnbCommsCategory[] = ["kapazitaetshinweis", "redispatch", "infrastruktur", "sonstiges"];
@@ -83,7 +81,6 @@ export default function VnbKommunikationPage() {
   });
 
   const threads = threadsQuery.data ?? [];
-  const activeThread: VnbThreadDetail | VnbThreadSummary | undefined = threadQuery.data ?? threads.find((t) => t.id === selectedId);
 
   const sortedThreads = useMemo(
     () => [...threads].sort((a, b) => String(b.last_message_at || b.created_at).localeCompare(String(a.last_message_at || a.created_at))),
@@ -244,16 +241,14 @@ export default function VnbKommunikationPage() {
                 <p className="text-sm text-text-muted">Lade Nachrichten...</p>
               ) : (
                 <div className="space-y-4">
-                  {activeThread && "messages" in activeThread
-                    ? activeThread.messages.map((msg) => (
+                  {threadQuery.data?.messages.map((msg) => (
                         <article key={msg.id} className="rounded-2xl border border-white/10 bg-black/15 px-4 py-3">
                           <p className="text-xs text-text-muted">
                             Nutzer #{msg.sender_user_id} · {fmt(msg.created_at)}
                           </p>
                           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">{msg.body}</p>
                         </article>
-                      ))
-                    : null}
+                      ))}
                   <div className="border-t border-white/10 pt-4">
                     <label className="block text-sm text-text-muted">Antwort</label>
                     <textarea
