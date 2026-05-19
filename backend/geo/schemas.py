@@ -70,3 +70,43 @@ class PlzLookupResponse(BaseModel):
         ...,
         description="Disclaimer fuer den Konsumenten der API.",
     )
+
+
+class OsmNearbyAsset(BaseModel):
+    """Ein OSM-Infrastrukturhinweis im Umkreis (keine Kapazitaetsaussage)."""
+
+    type: str = Field(..., description="Normalisierter Asset-Typ, z. B. substation, transformer.")
+    name: str | None = Field(default=None, description="Anzeigename aus OSM-Tags, falls vorhanden.")
+    lat: float = Field(..., description="Breitengrad WGS84.")
+    lon: float = Field(..., description="Laengengrad WGS84.")
+    distance_m: float = Field(..., ge=0, description="Luftlinie zum Suchmittelpunkt in Metern.")
+    osm_id: str | None = Field(default=None, description="OSM-Element-ID (node/way/relation).")
+    tags_summary: str | None = Field(
+        default=None,
+        description="Kurzfassung relevanter OSM-Tags ohne Kapazitaets-Claims.",
+    )
+
+
+class OsmNearbyResponse(BaseModel):
+    """Antwort fuer GET /api/v1/geo/osm-nearby."""
+
+    center_lat: float
+    center_lon: float
+    radius_m: int = Field(..., ge=100, le=15_000)
+    plz: str | None = Field(default=None, description="Optionale PLZ-Kontextangabe.")
+    assets: List[OsmNearbyAsset] = Field(default_factory=list)
+    source: str = Field(default="OSM", description="Datenquelle.")
+    data_class: str = Field(default="B", description="Datenklasse gemaess Projektregeln.")
+    confidence: str = Field(default="B", description="Confidence-Klasse der Gesamtaussage.")
+    confidence_score: int = Field(default=60, ge=0, le=100)
+    confidence_geometrisch: int = Field(default=60, ge=0, le=100)
+    confidence_technisch: int = Field(default=45, ge=0, le=100)
+    quelle: str = Field(..., description="Herkunft / Overpass-Instanz.")
+    hinweis: str = Field(..., description="Fachlicher Hinweis ohne Kapazitaets-Claim.")
+    disclaimer: str = Field(..., description="Rechtlicher/technischer Disclaimer.")
+    validierungsstatus: str = Field(
+        ...,
+        description="OK | PARTIAL | ERROR — Verarbeitungszustand, nicht Netz-OK.",
+    )
+    fetched_at: str = Field(..., description="ISO-8601-Zeitstempel der Abfrage (UTC).")
+    cache_hit: bool = Field(default=False, description="True, wenn Antwort aus In-Memory-Cache stammt.")

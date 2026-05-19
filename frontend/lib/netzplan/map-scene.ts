@@ -1,3 +1,4 @@
+import type { OsmNearbyAsset } from "@/lib/api/geo";
 import type { ResolvedProjectLocation } from "@/lib/mapbox/use-project-location";
 import type { GridCheckInput, GridCheckResult } from "@/types";
 
@@ -39,11 +40,40 @@ export interface NetzplanMapSegment {
   points: MapPoint[];
 }
 
+export interface NetzplanOsmAsset {
+  id: string;
+  type: string;
+  label: string;
+  detail: string;
+  position: MapPoint;
+  distanceM: number;
+}
+
+const OSM_TYPE_LABELS: Record<string, string> = {
+  substation: "Umspannwerk",
+  transformer: "Trafo",
+  power_line: "Leitung",
+  support: "Mast",
+  unknown: "Netzobjekt",
+};
+
+export function mapOsmNearbyAssets(assets: OsmNearbyAsset[]): NetzplanOsmAsset[] {
+  return assets.map((asset, index) => ({
+    id: asset.osm_id ?? `osm-${index}`,
+    type: asset.type,
+    label: asset.name ?? OSM_TYPE_LABELS[asset.type] ?? OSM_TYPE_LABELS.unknown,
+    detail: asset.tags_summary ?? "Hinweis aus OpenStreetMap (Datenklasse B).",
+    position: { lat: asset.lat, lng: asset.lon },
+    distanceM: asset.distance_m,
+  }));
+}
+
 export interface NetzplanMapScene {
   center: MapPoint;
   projectLocation: NetzplanProjectLocation;
   nodes: NetzplanMapNode[];
   segments: NetzplanMapSegment[];
+  osmAssets?: NetzplanOsmAsset[];
 }
 
 interface BuildMapSceneArgs {

@@ -16,6 +16,7 @@ import { getMapboxTileUrl } from "@/lib/mapbox/config";
 import type {
   NetzplanMapNode,
   NetzplanMapScene,
+  NetzplanOsmAsset,
   NetzplanProjectLocation,
   NetzplanTone,
 } from "@/lib/netzplan/map-scene";
@@ -63,6 +64,14 @@ const MARKER_LABELS: Record<NetzplanMapNode["kind"], string> = {
   bottleneck: "ENG",
 };
 
+const OSM_MARKER_LABELS: Record<string, string> = {
+  substation: "UWS",
+  transformer: "TRF",
+  power_line: "LTG",
+  support: "MST",
+  unknown: "OSM",
+};
+
 function FitSceneBounds({ scene }: { scene: NetzplanMapScene }) {
   const map = useMap();
 
@@ -71,6 +80,9 @@ function FitSceneBounds({ scene }: { scene: NetzplanMapScene }) {
       [
         [scene.projectLocation.position.lat, scene.projectLocation.position.lng] as [number, number],
         ...scene.nodes.map((node) => [node.position.lat, node.position.lng] as [number, number]),
+        ...(scene.osmAssets ?? []).map(
+          (asset) => [asset.position.lat, asset.position.lng] as [number, number],
+        ),
       ],
     );
     bounds.extend([scene.center.lat, scene.center.lng]);
@@ -134,6 +146,35 @@ function projectSourceLabel(source: NetzplanProjectLocation["source"]): string {
   }
 }
 
+function buildOsmIcon(asset: NetzplanOsmAsset): L.DivIcon {
+  const label = OSM_MARKER_LABELS[asset.type] ?? OSM_MARKER_LABELS.unknown;
+  const size = 38;
+  return divIcon({
+    className: "",
+    html: `
+      <div style="
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        width:${size}px;
+        height:${size}px;
+        border-radius:10px;
+        transform:rotate(45deg);
+        border:2px solid #a78bfa;
+        background:#2e1065;
+        color:#ede9fe;
+        font:700 10px/1 Inter, system-ui, sans-serif;
+        letter-spacing:0.06em;
+        box-shadow:0 0 0 7px rgba(167,139,250,0.2);
+      ">
+        <span style="transform:rotate(-45deg);">${label}</span>
+      </div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
 function buildProjectIcon(projectLocation: NetzplanProjectLocation): L.DivIcon {
   const label = projectSourceLabel(projectLocation.source);
   return divIcon({
@@ -171,6 +212,13 @@ export default function NetzplanLeafletMap({ scene }: { scene: NetzplanMapScene 
     return next;
   }, [scene.nodes]);
   const projectIcon = useMemo(() => buildProjectIcon(scene.projectLocation), [scene.projectLocation]);
+  const osmIcons = useMemo(() => {
+    const next = new Map<string, L.DivIcon>();
+    (scene.osmAssets ?? []).forEach((asset) => {
+      next.set(asset.id, buildOsmIcon(asset));
+    });
+    return next;
+  }, [scene.osmAssets]);
 
   if (!tileUrl) {
     return null;
@@ -291,6 +339,26 @@ export default function NetzplanLeafletMap({ scene }: { scene: NetzplanMapScene 
               <div className="text-sm text-white">{node.detail}</div>
               <div className="text-[11px] text-slate-400">
                 {node.approximate ? "Position heuristisch abgeleitet" : "PLZ-geocodierte Position"}
+              </div>
+            </div>
+          </Tooltip>
+        </Marker>
+      ))}
+
+      {(scene.osmAssets ?? []).map((asset) => (
+        <Marker
+          key={asset.id}
+          position={[asset.position.lat, asset.position.lng]}
+          icon={osmIcons.get(asset.id)!}
+        >
+          <Tooltip direction="top" offset={[0, -16]}>
+            <div className="space-y-1">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-200">
+                OSM · {asset.label}
+              </div>
+              <div className="text-sm text-white">{asset.detail}</div>
+              <div className="text-[11px] text-slate-400">
+                Hinweis aus OSM, nicht verifiziert · ca. {Math.round(asset.distanceM)} m
               </div>
             </div>
           </Tooltip>

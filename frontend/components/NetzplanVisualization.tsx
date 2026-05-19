@@ -16,6 +16,13 @@ import {
   Workflow,
 } from "lucide-react";
 import NetzplanMapPanel from "@/components/netzplan/NetzplanMapPanel";
+import {
+  osmBadgeLabel,
+  osmBadgeTone,
+  useOsmNearby,
+  type OsmNearbyStatus,
+} from "@/lib/api/use-osm-nearby";
+import { useProjectLocation } from "@/lib/mapbox/use-project-location";
 import type { GridCheckInput, GridCheckResult } from "@/types";
 
 type Tone = "good" | "warn" | "critical" | "neutral";
@@ -252,6 +259,7 @@ function buildBadges(
   result: GridCheckResult,
   meta: VisualizationMeta | undefined,
   distanceKm: number | null,
+  osmStatus: OsmNearbyStatus,
 ): PlanBadge[] {
   return [
     { label: "Mapbox-Kartenausschnitt", tone: "neutral" },
@@ -283,8 +291,8 @@ function buildBadges(
       tone: result.n1.dso_daten_vorhanden ? "good" : "warn",
     },
     {
-      label: "OSM-Infrastrukturhinweise: nicht angebunden",
-      tone: "warn",
+      label: osmBadgeLabel(osmStatus),
+      tone: osmBadgeTone(osmStatus),
     },
     ...(meta?.kundentyp
       ? [
@@ -403,6 +411,15 @@ export default function NetzplanVisualization({
   result,
   meta,
 }: NetzplanVisualizationProps) {
+  const locationStatus = useProjectLocation(input.plz, meta?.ort ?? input.ort, input.project_location);
+  const osmStatus = useOsmNearby(
+    locationStatus.kind === "ok" ? locationStatus.data.lat : null,
+    locationStatus.kind === "ok" ? locationStatus.data.lng : null,
+    {
+      enabled: locationStatus.kind === "ok",
+      plz: input.plz,
+    },
+  );
   const distanceKm = pickPositive(input.entfernung_km, result.nvp_entfernung_km);
   const resultTone = toneFromMachbarkeit(result.machbarkeit_stufe);
   const projectTitle =
@@ -414,7 +431,7 @@ export default function NetzplanVisualization({
     input.plz,
   ]).join(" - ");
   const components = buildComponents(input, result, meta);
-  const badges = buildBadges(input, result, meta, distanceKm);
+  const badges = buildBadges(input, result, meta, distanceKm, osmStatus);
   const riskNotes = buildRiskNotes(result);
   const assumptions = buildAssumptions(input, result, distanceKm);
   const disclaimers = buildDisclaimers(result);
@@ -521,6 +538,7 @@ export default function NetzplanVisualization({
             result={result}
             projectTitle={projectTitle}
             ortHint={meta?.ort ?? input.ort}
+            osmStatus={osmStatus}
           />
 
           <div className="space-y-4">

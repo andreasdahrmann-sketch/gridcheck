@@ -6,7 +6,9 @@ import { useMemo } from "react";
 import { usePlzLookup } from "@/lib/api/use-plz-lookup";
 import { hasMapboxToken } from "@/lib/mapbox/config";
 import { useProjectLocation } from "@/lib/mapbox/use-project-location";
-import { buildNetzplanMapScene } from "@/lib/netzplan/map-scene";
+import type { OsmNearbyStatus } from "@/lib/api/use-osm-nearby";
+import { osmBadgeLabel } from "@/lib/api/use-osm-nearby";
+import { buildNetzplanMapScene, mapOsmNearbyAssets } from "@/lib/netzplan/map-scene";
 import type { GridCheckInput, GridCheckResult } from "@/types";
 
 const LeafletMap = dynamic(() => import("./NetzplanLeafletMap"), {
@@ -27,6 +29,7 @@ interface NetzplanMapPanelProps {
   result: GridCheckResult;
   projectTitle: string;
   ortHint?: string;
+  osmStatus: OsmNearbyStatus;
 }
 
 function accuracyLabel(value: string): string {
@@ -68,6 +71,7 @@ export default function NetzplanMapPanel({
   result,
   projectTitle,
   ortHint,
+  osmStatus,
 }: NetzplanMapPanelProps) {
   const mapboxReady = hasMapboxToken();
   const locationStatus = useProjectLocation(input.plz, ortHint ?? input.ort, input.project_location);
@@ -75,13 +79,20 @@ export default function NetzplanMapPanel({
 
   const scene = useMemo(() => {
     if (locationStatus.kind !== "ok") return null;
-    return buildNetzplanMapScene({
+    const base = buildNetzplanMapScene({
       input,
       result,
       projectTitle,
       projectLocation: locationStatus.data,
     });
-  }, [input, locationStatus, projectTitle, result]);
+    if (osmStatus.kind !== "ok" || osmStatus.data.assets.length === 0) {
+      return base;
+    }
+    return {
+      ...base,
+      osmAssets: mapOsmNearbyAssets(osmStatus.data.assets),
+    };
+  }, [input, locationStatus, osmStatus, projectTitle, result]);
 
   const vnbSummary =
     plzLookupStatus.kind === "ok"
@@ -117,6 +128,18 @@ export default function NetzplanMapPanel({
           </span>
           <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-500/10 px-3 py-1 text-amber-100">
             Datenquelle {result.daten_confidence}
+          </span>
+          <span
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 ${
+              osmStatus.kind === "ok" && osmStatus.data.assets.length > 0
+                ? "border-violet-400/30 bg-violet-500/10 text-violet-100"
+                : osmStatus.kind === "error"
+                  ? "border-rose-400/25 bg-rose-500/10 text-rose-100"
+                  : "border-white/10 bg-white/5 text-text-muted"
+            }`}
+          >
+            <Zap className="h-3.5 w-3.5" />
+            {osmBadgeLabel(osmStatus)}
           </span>
         </div>
       </div>
@@ -156,6 +179,22 @@ export default function NetzplanMapPanel({
                 <div className="font-semibold text-white">Kartenausschnitt konnte nicht geladen werden.</div>
                 <p className="mt-2 leading-6">{locationStatus.message}</p>
               </div>
+            </div>
+          )}
+
+          {mapboxReady && scene && osmStatus.kind === "loading" && (
+            <div
+              className="border-b border-violet-400/20 bg-violet-500/10 px-4 py-2 text-center text-xs text-violet-100"
+              role="status"
+              aria-live="polite"
+            >
+              OSM-Infrastrukturhinweise werden geladen...
+            </div>
+          )}
+
+          {mapboxReady && scene && osmStatus.kind === "error" && (
+            <div className="border-b border-rose-400/20 bg-rose-500/10 px-4 py-2 text-center text-xs text-rose-100">
+              {osmStatus.message}
             </div>
           )}
 
@@ -251,6 +290,12 @@ export default function NetzplanMapPanel({
                   description: "Orange und Rot markieren Trafo-, Leitungs- oder Trassenstress im priorisierten Abschnitt.",
                   color: "bg-rose-400",
                 },
+                {
+                  label: "OSM-Nahbauten",
+                  description:
+                    "Violette Rautenmarker aus OpenStreetMap (Datenklasse B). Hinweis, nicht verifiziert — keine Kapazitaetsaussage.",
+                  color: "bg-violet-400",
+                },
               ].map((item) => (
                 <div key={item.label} className="rounded-2xl border border-white/10 bg-black/10 px-3 py-3">
                   <div className="flex items-center gap-2 text-white">
@@ -284,10 +329,21 @@ export default function NetzplanMapPanel({
               <li className="flex gap-2">
                 <span className="text-brand-orange">•</span>
                 <span>
-                  OSM-Infrastrukturhinweise (Trafo, Umspannwerk) sind im MVP noch nicht als Kartenebene
-                  angebunden – nur der Projektstandort ist georeferenziert.
+                  {osmStatus.kind === "ok"
+                    ? osmStatus.data.hinweis
+                    : osmStatus.kind === "loading"
+                      ? "OSM-Infrastrukturhinweise werden fuer den Kartenausschnitt geladen."
+                      : osmStatus.kind === "error"
+                        ? osmStatus.message
+                        : "OSM-Nahbauten erscheinen, sobald der Projektstandort aufgeloest ist."}
                 </span>
               </li>
+              {osmStatus.kind === "ok" && (
+                <li className="flex gap-2">
+                  <span className="text-brand-orange">•</span>
+                  <span>{osmStatus.data.disclaimer}</span>
+                </li>
+              )}
             </ul>
           </div>
         </div>
