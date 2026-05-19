@@ -100,6 +100,10 @@ export default function VnbBanner({ plz }: Props) {
         Confidence {data.confidence} - Quelle: {data.quelle} - Stand {data.stand}.
         <br />
         {data.hinweis}
+        <br />
+        <span className="text-amber-200/90">
+          TAB des VNB prüfen — Abweichungen von Richtwerten in dieser Vorprüfung sind möglich und üblich.
+        </span>
       </div>
     </div>
   );

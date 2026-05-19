@@ -2,6 +2,7 @@
 
 import type { GridCalculationV2 } from "@/lib/schemas/grid-calculation";
 import { feasibilityStatusLabel } from "@/lib/schemas/grid-calculation";
+import { FEED_IN_CLASS_LABELS } from "@/lib/plant-types";
 
 type Props = {
   data: GridCalculationV2;
@@ -34,6 +35,8 @@ export default function GridCalculationV2Panel({ data, sectionClass, sectionTitl
   const networkFb = data.network_feedback_screening;
   const coincidence = data.coincidence_factor_screening;
   const eeg = data.eeg_feed_in_screening;
+  const reactive = data.reactive_power_screening;
+  const persp = data.projektierer_perspective;
 
   return (
     <div className={sectionClass}>
@@ -127,8 +130,13 @@ export default function GridCalculationV2Panel({ data, sectionClass, sectionTitl
         ))}
       </ScreeningBlock>
 
-      {eeg.applicable && (eeg.warnings.length > 0 || eeg.hints.length > 0) ? (
+      {eeg.applicable && (eeg.warnings.length > 0 || eeg.hints.length > 0 || eeg.feed_in_management_class) ? (
         <ScreeningBlock title="EEG 2023 / Einspeisemanagement" disclaimer={eeg.disclaimer}>
+          {eeg.feed_in_management_class ? (
+            <p className="mt-2 text-sm text-gray-200">
+              Klasse: {FEED_IN_CLASS_LABELS[eeg.feed_in_management_class] ?? eeg.feed_in_management_class}
+            </p>
+          ) : null}
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-100">
             {eeg.warnings.map((w) => (
               <li key={w}>{w}</li>
@@ -139,6 +147,52 @@ export default function GridCalculationV2Panel({ data, sectionClass, sectionTitl
               </li>
             ))}
           </ul>
+        </ScreeningBlock>
+      ) : null}
+
+      {reactive.applicable ? (
+        <ScreeningBlock title="Blindleistung / Q(U)" disclaimer={reactive.disclaimer}>
+          <ul className="mt-2 space-y-2">
+            {reactive.checklist.map((item) => (
+              <li key={item.topic} className="rounded border border-white/5 bg-black/20 px-3 py-2 text-sm">
+                <span className="font-medium text-white">{item.topic}</span>
+                <p className="mt-1 text-xs text-gray-400">{item.note}</p>
+              </li>
+            ))}
+          </ul>
+        </ScreeningBlock>
+      ) : null}
+
+      {persp ? (
+        <ScreeningBlock title="Projektierer: Anlage & Ablauf" disclaimer={persp.disclaimer}>
+          <p className="mt-2 text-sm text-gray-200">
+            {persp.plant_type_label} ? AC {fmt(persp.ac_kw, 0)} kW
+            {persp.dc_kwp ? `, DC ${fmt(persp.dc_kwp, 0)} kWp` : ""}
+            {persp.overbuild_ratio ? ` (DC/AC ? ${fmt(persp.overbuild_ratio, 2)})` : ""}
+            , Screening {fmt(persp.screening_power_kw, 0)} kW, cos ? {fmt(persp.cos_phi, 2)}
+          </p>
+          <p className="mt-2 text-xs text-gray-400">
+            Gleichzeitigkeit {fmt(persp.simultaneity_factor * 100, 0)} % ? nur Einzelprojekt (
+            {typeof persp.kumulation_warning?.message === "string" ? persp.kumulation_warning.message : ""}
+            )
+          </p>
+          <div className="mt-3 rounded border border-white/5 bg-black/20 p-3 text-sm">
+            <div className="text-xs uppercase text-gray-400">Zeitplan (heuristisch)</div>
+            <p className="mt-1 font-medium text-white">{persp.process_timeline.estimated_total}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-300">
+              {persp.process_timeline.phases.map((ph) => (
+                <li key={ph.phase}>
+                  {ph.phase}: {ph.duration_weeks} ({ph.responsible})
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="mt-2 text-xs text-amber-100">{persp.bkz_hint.hint}</p>
+          <p className="mt-1 text-xs text-gray-400">{persp.nvp_recommendation.nearest_node_hint}</p>
+          <p className="mt-1 text-xs text-gray-500">{persp.nvp_recommendation.disclaimer}</p>
+          {persp.tab_disclaimer.applicable ? (
+            <p className="mt-2 text-xs text-blue-200">{persp.tab_disclaimer.message}</p>
+          ) : null}
         </ScreeningBlock>
       ) : null}
 

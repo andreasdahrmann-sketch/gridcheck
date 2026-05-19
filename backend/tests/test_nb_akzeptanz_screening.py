@@ -53,10 +53,11 @@ class TestTransformerAssessment:
 
 class TestEegScreening:
     def test_pv_30kw_eeg_25kw_warning(self):
-        inp = _base_input(power_kw=30.0, project_type="generation")
+        inp = _base_input(power_kw=30.0, ac_kw=30.0, project_type="generation")
         result = calculate_grid_connection(inp)
         eeg = result.eeg_feed_in_screening
         assert eeg.applicable is True
+        assert eeg.feed_in_management_class == "remote_control"
         assert any("§ 9 EEG" in w or "25" in w for w in eeg.warnings)
         assert any("Fernsteuer" in d for d in eeg.required_documents + eeg.hints + eeg.warnings)
 

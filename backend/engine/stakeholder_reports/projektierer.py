@@ -72,6 +72,8 @@ def build_projektierer_report(engine_result: dict[str, Any]) -> dict[str, Any]:
     route_environment = engine_result.get("route_environment", {})
     stakeholder = engine_result.get("stakeholder_bewertung", {})
     transparenz = engine_result.get("transparenz", {})
+    v2 = engine_result.get("grid_calculation_v2") or {}
+    persp = v2.get("projektierer_perspective") if isinstance(v2, dict) else None
     scope_meta = resolve_report_scope_meta(engine_result)
 
     nennspannung = float(eingabe.get("nennspannung", 20.0))
@@ -80,6 +82,21 @@ def build_projektierer_report(engine_result: dict[str, Any]) -> dict[str, Any]:
         {"norm_id": n.norm_id, "titel": n.titel, "stand": n.stand, "kategorie": n.kategorie}
         for n in normen
     ]
+
+    extra_auflagen: list[str] = []
+    if isinstance(persp, dict):
+        tl = persp.get("process_timeline") or {}
+        if isinstance(tl, dict) and tl.get("estimated_total"):
+            extra_auflagen.append(f"Zeitplan (heuristisch): {tl['estimated_total']}")
+        bkz = persp.get("bkz_hint") or {}
+        if isinstance(bkz, dict) and bkz.get("hint"):
+            extra_auflagen.append(str(bkz["hint"]))
+        tab = persp.get("tab_disclaimer") or {}
+        if isinstance(tab, dict) and tab.get("message"):
+            extra_auflagen.append(str(tab["message"]))
+        kum = persp.get("kumulation_warning") or {}
+        if isinstance(kum, dict) and kum.get("message"):
+            extra_auflagen.append(str(kum["message"]))
 
     dto = ProjektiererReportDTO(
         report_type="projektierer",
@@ -101,7 +118,7 @@ def build_projektierer_report(engine_result: dict[str, Any]) -> dict[str, Any]:
         anschlussart=str(eingabe.get("anschlussart", "Unbekannt")),
         entscheidung=str(fazit.get("entscheidung", "C")),
         geht=str(fazit.get("entscheidung", "C")) != "C",
-        auflagen=[str(w) for w in warnungen if isinstance(w, str)],
+        auflagen=[str(w) for w in warnungen if isinstance(w, str)] + extra_auflagen,
         n1_status="BESTANDEN" if bool(n1.get("n1_sicher")) else "NICHT BESTANDEN",
         n1_detail=str(n1.get("detail_text") or n1.get("topologie_text", "")),
         empfohlene_massnahmen=[str(x) for x in empfehlungen if isinstance(x, str)],

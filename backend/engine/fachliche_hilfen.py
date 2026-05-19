@@ -149,29 +149,23 @@ def estimate_cable_length_km(eingabe: dict) -> dict[str, Any]:
 
 
 def resolve_cos_phi_for_calculation(eingabe: dict) -> dict[str, Any]:
-    """Use explicit cos φ or role-based conservative default with documented assumption."""
-    explicit = _f(eingabe.get("cos_phi"))
-    if explicit is not None and 0.8 <= explicit <= 1.0:
+    """Use explicit cos φ or plant-type default with documented assumption."""
+    from engine.plant_types import resolve_plant_context
+
+    ctx = resolve_plant_context(eingabe)
+    if ctx.power_factor_source == "nutzer":
         return {
-            "cos_phi": round(explicit, 4),
+            "cos_phi": ctx.power_factor,
             "quelle": "nutzer",
-            "annahme": f"cos φ = {explicit} aus Projekteingabe.",
+            "annahme": f"cos φ = {ctx.power_factor} aus Projekteingabe.",
         }
 
-    typ = _normalize_anlagentyp(eingabe)
-    anschluss = str(eingabe.get("anschlussart") or "").strip()
-    if anschluss == "Entnahme":
-        typ = "entnahme"
-    elif anschluss == "Einspeisung":
-        typ = typ if typ not in ("", "default") else "einspeisung"
-
-    default = COS_PHI_DEFAULTS.get(typ, COS_PHI_DEFAULTS["default"])
     return {
-        "cos_phi": default,
+        "cos_phi": ctx.power_factor,
         "quelle": "rolle_default",
         "annahme": (
-            f"cos φ = {default} als konservativer Standardwert für Anlagentyp '{typ}' "
-            "(keine explizite Eingabe). Spannungsfall und Scheinleistung sind damit vorläufig."
+            f"cos φ = {ctx.power_factor} als Standard für Anlagentyp '{ctx.plant_type.value}' "
+            f"({ctx.config.label_de}, keine explizite Eingabe). Spannungsfall und Scheinleistung vorläufig."
         ),
     }
 

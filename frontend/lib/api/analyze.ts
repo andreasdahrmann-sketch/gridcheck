@@ -244,6 +244,16 @@ function mapAnlagentyp(t: GridCheckInput["anlagentyp"]): string {
   return t.toUpperCase();
 }
 
+function mapPlantType(input: GridCheckInput): string | undefined {
+  if (input.plant_type) {
+    return input.plant_type;
+  }
+  if (input.anlagentyp === "solar") return "pv";
+  if (input.anlagentyp === "wind") return "wind";
+  if (input.anlagentyp === "batterie") return "bess";
+  return undefined;
+}
+
 function mapProjectComponentType(componentType: string): string {
   switch (componentType) {
     case "pv":
@@ -759,8 +769,8 @@ function mapResponseToUi(res: any, input: GridCheckInput): GridCheckResult {
 }
 
 export function buildAnalyzePayload(input: GridCheckInput): Record<string, unknown> {
-  const pMw = finitePositive(input.anschlussleistung_kw);
-  const leistung_mw = pMw !== undefined ? pMw / 1000 : 0.001;
+  const acKw = finitePositive(input.ac_kw ?? input.anschlussleistung_kw);
+  const leistung_mw = acKw !== undefined ? acKw / 1000 : 0.001;
   const backendTopologie = mapTopologieToBackend(input.topologie);
 
   const payload: Record<string, unknown> = {
@@ -770,6 +780,7 @@ export function buildAnalyzePayload(input: GridCheckInput): Record<string, unkno
     entfernung_km: resolveEntfernungKm(input.entfernung_km),
     anschlussart: mapRichtung(input.richtung),
     anlagentyp: mapAnlagentyp(input.anlagentyp),
+    plant_type: mapPlantType(input),
     plz: input.plz?.trim() || undefined,
     ort: input.ort?.trim() || undefined,
     standort: input.project_location?.address_hint?.trim() || input.ort?.trim() || undefined,
@@ -778,6 +789,18 @@ export function buildAnalyzePayload(input: GridCheckInput): Record<string, unkno
     foerderfrist: input.foerderfrist ?? undefined,
     baugenehmigung_vorhanden: input.baugenehmigung_vorhanden ?? false,
     cos_phi: resolveCosPhi(input),
+    cos_phi_known: input.cos_phi_known ?? undefined,
+    existing_connection: input.existing_connection ?? undefined,
+    network_form: input.network_form ?? undefined,
+    inbetriebnahme: input.inbetriebnahme ?? undefined,
+    foerderung: input.foerderung ?? undefined,
+    flaeche_ha: finitePositive(input.flaeche_ha),
+    dc_kwp: finitePositive(input.dc_kwp),
+    dc_power_kwp: finitePositive(input.dc_kwp),
+    ac_kw: acKw,
+    ac_power_kw: acKw,
+    wr_count: input.wr_count,
+    eigenverbrauch_pct: finiteNonNegative(input.eigenverbrauch_pct),
     parallele_systeme: 1,
     redundanz: backendTopologie !== "stich" && backendTopologie !== "unbekannt",
     p_kw: finitePositive(input.anschlussleistung_kw),

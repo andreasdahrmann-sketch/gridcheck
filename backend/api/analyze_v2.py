@@ -165,6 +165,26 @@ class AnalyzeRequest(BaseModel):
 
     # Optionaler Basiskontext
     anlagentyp: str | None = Field(default="PV")
+    plant_type: Literal[
+        "pv",
+        "wind",
+        "bess",
+        "hybrid_pv_bess",
+        "hybrid",
+        "chp",
+        "hydro",
+        "consumption",
+    ] | None = None
+    dc_kwp: float | None = Field(default=None, gt=0, le=2_000_000)
+    ac_kw: float | None = Field(default=None, gt=0, le=2_000_000)
+    wr_count: int | None = Field(default=None, ge=1, le=500)
+    eigenverbrauch_pct: float | None = Field(default=None, ge=0, le=100)
+    cos_phi_known: bool | None = None
+    existing_connection: bool | None = None
+    network_form: Literal["radial", "ring", "meshed", "unknown"] | None = None
+    inbetriebnahme: str | None = Field(default=None, max_length=40)
+    foerderung: str | None = Field(default=None, max_length=200)
+    flaeche_ha: float | None = Field(default=None, gt=0, le=100_000)
     plz: str | None = Field(default=None)
     ort: str | None = Field(default=None)
     standort: str | None = Field(default=None, max_length=300)

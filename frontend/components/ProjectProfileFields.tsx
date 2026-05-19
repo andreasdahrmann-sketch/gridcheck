@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import AddressGeocoder, { type AddressGeocodeSelection } from "@/components/mapbox/AddressGeocoder";
+import { PLANT_TYPE_OPTIONS, plantTypeDefaults } from "@/lib/plant-types";
 import type {
   EnvironmentalRouteInput,
   GridCheckInput,
+  PlantTypeId,
   N1FeederInput,
   N1TransformerInput,
   NetzanschlusspunktInput,
@@ -171,8 +173,182 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
   const removeAbgang = (index: number) =>
     patchUmspannwerk({ abgaenge: (umspannwerk.abgaenge ?? []).filter((_, currentIndex) => currentIndex !== index) });
 
+  const plantType = value.plant_type;
+  const showDcAc =
+    plantType === "pv" || plantType === "hybrid_pv_bess" || value.anlagentyp === "solar";
+
   return (
     <div className="space-y-4">
+      <div className={sectionClass}>
+        <h3 className={titleClass}>Anlage & Netz (Projektierer)</h3>
+        <div className={`grid ${compact ? "md:grid-cols-2" : "md:grid-cols-3"} gap-3`}>
+          <div>
+            <label className={labelClass}>Anlagentyp</label>
+            <select
+              className={selectFieldClass}
+              value={plantType ?? ""}
+              onChange={(e) => {
+                const next = (e.target.value || undefined) as PlantTypeId | undefined;
+                const defaults = plantTypeDefaults(next);
+                const patchDelta: Partial<GridCheckInput> = {
+                  plant_type: next,
+                  cos_phi: defaults.defaultPowerFactor,
+                  cos_phi_known: false,
+                };
+                if (next === "pv") patchDelta.anlagentyp = "solar";
+                if (next === "wind") patchDelta.anlagentyp = "wind";
+                if (next === "bess") patchDelta.anlagentyp = "batterie";
+                if (next === "consumption") patchDelta.richtung = "bezug";
+                patch(patchDelta);
+              }}
+            >
+              <option value="">-- Aus Anlagentyp ableiten --</option>
+              {PLANT_TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>AC-Anschlussleistung (kW)</label>
+            <input
+              type="number"
+              className={inputClass}
+              value={value.ac_kw ?? value.anschlussleistung_kw ?? ""}
+              onChange={(e) => {
+                const kw = e.target.value ? Number(e.target.value) : undefined;
+                patch({ ac_kw: kw, anschlussleistung_kw: kw ?? value.anschlussleistung_kw });
+              }}
+            />
+          </div>
+          {showDcAc ? (
+            <div>
+              <label className={labelClass}>DC-Leistung (kWp, optional)</label>
+              <input
+                type="number"
+                className={inputClass}
+                value={value.dc_kwp ?? ""}
+                onChange={(e) => patch({ dc_kwp: e.target.value ? Number(e.target.value) : undefined })}
+              />
+            </div>
+          ) : null}
+          <div>
+            <label className={labelClass}>Wechselrichter (optional)</label>
+            <input
+              type="number"
+              min={1}
+              className={inputClass}
+              value={value.wr_count ?? ""}
+              onChange={(e) => patch({ wr_count: e.target.value ? Number(e.target.value) : undefined })}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Eigenverbrauch (% , optional)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              className={inputClass}
+              value={value.eigenverbrauch_pct ?? ""}
+              onChange={(e) =>
+                patch({ eigenverbrauch_pct: e.target.value ? Number(e.target.value) : undefined })
+              }
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Netzform (Annahme)</label>
+            <select
+              className={selectFieldClass}
+              value={value.network_form ?? ""}
+              onChange={(e) =>
+                patch({
+                  network_form: e.target.value
+                    ? (e.target.value as GridCheckInput["network_form"])
+                    : undefined,
+                })
+              }
+            >
+              <option value="">-- offen --</option>
+              <option value="radial">Strahl / radial</option>
+              <option value="ring">Ring</option>
+              <option value="meshed">Vermascht</option>
+              <option value="unknown">Unbekannt</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Inbetriebnahme (optional)</label>
+            <input
+              type="month"
+              className={inputClass}
+              value={value.inbetriebnahme ?? ""}
+              onChange={(e) => patch({ inbetriebnahme: e.target.value || undefined })}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Foerderung (optional)</label>
+            <input
+              className={inputClass}
+              value={value.foerderung ?? ""}
+              onChange={(e) => patch({ foerderung: e.target.value || undefined })}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Flaeche (ha, optional)</label>
+            <input
+              type="number"
+              step="0.1"
+              className={inputClass}
+              value={value.flaeche_ha ?? ""}
+              onChange={(e) => patch({ flaeche_ha: e.target.value ? Number(e.target.value) : undefined })}
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-200 md:col-span-2">
+            <input
+              type="checkbox"
+              className={checkboxClass}
+              checked={Boolean(value.cos_phi_known)}
+              onChange={(e) => patch({ cos_phi_known: e.target.checked })}
+            />
+            cos φ bekannt / vom Hersteller vorgegeben
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-200 md:col-span-2">
+            <input
+              type="checkbox"
+              className={checkboxClass}
+              checked={Boolean(value.existing_connection)}
+              onChange={(e) => patch({ existing_connection: e.target.checked })}
+            />
+            Bestehender Netzanschluss vorhanden
+          </label>
+        </div>
+        <p className={helperTextClass}>
+          Netzberechnung nutzt AC-Leistung am Anschluss. DC/AC dient der Transparenz, nicht der Kapazitätsaussage.
+        </p>
+        <div className="mt-3 overflow-x-auto rounded-xl border border-white/10">
+          <table className="min-w-full text-left text-xs text-gray-300">
+            <thead className="bg-black/20 text-[10px] uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-2 py-2">Typ</th>
+                <th className="px-2 py-2">cos φ</th>
+                <th className="px-2 py-2">Gleichz.</th>
+                <th className="px-2 py-2">Hinweis</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {PLANT_TYPE_OPTIONS.map((row) => (
+                <tr key={row.value}>
+                  <td className="px-2 py-1.5 font-medium text-white">{row.label}</td>
+                  <td className="px-2 py-1.5">{row.defaultPowerFactor}</td>
+                  <td className="px-2 py-1.5">{row.defaultSimultaneity}</td>
+                  <td className="px-2 py-1.5 text-gray-400">{row.hint}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className={sectionClass}>
         <h3 className={titleClass}>Stakeholder & Projektkontext</h3>
         <div className={`grid ${compact ? "md:grid-cols-2" : "md:grid-cols-3"} gap-3`}>

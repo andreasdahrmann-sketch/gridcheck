@@ -133,11 +133,90 @@ export const normReferenceSchema = z.object({
 export const eegFeedInScreeningSchema = z.object({
   applicable: z.boolean(),
   power_kw: z.number(),
+  feed_in_management_class: z.enum(["none", "remote_control", "direct_marketing"]).optional().nullable(),
   remote_control_threshold_kw: z.number().optional(),
   direct_marketing_hint_threshold_kw: z.number().optional(),
   warnings: z.array(z.string()),
   required_documents: z.array(z.string()),
   hints: z.array(z.string()),
+  disclaimer: z.string(),
+});
+
+export const reactivePowerScreeningSchema = z.object({
+  applicable: z.boolean(),
+  power_kw: z.number(),
+  threshold_kw: z.number(),
+  checklist: z.array(
+    z.object({
+      topic: z.string(),
+      norm_reference: z.string(),
+      status: z.enum(["requires_verification", "requires_study", "requires_configuration"]),
+      note: z.string(),
+    }),
+  ),
+  warnings: z.array(z.string()),
+  required_documents: z.array(z.string()),
+  disclaimer: z.string(),
+});
+
+export const projektiererPerspectiveSchema = z.object({
+  plant_type: z.string(),
+  plant_type_label: z.string(),
+  dc_kwp: z.number().optional().nullable(),
+  ac_kw: z.number(),
+  overbuild_ratio: z.number().optional().nullable(),
+  screening_power_kw: z.number(),
+  cos_phi: z.number(),
+  cos_phi_source: z.enum(["nutzer", "plant_default"]),
+  power_factor: z.number().optional(),
+  power_factor_source: z.enum(["nutzer", "plant_default"]).optional(),
+  simultaneity_factor: z.number(),
+  simultaneity_note: z.string().optional().nullable(),
+  reactive_power_mode: z
+    .enum(["fixed_cos_phi", "cos_phi_p", "q_u", "q_setpoint", "bidirectional"])
+    .optional()
+    .nullable(),
+  feed_in_profile_note: z.string().optional().nullable(),
+  feed_in_management_class: z.enum(["none", "remote_control", "direct_marketing"]),
+  process_timeline: z.object({
+    estimated_total: z.string(),
+    phases: z.array(
+      z.object({
+        phase: z.string(),
+        duration_weeks: z.string(),
+        responsible: z.enum(["applicant", "network_operator", "planner"]),
+        note: z.string().optional().nullable(),
+      }),
+    ),
+    disclaimer: z.string(),
+  }),
+  bkz_hint: z.object({
+    applicable: z.boolean(),
+    qualitative_band: z.enum(["niedrig", "mittel", "hoch", "unbekannt"]),
+    norm_reference: z.string(),
+    hint: z.string(),
+    disclaimer: z.string(),
+  }),
+  nvp_recommendation: z.object({
+    applicable: z.boolean(),
+    suggested_voltage_level: z.string(),
+    nearest_node_hint: z.string(),
+    cable_length_estimate_km: z.number(),
+    cable_length_note: z.string(),
+    plant_type: z.string(),
+    ac_kw: z.number(),
+    disclaimer: z.string(),
+  }),
+  tab_disclaimer: z.object({
+    applicable: z.boolean(),
+    plz: z.string().optional().nullable(),
+    vnb_name: z.string().optional().nullable(),
+    message: z.string(),
+    disclaimer: z.string(),
+  }),
+  kumulation_warning: z.record(z.unknown()).optional().nullable(),
+  scenario_comparison_note: z.record(z.unknown()).optional().nullable(),
+  reactive_power_threshold_kw: z.number(),
   disclaimer: z.string(),
 });
 
@@ -163,6 +242,8 @@ export const gridCalculationV2Schema = z.object({
   coincidence_factor_screening: coincidenceFactorScreeningSchema,
   norm_references_applied: z.array(normReferenceSchema),
   eeg_feed_in_screening: eegFeedInScreeningSchema,
+  reactive_power_screening: reactivePowerScreeningSchema,
+  projektierer_perspective: projektiererPerspectiveSchema.optional().nullable(),
 });
 
 export type GridCalculationV2 = z.infer<typeof gridCalculationV2Schema>;

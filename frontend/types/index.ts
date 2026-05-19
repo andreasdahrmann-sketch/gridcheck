@@ -2,6 +2,14 @@
 // Zentrale Typdefinitionen GridCheck
 
 export type Anlagentyp = "solar" | "wind" | "batterie" | "waermepumpe" | "ladepark" | "sonstiges";
+export type PlantTypeId =
+  | "pv"
+  | "wind"
+  | "bess"
+  | "hybrid_pv_bess"
+  | "chp"
+  | "hydro"
+  | "consumption";
 export type Richtung = "einspeisung" | "bezug" | "bidirektional";
 export type Spannungsebene = "NS" | "MS" | "HS";
 export type Topologie =
@@ -132,6 +140,17 @@ export interface GridCheckInput {
   plz: string;
   ort?: string;
   anlagentyp: Anlagentyp;
+  plant_type?: PlantTypeId;
+  dc_kwp?: number;
+  ac_kw?: number;
+  wr_count?: number;
+  eigenverbrauch_pct?: number;
+  cos_phi_known?: boolean;
+  existing_connection?: boolean;
+  network_form?: "radial" | "ring" | "meshed" | "unknown";
+  inbetriebnahme?: string;
+  foerderung?: string;
+  flaeche_ha?: number;
   richtung: Richtung;
   anschlussleistung_kw: number;
   cos_phi: number;

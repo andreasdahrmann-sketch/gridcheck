@@ -1623,6 +1623,16 @@ def berechne_netzanschluss(eingabe, dry_run=False, revision_context=None):
     cable_info = estimate_cable_length_km(eingabe)
     entfernung_km = float(cable_info['entfernung_km'])
     eingabe['entfernung_km'] = entfernung_km
+    from engine.plant_types import resolve_plant_context
+
+    plant_ctx = resolve_plant_context(eingabe)
+    eingabe['plant_type'] = plant_ctx.plant_type.value
+    eingabe['ac_kw'] = plant_ctx.ac_kw
+    if plant_ctx.dc_kwp is not None:
+        eingabe['dc_kwp'] = plant_ctx.dc_kwp
+    if plant_ctx.overbuild_ratio is not None:
+        eingabe['dc_ac_ratio'] = plant_ctx.overbuild_ratio
+
     cos_phi_info = resolve_cos_phi_for_calculation(eingabe)
     cos_phi = float(cos_phi_info['cos_phi'])
     eingabe['cos_phi'] = cos_phi

@@ -34,9 +34,12 @@ from engine.nb_akzeptanz_screening import (
     screen_eeg_feed_in,
     screen_network_feedback,
     screen_protection_concept,
+    screen_reactive_power,
 )
+from engine.plant_types import resolve_plant_context
+from engine.projektierer_output import build_projektierer_perspective
 
-CALCULATION_VERSION = "2.2.0"
+CALCULATION_VERSION = "2.3.0"
 
 THRESHOLDS = {
     "voltage_drop": {
@@ -109,22 +112,20 @@ def _map_topology(topologie: str | None) -> str:
     return mapping.get(str(topologie or "").strip().lower(), "unknown")
 
 
+def _effective_screening_kw(input_data: GridConnectionInput) -> float:
+    return input_data.screening_power_kw or input_data.power_kw
+
+
 def grid_connection_input_from_engine(eingabe: dict[str, Any]) -> GridConnectionInput:
     """Map legacy engine eingabe dict to GridConnectionInput v2."""
     u_kv = float(eingabe.get("nennspannung", 20))
     voltage_level = _voltage_level_from_kv(u_kv)
-    p_kw = float(eingabe.get("leistung_mw", 0)) * 1000.0
+    plant_ctx = resolve_plant_context(eingabe, voltage_level=voltage_level)  # type: ignore[arg-type]
+    ac_kw = plant_ctx.ac_kw
 
-    anschluss = str(eingabe.get("anschlussart", "Einspeisung"))
-    if anschluss == "Entnahme":
-        project_type = "consumption"
-    elif anschluss == "Speicher":
-        project_type = "storage"
-    else:
-        project_type = "generation"
-
+    project_type = plant_ctx.config.project_type
     components = eingabe.get("project_components") or []
-    if isinstance(components, list) and len(components) > 1:
+    if isinstance(components, list) and len(components) > 1 and project_type != "mixed":
         project_type = "mixed"
 
     leitungstyp = str(eingabe.get("leitungstyp", "NA2XS2Y150"))
@@ -158,12 +159,29 @@ def grid_connection_input_from_engine(eingabe: dict[str, Any]) -> GridConnection
         eingabe.get("bestand_trafo_auslastung", eingabe.get("bestand_auslastung_prozent")),
     )
 
+    cos_known = eingabe.get("cos_phi_known")
+    if cos_known is None:
+        cos_known = plant_ctx.power_factor_source == "nutzer"
+
+    topo = _map_topology(eingabe.get("topologie"))
+
     return GridConnectionInput(
         project_type=project_type,  # type: ignore[arg-type]
-        power_kw=p_kw,
-        power_factor=float(eingabe.get("cos_phi", 0.95)),
+        plant_type=plant_ctx.plant_type.value,  # type: ignore[arg-type]
+        power_kw=ac_kw,
+        screening_power_kw=plant_ctx.screening_power_kw,
+        dc_kwp=plant_ctx.dc_kwp,
+        ac_kw=ac_kw,
+        simultaneity_factor=plant_ctx.simultaneity_factor,
+        reactive_power_mode=plant_ctx.reactive_power_mode,
+        power_factor=plant_ctx.power_factor,
         voltage_level=voltage_level,  # type: ignore[arg-type]
         connection_type="three_phase",
+        cos_phi_known=bool(cos_known) if cos_known is not None else None,
+        existing_connection=bool(eingabe.get("existing_connection"))
+        if eingabe.get("existing_connection") is not None
+        else None,
+        network_form=topo,  # type: ignore[arg-type]
         cable_length_km=entfernung,
         cable_length_source=cable_source,  # type: ignore[arg-type]
         cable_cross_section_mm2=cross_section,
@@ -173,7 +191,7 @@ def grid_connection_input_from_engine(eingabe: dict[str, Any]) -> GridConnection
         transformer_load_percent=float(trafo_load) if trafo_load is not None else None,
         transformer_impedance_percent=float(trafo_uk) if trafo_uk else None,
         network_short_circuit_mva=float(sk) if sk else None,
-        grid_topology=_map_topology(eingabe.get("topologie")),  # type: ignore[arg-type]
+        grid_topology=topo,  # type: ignore[arg-type]
         coordinates=coords,
         network_operator=eingabe.get("netzbetreiber"),
     )
@@ -187,12 +205,13 @@ def calculate_voltage_drop(
     u_n_v = u_n_kv * 1000.0
     cos_phi = input_data.power_factor
     sin_phi = math.sqrt(max(0.0, 1.0 - cos_phi * cos_phi))
+    p_kw = _effective_screening_kw(input_data)
 
     if input_data.connection_type == "three_phase":
-        current_a = (input_data.power_kw * 1000.0) / (math.sqrt(3) * u_n_v * cos_phi)
+        current_a = (p_kw * 1000.0) / (math.sqrt(3) * u_n_v * cos_phi)
         formula = "ΔU = √3 × I × L × (R·cosφ + X·sinφ) [DIN EN 50480, 3-phasig]"
     else:
-        current_a = (input_data.power_kw * 1000.0) / (u_n_v * cos_phi)
+        current_a = (p_kw * 1000.0) / (u_n_v * cos_phi)
         formula = "ΔU = 2 × I × L × (R·cosφ + X·sinφ) [DIN EN 50480, 1-phasig]"
 
     vl_cable: str = "low" if input_data.voltage_level == "low" else "medium"
@@ -360,7 +379,7 @@ def assess_n1(input_data: GridConnectionInput) -> N1Assessment:
             "Belastung der Reserveinfrastruktur durch Netzbetreiber pruefen lassen."
         ),
         disclaimer=N1_DISCLAIMER,
-        requires_detailed_study=is_radial or input_data.power_kw > 500,
+        requires_detailed_study=is_radial or _effective_screening_kw(input_data) > 500,
     )
 
 
@@ -460,9 +479,11 @@ def evaluate_feasibility(
             "uebersteigt 100% der Nennbelastbarkeit des Kabels."
         )
 
-    if input_data.power_kw > thresholds.power_limit_kw and input_data.voltage_level == "low":
+    screening_kw = _effective_screening_kw(input_data)
+    if screening_kw > thresholds.power_limit_kw and input_data.voltage_level == "low":
         conditions.append(
-            f"Leistung {input_data.power_kw:.0f} kW ueberschreitet typischen NS-Grenzwert "
+            f"Screening-Leistung {screening_kw:.0f} kW (AC {input_data.power_kw:.0f} kW, "
+            f"Gleichzeitigkeit beruecksichtigt) ueberschreitet typischen NS-Grenzwert "
             f"{thresholds.power_limit_kw:.0f} kW. MS-Direktanschluss (20 kV) pruefen. "
             f"({thresholds.power_limit_basis})"
         )
@@ -524,7 +545,7 @@ def evaluate_feasibility(
 
     process_time = (
         "8-16 Wochen (MS-Anschluss, inkl. Systemstudie)"
-        if input_data.power_kw > 100
+        if screening_kw > 100
         else "4-8 Wochen (NS-Standardanschluss)"
     )
 
@@ -570,6 +591,39 @@ def calculate_grid_connection(
             )
         )
 
+    if input_data.plant_type:
+        sim_note = ""
+        if input_data.simultaneity_factor is not None:
+            sim_note = f" (Gleichzeitigkeit {input_data.simultaneity_factor:.2f})"
+        assumptions.append(
+            CalculationAssumption(
+                parameter="Anlagentyp / Gleichzeitigkeit",
+                assumed_value=(
+                    f"{input_data.plant_type}, AC={input_data.power_kw:.0f} kW, "
+                    f"Screening={_effective_screening_kw(input_data):.0f} kW{sim_note}, "
+                    f"cos φ={input_data.power_factor}"
+                ),
+                reason=(
+                    "AC-Leistung am Netzanschluss; Screening-Leistung mit dokumentiertem "
+                    "Gleichzeitigkeitsfaktor (Einzelprojekt, kein Cluster-Modell)."
+                ),
+                norm_reference="VNB-Planungsrichtlinien",
+                confidence="medium",
+            )
+        )
+    if input_data.dc_kwp and input_data.ac_kw:
+        ratio = input_data.dc_kwp / input_data.ac_kw if input_data.ac_kw > 0 else None
+        assumptions.append(
+            CalculationAssumption(
+                parameter="DC/AC-Verhaeltnis",
+                assumed_value=f"DC {input_data.dc_kwp:.0f} kWp / AC {input_data.ac_kw:.0f} kW"
+                + (f" ≈ {ratio:.2f}" if ratio else ""),
+                reason="Ueberdimensionierung nur fuer Erzeugungsnachweis — Netzanschluss basiert auf AC.",
+                norm_reference="VDE-AR-N 4105",
+                confidence="high" if ratio else "medium",
+            )
+        )
+
     voltage_drop = calculate_voltage_drop(input_data, assumptions)
     short_circuit = calculate_short_circuit(input_data, assumptions)
     n1 = assess_n1(input_data)
@@ -585,6 +639,7 @@ def calculate_grid_connection(
     coincidence = screen_coincidence_factor(input_data, assumptions)
     norm_refs = build_norm_references_applied(input_data)
     eeg = screen_eeg_feed_in(input_data)
+    reactive = screen_reactive_power(input_data)
 
     req_docs, conditions = merge_screening_into_feasibility(
         feasibility.required_documents,
@@ -592,6 +647,7 @@ def calculate_grid_connection(
         protection,
         network_feedback,
         eeg,
+        reactive,
     )
     feasibility = feasibility.model_copy(
         update={"required_documents": req_docs, "conditions": conditions}
@@ -613,12 +669,26 @@ def calculate_grid_connection(
         coincidence_factor_screening=coincidence,
         norm_references_applied=norm_refs,
         eeg_feed_in_screening=eeg,
+        reactive_power_screening=reactive,
+        projektierer_perspective=None,
     )
 
 
-def calculate_grid_connection_from_engine(eingabe: dict[str, Any]) -> dict[str, Any]:
+def calculate_grid_connection_from_engine(
+    eingabe: dict[str, Any],
+    *,
+    project_id: int | None = None,
+) -> dict[str, Any]:
     """Convenience: legacy eingabe → v2 result as JSON-serializable dict."""
     inp = grid_connection_input_from_engine(eingabe)
     anlagentyp = eingabe.get("anlagentyp")
     result = calculate_grid_connection(inp, anlagentyp=str(anlagentyp) if anlagentyp else None)
-    return result.model_dump()
+    perspective_raw = build_projektierer_perspective(
+        eingabe, inp, project_id=project_id or eingabe.get("project_id")
+    )
+    from engine.grid_calculation_types import ProjektiererPerspective
+
+    updated = result.model_copy(
+        update={"projektierer_perspective": ProjektiererPerspective.model_validate(perspective_raw)}
+    )
+    return updated.model_dump()

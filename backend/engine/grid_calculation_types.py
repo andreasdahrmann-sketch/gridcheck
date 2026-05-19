@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,12 +12,50 @@ class Coordinates(BaseModel):
     lng: float = Field(..., ge=-180, le=180)
 
 
+PlantTypeLiteral = Literal[
+    "pv",
+    "wind",
+    "bess",
+    "hybrid_pv_bess",
+    "chp",
+    "hydro",
+    "consumption",
+]
+FeedInManagementClass = Literal["none", "remote_control", "direct_marketing"]
+ReactivePowerMode = Literal[
+    "fixed_cos_phi",
+    "cos_phi_p",
+    "q_u",
+    "q_setpoint",
+    "bidirectional",
+]
+
+
 class GridConnectionInput(BaseModel):
     project_type: Literal["generation", "consumption", "storage", "mixed"] = "generation"
-    power_kw: float = Field(..., gt=0, le=2_000_000)
+    plant_type: PlantTypeLiteral | None = None
+    power_kw: float = Field(..., gt=0, le=2_000_000, description="AC-Anschlussleistung am Netz")
+    screening_power_kw: float | None = Field(
+        default=None,
+        gt=0,
+        le=2_000_000,
+        description="Leistung nach Gleichzeitigkeit für Screening",
+    )
+    dc_kwp: float | None = Field(default=None, gt=0, le=2_000_000)
+    ac_kw: float | None = Field(default=None, gt=0, le=2_000_000)
+    simultaneity_factor: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Gleichzeitigkeitsfaktor (Audit, aus PlantTypeConfig)",
+    )
+    reactive_power_mode: ReactivePowerMode | None = None
     power_factor: float = Field(..., ge=0.8, le=1.0)
     voltage_level: Literal["low", "medium", "high"] = "medium"
     connection_type: Literal["single_phase", "three_phase"] = "three_phase"
+    cos_phi_known: bool | None = None
+    existing_connection: bool | None = None
+    network_form: Literal["radial", "ring", "meshed", "unknown"] | None = None
 
     cable_length_km: float = Field(..., gt=0, le=500)
     cable_length_source: Literal["user_input", "geo_calculated", "estimated"] = "estimated"
@@ -177,12 +215,96 @@ class NormReference(BaseModel):
 class EegFeedInScreening(BaseModel):
     applicable: bool
     power_kw: float
+    feed_in_management_class: FeedInManagementClass | None = None
     remote_control_threshold_kw: float = 25.0
     direct_marketing_hint_threshold_kw: float = 100.0
     warnings: list[str] = Field(default_factory=list)
     required_documents: list[str] = Field(default_factory=list)
     hints: list[str] = Field(default_factory=list)
     disclaimer: str = ""
+
+
+class ReactivePowerChecklistItem(BaseModel):
+    topic: str
+    norm_reference: str
+    status: Literal["requires_verification", "requires_study", "requires_configuration"]
+    note: str
+
+
+class ReactivePowerScreening(BaseModel):
+    applicable: bool
+    power_kw: float
+    threshold_kw: float = 135.0
+    checklist: list[ReactivePowerChecklistItem] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    required_documents: list[str] = Field(default_factory=list)
+    disclaimer: str = ""
+
+
+class ProcessTimelinePhase(BaseModel):
+    phase: str
+    duration_weeks: str
+    responsible: Literal["applicant", "network_operator", "planner"]
+    note: str | None = None
+
+
+class ProcessTimeline(BaseModel):
+    estimated_total: str
+    phases: list[ProcessTimelinePhase]
+    disclaimer: str
+
+
+class BkzHint(BaseModel):
+    applicable: bool
+    qualitative_band: Literal["niedrig", "mittel", "hoch", "unbekannt"]
+    norm_reference: str
+    hint: str
+    disclaimer: str
+
+
+class NvpRecommendation(BaseModel):
+    applicable: bool
+    suggested_voltage_level: str
+    nearest_node_hint: str
+    cable_length_estimate_km: float
+    cable_length_note: str
+    plant_type: str
+    ac_kw: float
+    disclaimer: str
+
+
+class TabDisclaimer(BaseModel):
+    applicable: bool
+    plz: str | None = None
+    vnb_name: str | None = None
+    message: str
+    disclaimer: str
+
+
+class ProjektiererPerspective(BaseModel):
+    plant_type: str
+    plant_type_label: str
+    dc_kwp: float | None = None
+    ac_kw: float
+    overbuild_ratio: float | None = None
+    screening_power_kw: float
+    cos_phi: float
+    cos_phi_source: Literal["nutzer", "plant_default"]
+    power_factor: float
+    power_factor_source: Literal["nutzer", "plant_default"]
+    simultaneity_factor: float
+    simultaneity_note: str | None = None
+    reactive_power_mode: ReactivePowerMode | None = None
+    feed_in_profile_note: str | None = None
+    feed_in_management_class: FeedInManagementClass
+    process_timeline: ProcessTimeline
+    bkz_hint: BkzHint
+    nvp_recommendation: NvpRecommendation
+    tab_disclaimer: TabDisclaimer
+    kumulation_warning: dict[str, Any] | None = None
+    scenario_comparison_note: dict[str, Any] | None = None
+    reactive_power_threshold_kw: float = 135.0
+    disclaimer: str
 
 
 class GridCalculationResult(BaseModel):
@@ -201,6 +323,8 @@ class GridCalculationResult(BaseModel):
     coincidence_factor_screening: CoincidenceFactorScreening
     norm_references_applied: list[NormReference] = Field(default_factory=list)
     eeg_feed_in_screening: EegFeedInScreening
+    reactive_power_screening: ReactivePowerScreening
+    projektierer_perspective: ProjektiererPerspective | None = None
 
     def model_dump(self, **kwargs):
         return super().model_dump(mode="json", **kwargs)

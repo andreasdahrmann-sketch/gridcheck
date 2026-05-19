@@ -121,16 +121,39 @@ export function estimateCableLength(input: Pick<GridCheckInput, "spannungsebene"
   };
 }
 
-export function resolveCosPhiDefault(input: Pick<GridCheckInput, "cos_phi" | "anlagentyp" | "richtung" | "project_components">) {
-  if (input.cos_phi !== undefined && input.cos_phi >= 0.8 && input.cos_phi <= 1) {
+const PLANT_COS_PHI: Record<string, number> = {
+  pv: 0.9,
+  wind: 0.9,
+  bess: 0.92,
+  hybrid_pv_bess: 0.98,
+  hybrid: 0.98,
+  chp: 0.95,
+  hydro: 0.9,
+  consumption: 0.95,
+};
+
+function inferPlantType(input: Pick<GridCheckInput, "plant_type" | "anlagentyp" | "richtung" | "project_components">): string {
+  if (input.plant_type) return input.plant_type;
+  if (input.anlagentyp === "solar") return "pv";
+  if (input.anlagentyp === "wind") return "wind";
+  if (input.anlagentyp === "batterie") return "bess";
+  const types = (input.project_components ?? []).map((c) => c.component_type);
+  if (types.includes("battery") && (types.includes("pv") || types.includes("wind"))) return "hybrid_pv_bess";
+  if (types.includes("battery")) return "bess";
+  if (input.richtung === "bezug") return "consumption";
+  return "pv";
+}
+
+export function resolveCosPhiDefault(
+  input: Pick<GridCheckInput, "cos_phi" | "cos_phi_known" | "anlagentyp" | "plant_type" | "richtung" | "project_components">,
+) {
+  if (input.cos_phi_known && input.cos_phi !== undefined && input.cos_phi >= 0.8 && input.cos_phi <= 1) {
     return { cosPhi: input.cos_phi, quelle: "nutzer" as const };
   }
-  const types = (input.project_components ?? []).map((c) => c.component_type);
-  if (types.includes("battery")) {
-    return { cosPhi: 0.92, quelle: "rolle_default" as const };
+  if (!input.cos_phi_known && input.cos_phi !== undefined && input.cos_phi >= 0.8 && input.cos_phi <= 1) {
+    return { cosPhi: input.cos_phi, quelle: "nutzer" as const };
   }
-  if (input.anlagentyp === "solar" || input.anlagentyp === "wind" || input.richtung === "einspeisung") {
-    return { cosPhi: 1.0, quelle: "rolle_default" as const };
-  }
-  return { cosPhi: 0.95, quelle: "rolle_default" as const };
+  const plant = inferPlantType(input);
+  const cosPhi = PLANT_COS_PHI[plant] ?? 0.95;
+  return { cosPhi, quelle: "rolle_default" as const };
 }
