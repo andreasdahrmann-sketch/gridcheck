@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ClipboardList, FileDown, MapPinned, Radar, Settings2, Share2 } from "lucide-react";
+import { ArrowLeft, ClipboardList, FileDown, GitCompareArrows, MapPinned, Radar, Settings2, Share2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import BillingUpgradePrompt from "@/components/BillingUpgradePrompt";
@@ -44,6 +44,7 @@ import {
   getStakeholderProductCopy,
   resolveStakeholderProductPath,
 } from "@/lib/stakeholder-product";
+import { pushCompareSnapshot } from "@/lib/scenario-compare-snapshots";
 import type { GridCheckInput, GridCheckResult, StakeholderContextInput } from "@/types";
 
 const PROJECT_TYPE_OPTIONS = [
@@ -58,7 +59,7 @@ const cardClass = "rounded-[24px] border border-border/70 bg-bg-card/80 shadow-[
 const fieldClass =
   "h-11 rounded-xl border-border/70 bg-white/5 px-3 text-white placeholder:text-text-dim focus-visible:border-brand-cyan/70 focus-visible:ring-brand-cyan/20";
 const selectClass =
-  "flex h-11 w-full rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70";
+  "form-select flex h-11 w-full cursor-pointer rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70";
 const textAreaClass =
   "min-h-[128px] w-full rounded-2xl border border-border/70 bg-white/5 px-3 py-3 text-sm text-white placeholder:text-text-dim outline-none transition focus:border-brand-cyan/70";
 
@@ -347,6 +348,7 @@ export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { pr
         requestedOfferId: selectedOfferId === "free" ? "free" : selectedOfferId,
       });
       setResult(analysisResult);
+      pushCompareSnapshot(projectIdStr, analysisResult);
       const normalizedProfile = normalizeRoleInputs(profile);
       setProfile(normalizedProfile);
       try {
@@ -484,6 +486,13 @@ export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { pr
                 >
                   <MapPinned className="mr-2 h-4 w-4" />
                   Vor-Ort-Marker aufnehmen
+                </Link>
+                <Link
+                  href={`/projects/${projectIdStr}/szenarien-vergleich`}
+                  className="inline-flex h-11 items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  <GitCompareArrows className="mr-2 h-4 w-4" />
+                  Szenarien vergleichen
                 </Link>
               </div>
             </div>

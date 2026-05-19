@@ -219,11 +219,72 @@ Bis Phase 1 existiert: **operatives Training = Analysen + NB-Feedback sammeln**,
 
 ---
 
-## 10. Relevante Dateien (Schnellnavigation)
+## 10. Produktions-Workflow (operatives „Training“)
+
+Ziel: **Daten sammeln und kalibrieren** — keine Ersetzung der deterministischen Norm-Engine.
+
+### 10.1 Datenanforderungen
+
+| Anforderung | Minimum | Ziel (Produktion) |
+|-------------|---------|-------------------|
+| Abgeschlossene Analysen mit `revision.hash` | 10 | 100+ |
+| NB-Feedback mit gültigem `revision_hash` | 5 | 50+ |
+| Verknüpfte Paare KI-Fazit ↔ NB-Fazit | 5 | 30+ |
+| Fachliche Felder vollständig (Spannung, Leistung, Entfernung) | ja | ja |
+| Keine PII in Export-Datasets ohne Freigabe | ja | ja + Anonymisierung |
+
+**Verboten:** Feedback oder Trainingsdaten dürfen die Berechnungslogik in `berechnung.py` **nicht** still ändern. ML-Ranking (Roadmap Phase 3) nur hinter Feature-Flag + ADR in `DECISIONS.md`.
+
+### 10.2 Versionierung
+
+| Artefakt | Versionierung |
+|----------|----------------|
+| Engine / Norm | `engine_version`, `NORM_VERSION` in Revision |
+| KI-Heuristik | Git-Tag `APP_VERSION` |
+| Feedback-Schema | `schema_version` in `ki_feedback_records` (aktuell `1.2.0`) |
+| Export-Datasets | Dateiname mit UTC-Datum + Git-Short-SHA |
+
+Jeder Export-Lauf protokolliert: Quelle (`ki_feedback_records`), Zeilenanzahl, Filter (nur `completed` Runs), **keine** Secrets.
+
+### 10.3 Human-Review-Gate (Pflicht vor Auswertung/ML)
+
+1. **Fachlich:** Stichprobe ≥10 % der Feedbacks — NB-Entscheidung plausibel, Kommentar nachvollziehbar.
+2. **Technisch:** `GET /api/v1/ki/verify` (Admin) — Hash-Kette `valid: true`.
+3. **Datenschutz:** Keine personenbezogenen Standort-Details im Export ohne Pseudonymisierung.
+4. **Freigabe:** Product Owner dokumentiert „Dataset vYYYY-MM-DD freigegeben“ (Ticket/ADR).
+
+Erst nach Gate: Offline-Auswertung (Roadmap Phase 2) oder externes ML.
+
+### 10.4 Produktions-Routine (monatlich)
+
+```powershell
+cd backend
+# 1) Integrität
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" https://<api>/api/v1/ki/verify
+
+# 2) Lernstatus
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" https://<api>/api/v1/ki/learning-status
+
+# 3) Export-Stub (lokal, gegen DATABASE_URL)
+make ki-export-dataset
+```
+
+Ausgabe: `backend/daten/exports/ki_feedback_YYYYMMDD.jsonl` (Stub — siehe Skript).
+
+### 10.5 Rollback / Incident
+
+- Fehlerhafte Feedback-Zeile: **nicht löschen** — Korrektur als neue Zeile + Audit-Ticket.
+- Verdacht auf Datenmanipulation: `ki/verify` + DB-Backup einfrieren.
+- Kalibrierungs-Regression: `kalibrierungsfaktor` in Staging vergleichen, Engine-Deploy unabhängig vom KI-Modul.
+
+---
+
+## 11. Relevante Dateien (Schnellnavigation)
 
 - `backend/engine/ki_modul.py` – Ähnlichkeit, Konfidenz, Anomalie
 - `backend/engine/ki_feedback.py` – Speicherung, Kalibrierung, Lernstatus, Integrität
 - `backend/api/v1_ki_feedback.py` – REST
 - `backend/services/ki_feedback_service.py` – AuthZ, Audit-Revision
 - `frontend/lib/api/ki.ts` – `submitKiFeedback`
+- `backend/scripts/export_ki_feedback_dataset.py` – Export-Stub (Dataset-Vorbereitung)
 - `docs/RISIKO_STATUS.md` – Risiko R-07

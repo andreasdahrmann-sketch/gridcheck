@@ -106,7 +106,7 @@ Middleware in `backend/main.py` setzt u. a.:
 
 ## Offene Punkte (transparent)
 
-- [ ] Externer **Penetrationstest** vor Enterprise-Vertrag (siehe Pentest-Checkliste)
+- [ ] Externer **Penetrationstest** vor Enterprise-Vertrag — [SECURITY_PENTEST_CHECKLIST.md](./SECURITY_PENTEST_CHECKLIST.md)
 - [ ] Formales **ISMS / SOC 2** — derzeit nicht vorhanden
 - [ ] **AVV** final durch Rechtsanwalt ([AVV_ENTWURF.md](./AVV_ENTWURF.md))
 - [ ] **DPIA** bei personenbezogenen Standort-/Anschlussnehmerdaten (Kunde als Verantwortlicher)
