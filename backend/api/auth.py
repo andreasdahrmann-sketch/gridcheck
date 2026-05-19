@@ -11,7 +11,14 @@ from core.config import settings
 from core.rate_limit import enforce_rate_limit
 from db.database import get_db
 from db.models import User
-from services.auth_service import issue_token_pair, login_user, refresh_access_token, register_user
+from services.auth_service import (
+    complete_password_reset,
+    issue_token_pair,
+    login_user,
+    refresh_access_token,
+    register_user,
+    request_password_reset,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -43,6 +50,15 @@ class UserResponse(BaseModel):
     email: str
     role: str
     full_name: str | None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(..., min_length=5, max_length=254)
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=20, max_length=512)
+    password: str = Field(..., min_length=12, max_length=128)
 
 
 @router.post("/register", response_model=UserResponse)
@@ -140,3 +156,21 @@ def me(current_user: User = Depends(get_current_user)) -> UserResponse:
         role=current_user.role,
         full_name=current_user.full_name,
     )
+
+
+@router.post("/forgot-password")
+def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)) -> dict[str, str]:
+    """Startet Passwort-Reset (antwortet immer gleich, kein Account-Leak)."""
+    enforce_rate_limit(f"auth:forgot:{req.email.strip().lower()}", limit=5, window_seconds=300)
+    request_password_reset(db, email=req.email)
+    return {
+        "status": "ok",
+        "message": "Falls ein Konto existiert, wurde eine E-Mail mit weiteren Schritten versendet.",
+    }
+
+
+@router.post("/reset-password")
+def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)) -> dict[str, str]:
+    enforce_rate_limit(f"auth:reset:{req.token[:16]}", limit=10, window_seconds=300)
+    complete_password_reset(db, token=req.token, password=req.password)
+    return {"status": "ok", "message": "Passwort wurde aktualisiert. Sie koennen sich jetzt anmelden."}

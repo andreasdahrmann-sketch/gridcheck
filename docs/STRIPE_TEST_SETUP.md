@@ -38,6 +38,23 @@ python scripts/smoke_go_live.py --base-url http://localhost:8000 --email test@ex
 
 `GET /api/v1/billing/status` → `stripe_configured: true`, Offers mit `checkout_enabled: true`.
 
+## Vercel (Frontend)
+
+Stripe-Keys gehoeren **nicht** ins Frontend. Nur Backend/Railway:
+
+| Variable | Pflicht | Zweck |
+|----------|---------|--------|
+| `BACKEND_URL` | ja | Origin der Railway-API (z. B. `https://api.gridcheck.de`) |
+| `NEXT_PUBLIC_API_BASE` | optional | Default `/api/backend` (Proxy) |
+
+Checkout-Rueckkehr-URLs (`STRIPE_CHECKOUT_*`) zeigen auf die **Frontend**-Domain (z. B. `https://app.gridcheck.de/settings?billing=success`).
+
+## Railway Webhook
+
+- URL: `https://<BACKEND-HOST>/api/v1/billing/webhook`
+- Events: `checkout.session.completed`, `customer.subscription.*`, `invoice.payment_*` (Stripe-Standardpaket)
+- Signing secret → `STRIPE_WEBHOOK_SECRET`
+
 ## Live (spaeter)
 
 Nur mit `sk_live_` / `pk_live_` und `APP_ENV=prod`. Siehe `backend/.env.prod.example`.

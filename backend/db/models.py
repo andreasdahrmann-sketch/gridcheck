@@ -99,6 +99,21 @@ class User(Base):
     billing_events = relationship("BillingEvent", back_populates="user")
     conversion_events = relationship("ConversionEvent", back_populates="user")
     billing_entitlements = relationship("BillingEntitlement", foreign_keys="BillingEntitlement.user_id", back_populates="user")
+    password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    __table_args__ = (Index("ix_password_reset_tokens_user_expires", "user_id", "expires_at"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User", back_populates="password_reset_tokens")
 
 
 class ProjectMember(Base):
