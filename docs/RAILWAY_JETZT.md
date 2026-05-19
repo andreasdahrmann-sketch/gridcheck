@@ -10,9 +10,34 @@
 | `APP_ENV` | `prod` |
 | `CORS_ORIGINS` | `https://gridcheck.vercel.app` |
 | `CORS_ORIGIN_REGEX` | `^https://[a-z0-9-]+\.vercel\.app$` |
-| `TRUSTED_HOSTS` | `*.up.railway.app,gridcheck-production.up.railway.app,*.vercel.app` |
+| `TRUSTED_HOSTS` | `*` (Railway-Healthchecks nutzen interne Hosts; restriktive Listen führen zu Deploy-FAIL mit HTTP 400 auf `/health`) |
 
-Ohne `JWT_SECRET` / `JWT_REFRESH_SECRET` startet die App in Prod nicht zuverlässig.
+Ohne `JWT_SECRET` / `JWT_REFRESH_SECRET` liefert **Login** HTTP **503** mit `AUTH_JWT_NOT_CONFIGURED` (kein 500 mehr seit Commit `fix: return 503 when JWT secrets missing on login`).
+
+Secrets per CLI setzen (Beispiel):
+
+```powershell
+cd C:\Users\andre\gridcheck
+railway link -p proud-spirit -s gridcheck -e production
+$jwt1 = [Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Maximum 256 }))
+$jwt2 = [Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Maximum 256 }))
+railway variables set "JWT_SECRET=$jwt1" "JWT_REFRESH_SECRET=$jwt2" "APP_ENV=prod" "CORS_ORIGINS=https://gridcheck.vercel.app" "CORS_ORIGIN_REGEX=^https://[a-z0-9-]+\.vercel\.app$" "TRUSTED_HOSTS=*"
+```
+
+Danach Deploy abwarten (`railway deployment list`) und Login testen.
+
+## Admin-Login (`admin@gridcheck.de`)
+
+Oeffentliche Registrierung als Admin ist gesperrt. Fehlt der Nutzer in der DB → Login **401** `LOGIN_INVALID`.
+
+Einmalig vorprovisionieren (z. B. `Admin2026!` — min. 8 Zeichen + Komplexitaet):
+
+```powershell
+$env:ADMIN_PASSWORD = "Admin2026!"
+railway run python scripts/create_admin_user.py --email admin@gridcheck.de --password-env ADMIN_PASSWORD
+```
+
+Details: `docs/ADMIN_USER.md`
 
 ## Falls Registrierung `DATABASE_SCHEMA_MISSING` meldet
 
