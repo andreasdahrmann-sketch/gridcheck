@@ -889,7 +889,6 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
               <p className="mt-1 text-xs text-gray-500">{cableLengthHint.annahme}</p>
             </div>
           </div>
-        </div>
           <p className="mt-3 rounded-xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs leading-5 text-blue-100">
             <span className="font-semibold">Leistungsrichtwert {powerLimitHints.label}:</span> typisch bis ca.{" "}
             {powerLimitHints.typicalMaxKw.toLocaleString("de-DE")} kW (Screening bis ca.{" "}
@@ -901,7 +900,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
               cos φ Standard für diese Anlagenrolle: {cosPhiHint.cosPhi} (kann im Feld überschrieben werden).
             </p>
           ) : null}
-        </motion.div>
+        </div>
 
         <ProjectProfileFields value={input} onChange={(next) => setInput((prev) => ({ ...prev, ...next }))} />
 
@@ -930,8 +929,19 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
               <input type="number" step="0.1" className={inputClass} value={input.trafo_uk_pct ?? ""} onChange={e => updateInput({ trafo_uk_pct: e.target.value ? Number(e.target.value) : undefined })} placeholder="auto" />
             </div>
             <div>
-              <label className={labelClass}>Freie Kapazität (kW)</label>
-              <input type="number" className={inputClass} value={input.netzkapazitaet_kw ?? ""} onChange={e => updateInput({ netzkapazitaet_kw: e.target.value ? Number(e.target.value) : undefined })} placeholder="auto" />
+              <label className={labelClass}>VNB-Kapazitätsangabe (kW)</label>
+              <input
+                type="number"
+                className={inputClass}
+                value={input.netzkapazitaet_kw ?? ""}
+                onChange={(e) =>
+                  updateInput({ netzkapazitaet_kw: e.target.value ? Number(e.target.value) : undefined })
+                }
+                placeholder="optional"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Nur als Nutzer- oder VNB-Hinweis – keine verifizierte freie Netzkapazität ohne belastbare VNB-Daten.
+              </p>
             </div>
           </div>
         </div>
@@ -1080,6 +1090,110 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
               <div className="mt-1 text-xl font-semibold text-white">{result.netzausbau_erforderlich ? "Voraussichtlich ja" : "Derzeit kein Hinweis"}</div>
             </div>
           </div>
+        </div>
+
+        {(result.connection_type_label || result.power_limit_hints) ? (
+          <div className={sectionClass}>
+            <h3 className={sectionTitle}>Anschluss & Leistungsrahmen</h3>
+            <div className="grid gap-3 text-sm text-gray-300 md:grid-cols-2">
+              {result.connection_type_label ? (
+                <p>
+                  <span className="text-gray-400">Anschlussart:</span>{" "}
+                  <span className="text-white font-medium">{result.connection_type_label}</span>
+                </p>
+              ) : null}
+              {result.power_limit_hints ? (
+                <p>
+                  <span className="text-gray-400">Leistungsrichtwert {result.power_limit_hints.label}:</span>{" "}
+                  typisch bis ca. {result.power_limit_hints.typical_max_kw.toLocaleString("de-DE")} kW
+                  {result.power_limit_hints.ueber_typischem_richtwert ? " — Eingabe über typischem Richtwert." : ""}
+                </p>
+              ) : null}
+            </div>
+            {result.power_limit_hints?.hinweis ? (
+              <p className="mt-2 text-xs leading-5 text-gray-500">{result.power_limit_hints.hinweis}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {result.warnings.length > 0 ? (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+            <h4 className="text-sm font-semibold text-amber-200">Hinweise & Warnungen</h4>
+            <ul className="mt-2 space-y-1 text-sm text-amber-100">
+              {result.warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {result.technical_details ? (
+          <div className={sectionClass}>
+            <h3 className={sectionTitle}>Technische Details (vorläufig)</h3>
+            <div className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg bg-gray-900 p-3">
+                <div className="text-xs text-gray-400">Spannungsfall</div>
+                <div className="mt-1 font-mono text-white">
+                  {fmt(result.technical_details.spannungsfall?.delta_u_prozent ?? result.delta_u_pct, 2)} %
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  {result.technical_details.spannungsfall?.bewertung ?? result.spannungsbewertung}
+                  {result.technical_details.spannungsfall?.cos_phi_annahme
+                    ? ` · ${result.technical_details.spannungsfall.cos_phi_annahme}`
+                    : ""}
+                </div>
+              </div>
+              <div className="rounded-lg bg-gray-900 p-3">
+                <div className="text-xs text-gray-400">Kurzschluss Ik</div>
+                <div className="mt-1 font-mono text-white">
+                  {fmt(
+                    result.technical_details.kurzschluss?.ik_referenz_ka ??
+                      result.technical_details.kurzschluss?.ik_max_ka ??
+                      result.kurzschluss.ik_max_ka,
+                    1,
+                  )}{" "}
+                  kA
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  {result.technical_details.kurzschluss?.vorlaeufig
+                    ? "Vorläufig (Band nach Spannungsebene)"
+                    : "Berechnet"}
+                  {result.technical_details.kurzschluss?.hinweis
+                    ? ` · ${result.technical_details.kurzschluss.hinweis}`
+                    : ""}
+                </div>
+              </div>
+              <div className="rounded-lg bg-gray-900 p-3">
+                <div className="text-xs text-gray-400">Leitung / Querschnitt</div>
+                <div className="mt-1 font-mono text-white">
+                  {result.technical_details.leitung?.querschnitt_mm2
+                    ? `${result.technical_details.leitung.querschnitt_mm2} mm²`
+                    : "—"}
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  {result.technical_details.leitung?.typ ?? "Typ aus Annahme"}
+                  {result.technical_details.leitung?.i_max_a
+                    ? ` · Imax ${fmt(result.technical_details.leitung.i_max_a, 0)} A`
+                    : ""}
+                </div>
+              </div>
+              <div className="rounded-lg bg-gray-900 p-3">
+                <div className="text-xs text-gray-400">Trasse</div>
+                <div className="mt-1 font-mono text-white">
+                  {fmt(result.technical_details.trasse?.entfernung_km ?? result.nvp_entfernung_km, 2)} km
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  {result.technical_details.trasse?.heuristisch
+                    ? "Heuristische Entfernung (keine GPS-Messung)"
+                    : "Nutzereingabe"}
+                  {result.technical_details.trasse?.annahme
+                    ? ` · ${result.technical_details.trasse.annahme}`
+                    : ""}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
@@ -1265,19 +1379,21 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
           </div>
         </div>
 
+        {hasNetzplanResult(result) ? (
+          <NetzplanVisualization
+            input={input}
+            result={result}
+            meta={{
+              kundentyp: meta.kundentyp,
+              projektname: meta.projektname,
+              ort: meta.ort,
+              erzeugungstyp: meta.erzeugungstyp,
+            }}
+          />
+        ) : null}
+
         {showDeepTechnicalDetails ? (
           <>
-            <NetzplanVisualization
-              input={input}
-              result={result}
-              meta={{
-                kundentyp: meta.kundentyp,
-                projektname: meta.projektname,
-                ort: meta.ort,
-                erzeugungstyp: meta.erzeugungstyp,
-              }}
-            />
-
             <N1AssessmentPanel result={result} />
 
             <div className={sectionClass}>
@@ -1677,6 +1793,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
               Neue Analyse
             </button>
             <button
+              type="button"
               onClick={handlePdfExport}
               disabled={isExporting || !result || !authUser}
               className="rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"

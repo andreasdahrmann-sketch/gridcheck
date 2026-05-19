@@ -195,7 +195,16 @@ def bewerte_n1_ms(eingabe: dict) -> dict:
         )
 
     else:
-        # ring_offen, ring_geschlossen, doppelstich, vermascht
+        # ring_offen, ring_geschlossen, doppelstich, vermascht — MS screening for all sizes (not only < 2 MW)
+        if leistung_mw >= 2.0:
+            empfehlungen.append(
+                "Großanlage ≥ 2 MW: N-1-/Betriebsmittelreserve mit Netzbetreiber verifizieren "
+                "(MVP-Screening maximal N1-2 ohne DSO-Daten)."
+            )
+            annahmen.append(
+                f"Leistung {leistung_mw:.2f} MW in MS — Screening umfasst Topologie und Restkapazität, "
+                "keine verbindliche N-1-Zusage."
+            )
         if not rest_bekannt:
             # Pre-Check-Logik: N-1-faehige Topologie + fehlende Restkapazitaet
             # -> GELB statt ROT (Konfiguration plausibel, Datenluecke beim VNB schliessen)

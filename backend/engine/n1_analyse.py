@@ -646,8 +646,8 @@ def bestimme_n1_klasse(
     spannung_geprueft = _ist_geprueft(n1_spg)
 
     if dso_daten_vorhanden and topo_geprueft and pfad_geprueft and trafo_geprueft and spannung_geprueft:
-        return "N1-4"
-    if topo_geprueft and pfad_geprueft and trafo_geprueft and spannung_geprueft:
+        klasse = "N1-4"
+    elif topo_geprueft and pfad_geprueft and trafo_geprueft and spannung_geprueft:
         klasse = "N1-3"
     elif topo_geprueft and pfad_geprueft:
         klasse = "N1-2"
@@ -656,7 +656,7 @@ def bestimme_n1_klasse(
     else:
         klasse = "N1-0"
     # MVP ohne DSO-Daten: maximal N1-2 behaupten (06-arbeitsweise-gridcheck.mdc).
-    if not dso_daten_vorhanden and klasse == "N1-3":
+    if not dso_daten_vorhanden and klasse in ("N1-3", "N1-4"):
         return "N1-2"
     return klasse
 

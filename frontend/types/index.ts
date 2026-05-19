@@ -428,11 +428,56 @@ export interface KostenBandbreiteResult {
   drivers: string[];
 }
 
+export interface TechnicalDetailsResult {
+  spannungsfall: {
+    delta_u_prozent?: number;
+    richtung?: string;
+    bewertung?: string;
+    cos_phi?: number;
+    cos_phi_quelle?: string;
+    cos_phi_annahme?: string;
+  };
+  kurzschluss: {
+    ik_max_ka?: number;
+    ik_min_ka?: number;
+    sk_mva?: number;
+    ik_referenz_ka?: number;
+    ik_band_min_ka?: number;
+    ik_band_max_ka?: number;
+    vorlaeufig?: boolean;
+    hinweis?: string;
+  };
+  leitung: {
+    typ?: string;
+    querschnitt_mm2?: number;
+    material?: string;
+    i_max_a?: number;
+  };
+  trasse: {
+    entfernung_km?: number;
+    heuristisch?: boolean;
+    annahme?: string;
+  };
+}
+
+export interface PowerLimitHintResult {
+  label: string;
+  typical_max_kw: number;
+  screening_upper_kw: number;
+  hinweis: string;
+  eingabe_kw?: number;
+  ueber_typischem_richtwert?: boolean;
+}
+
 export interface GridCheckResult {
   machbar: boolean;
   machbarkeit_stufe: MachbarkeitStufe;
   einschraenkungen: string[];
+  warnings: string[];
   empfehlungen: string[];
+  connection_type_label?: string;
+  technical_details?: TechnicalDetailsResult;
+  power_limit_hints?: PowerLimitHintResult;
   p_max_kW: number;
   q_max_kvar: number;
   s_max_kVA: number;

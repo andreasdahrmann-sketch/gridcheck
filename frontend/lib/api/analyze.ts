@@ -9,6 +9,8 @@ import type {
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
 import type { BillingStatus } from "@/lib/api/billing";
 import { bearerAuthHeaders } from "@/lib/api/session";
+import { formatConnectionType, resolveCosPhiDefault } from "@/lib/gridcheck-engine";
+import type { PowerLimitHintResult, TechnicalDetailsResult } from "@/types";
 
 type ApiErrorDetail = {
   code?: string;
@@ -287,12 +289,10 @@ function resolveEntfernungKm(n: unknown): number {
   return 5;
 }
 
-/** Missing cos phi gets a conservative default; invalid provided values are rejected earlier. */
-function resolveCosPhi(n: unknown): number {
-  if (!hasValue(n)) return 0.95;
-  const c = Number(n);
-  if (Number.isFinite(c) && c >= 0.8 && c <= 1) return c;
-  return 0.95;
+/** Missing cos phi gets a role-based default; invalid provided values are rejected earlier. */
+function resolveCosPhi(input: GridCheckInput): number {
+  const resolved = resolveCosPhiDefault(input);
+  return resolved.cosPhi;
 }
 
 function mapKostenklasse(investition: number): GridCheckResult["kostenklasse"] {
@@ -478,16 +478,47 @@ function mapResponseToUi(res: any, input: GridCheckInput): GridCheckResult {
   const weicheHinweise = Array.isArray(res?.scores?.weiche_hinweise)
     ? (res.scores.weiche_hinweise as string[])
     : [];
-  const einschraenkungen = [
-    ...(Array.isArray(res?.warnungen) ? res.warnungen : []),
-    ...harteVerstoesse,
-    ...weicheHinweise,
-  ];
+  const engineWarnings = Array.isArray(res?.warnungen)
+    ? (res.warnungen as string[]).map((item) => String(item))
+    : [];
+  const einschraenkungen = [...engineWarnings, ...harteVerstoesse, ...weicheHinweise];
+
+  const technicalRaw = res?.technical_details;
+  const technical_details: TechnicalDetailsResult | undefined =
+    technicalRaw && typeof technicalRaw === "object"
+      ? {
+          spannungsfall: technicalRaw.spannungsfall ?? {},
+          kurzschluss: technicalRaw.kurzschluss ?? {},
+          leitung: technicalRaw.leitung ?? {},
+          trasse: technicalRaw.trasse ?? {},
+        }
+      : undefined;
+
+  const power_limit_hints: PowerLimitHintResult | undefined =
+    res?.power_limit_hints && typeof res.power_limit_hints === "object"
+      ? {
+          label: String(res.power_limit_hints.label ?? ""),
+          typical_max_kw: Number(res.power_limit_hints.typical_max_kw ?? 0),
+          screening_upper_kw: Number(res.power_limit_hints.screening_upper_kw ?? 0),
+          hinweis: String(res.power_limit_hints.hinweis ?? ""),
+          eingabe_kw: Number(res.power_limit_hints.eingabe_kw ?? input.anschlussleistung_kw),
+          ueber_typischem_richtwert: Boolean(res.power_limit_hints.ueber_typischem_richtwert),
+        }
+      : undefined;
+
+  const connectionTypeRaw =
+    input.storage_profile?.operation_mode ??
+    input.richtung ??
+    res?.eingabe?.anschlussart;
 
   return {
     machbar: String(res?.fazit?.entscheidung ?? "C") !== "C",
     machbarkeit_stufe: mapFazitToStufe(res?.fazit?.entscheidung),
     einschraenkungen,
+    warnings: engineWarnings,
+    connection_type_label: formatConnectionType(String(connectionTypeRaw ?? "")),
+    technical_details,
+    power_limit_hints,
     empfehlungen: Array.isArray(res?.empfehlungen) ? res.empfehlungen : [],
     p_max_kW: Number((res?.pqs?.p_mw ?? input.anschlussleistung_kw / 1000) * 1000),
     q_max_kvar: Number((res?.pqs?.q_mvar ?? 0) * 1000),
@@ -742,7 +773,7 @@ export function buildAnalyzePayload(input: GridCheckInput): Record<string, unkno
     projektreife: input.projektreife ?? undefined,
     foerderfrist: input.foerderfrist ?? undefined,
     baugenehmigung_vorhanden: input.baugenehmigung_vorhanden ?? false,
-    cos_phi: resolveCosPhi(input.cos_phi),
+    cos_phi: resolveCosPhi(input),
     parallele_systeme: 1,
     redundanz: backendTopologie !== "stich" && backendTopologie !== "unbekannt",
     p_kw: finitePositive(input.anschlussleistung_kw),

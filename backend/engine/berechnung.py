@@ -1,8 +1,27 @@
+from engine.fachliche_hilfen import (
+    erzeuge_blindleistung_trafo_warnungen,
+    erzeuge_technische_details,
+    estimate_cable_length_km,
+    get_max_short_circuit_current_ka,
+    kosten_leistungs_staffel_faktor,
+    n1_mvp_dokumentation,
+    power_limit_hints,
+    resolve_cos_phi_for_calculation,
+)
 from engine.n1_ms import bewerte_n1_ms
 from engine.n1_analyse import analysiere_n1
 from engine.revision import speichere_revision
+from compliance import APP_VERSION_NORMSTAND, get_normen_fuer_spannungsebene
 
-ENGINE_VERSION = "1.3.0"
+ENGINE_VERSION = "1.3.1"
+
+
+def _norm_version_label(u_kv: float) -> str:
+    norms = get_normen_fuer_spannungsebene(u_kv, nur_kategorien=["Anwendungsregel", "Norm"])
+    details = "; ".join(f"{n.norm_id} ({n.stand})" for n in norms[:8])
+    if details:
+        return f"Registry {APP_VERSION_NORMSTAND} | {details}"
+    return f"Registry {APP_VERSION_NORMSTAND}"
 import math
 from typing import Optional
 
@@ -921,14 +940,16 @@ def berechne_scores(thermisch, spannung, kurzschluss, n1, datenqualitaet, trafo)
 # KOSTEN-MODUL
 # =============================================================================
 
-def berechne_kosten(eingabe, spannungsebene, entfernung_km, parallele_systeme):
+def berechne_kosten(eingabe, spannungsebene, entfernung_km, parallele_systeme, p_mw=0.0):
     ref = REFERENZKOSTEN[spannungsebene]
     entfernung_m = entfernung_km * 1000
+    staffel = kosten_leistungs_staffel_faktor(float(p_mw or 0), spannungsebene)
+    leistungs_faktor = staffel['faktor']
 
     tiefbau_m = _float_or(eingabe.get('kosten_tiefbau_eur_m'), ref['tiefbau_eur_m'])
     kabel_m = _float_or(eingabe.get('kosten_kabel_eur_m'), ref['kabel_eur_m'])
-    trafo = _float_or(eingabe.get('kosten_trafostation_eur'), ref['trafostation_eur'])
-    schaltanlage = _float_or(eingabe.get('kosten_schaltanlage_eur'), ref['schaltanlage_eur'])
+    trafo = _float_or(eingabe.get('kosten_trafostation_eur'), ref['trafostation_eur']) * leistungs_faktor
+    schaltanlage = _float_or(eingabe.get('kosten_schaltanlage_eur'), ref['schaltanlage_eur']) * leistungs_faktor
     genehmigung = _float_or(eingabe.get('kosten_genehmigung_eur'), ref['genehmigung_eur'])
     pacht_pa = _float_or(eingabe.get('kosten_pacht_eur_a'), 0)
     bkz = _float_or(eingabe.get('kosten_bkz_eur'), 0)
@@ -955,6 +976,7 @@ def berechne_kosten(eingabe, spannungsebene, entfernung_km, parallele_systeme):
     band_annahmen = [
         'Kosten werden bewusst als Bandbreite und nicht als punktgenaue Aussage ausgegeben.',
         'Bandbreite basiert auf Anschlussdistanz, Spannungsebene, Parallelitaet und Anteil projektspezifischer Kosteneingaben.',
+        staffel['annahme'],
     ]
 
     if eigene_count == 0:
@@ -991,6 +1013,8 @@ def berechne_kosten(eingabe, spannungsebene, entfernung_km, parallele_systeme):
         'quelle': 'Eigene + Referenz' if eigene_count > 0 else 'Referenzwerte',
         'band_annahmen': band_annahmen,
         'hauptrisikotreiber': risikotreiber,
+        'leistungs_staffel': staffel['stufe'],
+        'leistungs_faktor': staffel['faktor'],
     }
 
 
@@ -1586,7 +1610,7 @@ def erzeuge_fazit(scores, harte_verstoesse):
 # HAUPTFUNKTION
 # =============================================================================
 
-def berechne_netzanschluss(eingabe, dry_run=False):
+def berechne_netzanschluss(eingabe, dry_run=False, revision_context=None):
     # Validierung
     fehler, warnungen = validiere_eingabe(eingabe)
     if fehler:
@@ -1596,8 +1620,12 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     u_kv = float(eingabe['nennspannung'])
     p_mw = float(eingabe['leistung_mw'])
     leitungstyp = eingabe['leitungstyp']
-    entfernung_km = float(eingabe['entfernung_km'])
-    cos_phi = float(eingabe.get('cos_phi', 0.95))
+    cable_info = estimate_cable_length_km(eingabe)
+    entfernung_km = float(cable_info['entfernung_km'])
+    eingabe['entfernung_km'] = entfernung_km
+    cos_phi_info = resolve_cos_phi_for_calculation(eingabe)
+    cos_phi = float(cos_phi_info['cos_phi'])
+    eingabe['cos_phi'] = cos_phi
     redundanz = eingabe.get('redundanz', False)
     parallele_systeme = int(eingabe.get('parallele_systeme', 1))
     anschlussart = eingabe['anschlussart']
@@ -1613,7 +1641,8 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     pqs = berechne_pqs(p_mw_wirksam, cos_phi)
 
     # Impedanzmodell
-    sk_mva = _float_or(eingabe.get('sk_mva'), SK_DEFAULT[spannungsebene])
+    sk_user = _float_or_none(eingabe.get('sk_mva'))
+    sk_mva = _float_or(sk_user, SK_DEFAULT[spannungsebene])
     rx_ratio = _float_or(eingabe.get('rx_ratio'), RX_RATIO_DEFAULT[spannungsebene])
     trafo_s_mva = _float_or(eingabe.get('trafo_s_mva'), TRAFO_DEFAULTS[spannungsebene]['s_mva'])
     trafo_uk = _float_or(
@@ -1635,6 +1664,16 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     trafo = berechne_trafo(pqs['s_mva'], trafo_s_mva, bestand_trafo_proz)
     spannung = berechne_spannung(pqs['p_mw'], pqs['q_mvar'], u_kv, r_ges, x_ges, anschlussart)
     kurzschluss = berechne_kurzschluss(u_kv, z_ges, pqs['s_mva'], sk_mva)
+    ik_info = get_max_short_circuit_current_ka(
+        spannungsebene,
+        sk_mva_user=sk_user,
+        ik_berechnet_ka=kurzschluss.get('ik_max_ka'),
+    )
+    kurzschluss['ik_referenz_ka'] = ik_info['ik_referenz_ka']
+    kurzschluss['ik_band_min_ka'] = ik_info['ik_band_min_ka']
+    kurzschluss['ik_band_max_ka'] = ik_info['ik_band_max_ka']
+    kurzschluss['ik_vorlaeufig'] = ik_info['vorlaeufig']
+    kurzschluss['ik_hinweis'] = ik_info['hinweis']
     n1 = berechne_n1_prescreen(thermisch, trafo, topologie, parallele_systeme, redundanz, pqs=pqs, cos_phi=cos_phi, eingabe=eingabe)
     datenqualitaet = berechne_datenqualitaet(eingabe)
 
@@ -1657,13 +1696,14 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     else:
         n1_analyse = {'status': 'NICHT_BEWERTET', 'text': 'Kein N-1 Szenario verfuegbar.'}
     n1 = konsolidiere_n1_ergebnis(n1, n1_analyse)
+    n1['mvp_dokumentation'] = n1_mvp_dokumentation(eingabe, n1.get('n1_klasse'))
 
     # Scores
     scores = berechne_scores(thermisch, spannung, kurzschluss, n1, datenqualitaet, trafo)
     fazit = erzeuge_fazit(scores, scores['harte_verstoesse'])
 
     # Kosten & Wirtschaftlichkeit
-    kosten = berechne_kosten(eingabe, spannungsebene, entfernung_km, parallele_systeme)
+    kosten = berechne_kosten(eingabe, spannungsebene, entfernung_km, parallele_systeme, p_mw=p_mw)
     wirtschaftlichkeit = berechne_wirtschaftlichkeit(eingabe, kosten, p_mw)
     speicher_bewertung = bewerte_speicherprofil(eingabe, projektprofil)
     route_environment = bewerte_umwelt_trasse(eingabe)
@@ -1699,6 +1739,18 @@ def berechne_netzanschluss(eingabe, dry_run=False):
     _append_unique_text(empfehlungen, stakeholder_bewertung['recommended_focus'])
 
     warnungen.extend(speicher_bewertung.get('warnings', []))
+    warnungen.extend(
+        erzeuge_blindleistung_trafo_warnungen(eingabe, trafo, pqs, leitungstyp=leitungstyp)
+    )
+    if cable_info.get('heuristisch'):
+        _append_unique_text(warnungen, cable_info['annahme'])
+    if cos_phi_info.get('quelle') == 'rolle_default':
+        _append_unique_text(warnungen, cos_phi_info['annahme'])
+    if ik_info.get('vorlaeufig'):
+        _append_unique_text(warnungen, ik_info['hinweis'])
+    mvp_doc = n1.get('mvp_dokumentation') or {}
+    if mvp_doc.get('hinweis'):
+        _append_unique_text(warnungen, mvp_doc['hinweis'])
     if stakeholder_bewertung.get('konflikt_level') == 'hoch':
         _append_unique_text(warnungen, 'Hoher Stakeholder-Zielkonflikt zwischen Netzsicht, Projektsicht und Umsetzbarkeit.')
     if route_environment.get('risk_level') == 'hoch':
@@ -1717,7 +1769,22 @@ def berechne_netzanschluss(eingabe, dry_run=False):
             'leistung_mw_neuanlage': round(p_mw, 4),
             'bestehende_einspeisung_mw': round(bestehende_einspeisung_mw, 4),
             'leistung_mw_wirksam': round(p_mw_wirksam, 4),
+            'entfernung_km': entfernung_km,
+            'entfernung_heuristisch': cable_info.get('heuristisch', False),
+            'cos_phi': cos_phi,
+            'cos_phi_quelle': cos_phi_info.get('quelle'),
         },
+        'technical_details': erzeuge_technische_details(
+            eingabe,
+            spannung=spannung,
+            kurzschluss=kurzschluss,
+            leitungstyp=leitungstyp,
+            leitung_meta=LEITUNGSDATEN.get(leitungstyp),
+            cos_phi_info=cos_phi_info,
+            cable_info=cable_info,
+            ik_info=ik_info,
+        ),
+        'power_limit_hints': power_limit_hints(spannungsebene, p_mw * 1000),
         'pqs': pqs,
         'impedanz': {
             'r_q': round(r_q, 5), 'x_q': round(x_q, 5),
@@ -1748,9 +1815,19 @@ def berechne_netzanschluss(eingabe, dry_run=False):
         'transparenz': transparenz,
         'disclaimer': transparenz['disclaimers'],
         'engine_version': ENGINE_VERSION,
+        'norm_version': _norm_version_label(u_kv),
+        'norm_registry_stand': APP_VERSION_NORMSTAND,
     }
+    ctx = revision_context if isinstance(revision_context, dict) else {}
     try:
-        rev = speichere_revision(result, dry_run=dry_run)
+        rev = speichere_revision(
+            result,
+            dry_run=dry_run,
+            actor_user_id=ctx.get("actor_user_id"),
+            action_type=ctx.get("action_type") or "ANALYSIS_COMPLETED",
+            project_id=ctx.get("project_id"),
+            db=ctx.get("db"),
+        )
         result['revision'] = rev
     except Exception as e:
         result['revision'] = {'fehler': str(e), 'dry_run': dry_run}
