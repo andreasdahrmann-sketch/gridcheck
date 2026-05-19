@@ -369,7 +369,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
           </div>
           <div className="rounded-2xl border border-brand-orange/20 bg-brand-orange/10 px-3 py-3 text-xs leading-5 text-text-muted sm:max-w-xs">
             Ohne verifizierte VNB-Daten bleibt die N-1-Aussage bewusst konservativ und erreicht im MVP
-            maximal N1-3.
+            maximal N1-2.
           </div>
         </div>
 

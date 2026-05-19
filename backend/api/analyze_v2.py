@@ -316,7 +316,15 @@ def analyze_v2(
 
     # 1) Berechnung
     try:
-        result = run_v1_analysis(eingabe)
+        result = run_v1_analysis(
+            eingabe,
+            revision_context={
+                "actor_user_id": current_user.id,
+                "project_id": project_id,
+                "action_type": "ANALYSIS_COMPLETED",
+                "db": db,
+            },
+        )
     except Exception as e:
         persist_failed_analysis_run(
             db,

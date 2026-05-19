@@ -10,7 +10,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from core.config import settings
-from db.models import AnalysisRun, BillingEntitlement, BillingEvent, Project, User, make_checksum
+from db.models import AnalysisRun, BillingEntitlement, BillingEvent, GridcheckResultAudit, Project, User, make_checksum
+from engine.berechnung import ENGINE_VERSION
+from compliance import APP_VERSION_NORMSTAND, get_normen_fuer_spannungsebene
 from services.conversion_tracking_service import track_checkout_completed, track_checkout_started
 
 PAID_ACCESS_STATUSES = {"active", "trialing", "past_due"}
@@ -1300,6 +1302,59 @@ def _extract_revision_hash(result_payload: dict[str, Any]) -> str | None:
     return None
 
 
+def _resolve_norm_version(
+    request_payload: dict[str, Any],
+    result_payload: dict[str, Any],
+) -> str:
+    if result_payload.get("norm_version"):
+        return str(result_payload["norm_version"])
+    try:
+        u_kv = float(
+            request_payload.get("nennspannung")
+            or request_payload.get("spannung_kv")
+            or 20.0
+        )
+    except (TypeError, ValueError):
+        u_kv = 20.0
+    norms = get_normen_fuer_spannungsebene(u_kv, nur_kategorien=["Anwendungsregel", "Norm"])
+    details = "; ".join(f"{n.norm_id} ({n.stand})" for n in norms[:8])
+    if details:
+        return f"Registry {APP_VERSION_NORMSTAND} | {details}"
+    return f"Registry {APP_VERSION_NORMSTAND}"
+
+
+def _persist_gridcheck_result_audit(
+    db: Session,
+    *,
+    user: User,
+    project_id: int | None,
+    request_payload: dict[str, Any],
+    result_payload: dict[str, Any],
+) -> None:
+    transparenz = result_payload.get("transparenz") if isinstance(result_payload.get("transparenz"), dict) else {}
+    scores = result_payload.get("scores") if isinstance(result_payload.get("scores"), dict) else {}
+    sources: list[Any] = []
+    if isinstance(result_payload.get("datenqualitaet"), dict):
+        dq_sources = result_payload["datenqualitaet"].get("quellen")
+        if isinstance(dq_sources, list):
+            sources = dq_sources
+    audit = GridcheckResultAudit(
+        project_id=project_id,
+        model_version=str(result_payload.get("engine_version") or ENGINE_VERSION),
+        scoring_version=str(result_payload.get("engine_version") or ENGINE_VERSION),
+        norm_version=_resolve_norm_version(request_payload, result_payload),
+        app_version=settings.app_version,
+        inputs_json=_json_text({**request_payload, "user_id": user.id}),
+        assumptions_json=_json_text(transparenz.get("assumptions", [])),
+        warnings_json=_json_text(result_payload.get("warnungen", [])),
+        score_components_json=_json_text(scores),
+        sources_json=_json_text(sources),
+        result_json=_json_text(result_payload),
+        result_hash=make_checksum(result_payload),
+    )
+    db.add(audit)
+
+
 def persist_completed_analysis_run(
     db: Session,
     user: User,
@@ -1342,6 +1397,13 @@ def persist_completed_analysis_run(
         free_quota_consumed=bool(access["free_quota_consumed"]),
     )
     db.add(run)
+    _persist_gridcheck_result_audit(
+        db,
+        user=user,
+        project_id=project_id,
+        request_payload=request_payload,
+        result_payload=result_payload,
+    )
     db.commit()
     db.refresh(run)
     return run
