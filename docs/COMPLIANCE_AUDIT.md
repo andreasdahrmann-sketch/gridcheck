@@ -81,7 +81,7 @@ cd backend
 python -m pytest tests/test_n1_analyse.py tests/test_vnb_access_control.py -q --tb=no
 ```
 
-Erwartung: grün (PostgreSQL-Test-DB gemäß `conftest.py`).
+**Ergebnis 2026-05-19:** 43 passed (PostgreSQL-Test-DB gemäß `conftest.py`).
 
 ---
 
