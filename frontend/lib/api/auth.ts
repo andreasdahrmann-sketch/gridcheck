@@ -79,6 +79,9 @@ function resolveAuthErrorMessage(res: Response, body: unknown): string {
   if (code === "PASSWORD_TOO_WEAK") {
     return parsed || "Passwort erfuellt die Mindestanforderungen nicht.";
   }
+  if (code === "PASSWORD_RESET_INVALID") {
+    return parsed || "Der Link ist ungueltig oder abgelaufen. Bitte fordern Sie einen neuen Link an.";
+  }
   if (code === "USER_INACTIVE") {
     return parsed || "Ihr Konto ist deaktiviert. Bitte den Administrator kontaktieren.";
   }

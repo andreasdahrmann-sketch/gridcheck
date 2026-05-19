@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, FormEvent, useState } from "react";
+import { Suspense, FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Eye, EyeOff, ShieldCheck } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,15 @@ const fieldClass =
   "h-11 rounded-xl border-border/70 bg-white/5 px-3 text-white placeholder:text-text-dim focus-visible:border-brand-cyan/70 focus-visible:ring-brand-cyan/20";
 
 function LoginPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
+  const resetToken = searchParams.get("reset_token");
+
+  useEffect(() => {
+    if (resetToken) {
+      router.replace(`/reset-password?token=${encodeURIComponent(resetToken)}`);
+    }
+  }, [resetToken, router]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -179,14 +187,22 @@ function LoginPageContent() {
                   <Label htmlFor="login-password" className="text-white">
                     Passwort
                   </Label>
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((current) => !current)}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-text-muted transition hover:text-white"
-                  >
-                    {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                    {showPassword ? "Verbergen" : "Anzeigen"}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href="/login/forgot-password"
+                      className="text-xs font-medium text-brand-cyan transition hover:text-brand-cyan/80"
+                    >
+                      Passwort vergessen?
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((current) => !current)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-text-muted transition hover:text-white"
+                    >
+                      {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      {showPassword ? "Verbergen" : "Anzeigen"}
+                    </button>
+                  </div>
                 </div>
                 <Input
                   id="login-password"

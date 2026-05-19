@@ -26,7 +26,8 @@ export function isSelfServeCheckoutPlan(plan: string): boolean {
   return SELF_SERVE_CHECKOUT_PLANS.has(plan);
 }
 
-export function registerHrefForPlan(plan: string, next = "/settings"): string {
+export function registerHrefForPlan(plan: string): string {
+  const next = isSelfServeCheckoutPlan(plan) ? settingsCheckoutHref(plan) : "/onboarding";
   return `/register?plan=${encodeURIComponent(plan)}&next=${encodeURIComponent(next)}`;
 }
 

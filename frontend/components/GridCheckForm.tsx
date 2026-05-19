@@ -49,6 +49,8 @@ import {
   resolveCosPhiDefault,
 } from "@/lib/gridcheck-engine";
 import { readUserPreferences } from "@/lib/user-preferences";
+import DemoCaseLoader, { type DemoCase } from "./DemoCaseLoader";
+import DemoModeBanner from "./DemoModeBanner";
 
 type CustomerType = "projektierer" | "speicherbetreiber" | "netzbetreiber" | "investor";
 
@@ -138,6 +140,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
   const [isStartingCheckout, setIsStartingCheckout] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<string>("free");
   const [packageSelectionTouched, setPackageSelectionTouched] = useState(false);
+  const [activeDemoId, setActiveDemoId] = useState<string | null>(null);
 
   const ct = meta.kundentyp as CustomerType;
   const stakeholderPath = resolveStakeholderProductPath({
@@ -152,6 +155,26 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
 
   const updateInput = (patch: Partial<GridCheckInput>) => setInput(prev => ({ ...prev, ...patch }));
   const updateMeta = (patch: Partial<MetaData>) => setMeta(prev => ({ ...prev, ...patch }));
+
+  const applyDemoCase = (demo: DemoCase) => {
+    const demoCustomerType = demo.kundentyp as CustomerType;
+    setInput((prev) => ({ ...INITIAL_INPUT, ...prev, ...demo.input }));
+    setMeta((prev) => ({
+      ...prev,
+      kundentyp: forcedCustomerType ?? demoCustomerType ?? prev.kundentyp,
+      ort: demo.input.ort ?? prev.ort,
+      projektname: prev.projektname || demo.label.replace("[DEMO] ", "").trim(),
+      erzeugungstyp:
+        prev.erzeugungstyp ||
+        (demo.input.anlagentyp === "batterie" ? "BESS" : demo.input.anlagentyp === "solar" ? "PV" : ""),
+    }));
+    setActiveDemoId(demo.id);
+    setResult(null);
+    setAnalysisError(null);
+    if (!forcedCustomerType && demoCustomerType) {
+      setStep(1);
+    }
+  };
 
   const buildCombinedInput = (): GridCheckInput => ({
     ...input,
@@ -500,6 +523,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
     setAnalysisRunId(createAnalysisRunId());
     setSelectedOfferId("free");
     setPackageSelectionTouched(false);
+    setActiveDemoId(null);
     window.localStorage.removeItem(DRAFT_STORAGE_KEY);
   };
 
@@ -587,6 +611,14 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
         <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
           {stakeholderCopy.visibilityNote}
         </div>
+
+        <DemoCaseLoader onSelect={applyDemoCase} />
+        {activeDemoId ? (
+          <DemoModeBanner
+            title="Beispieldaten aktiv"
+            description="Die Eingaben stammen aus einem Demo-Fall ohne echte Netzbetreiberdaten. Ergebnisse dienen der Produktdemonstration."
+          />
+        ) : null}
 
         <div className={sectionClass}>
           <h3 className={sectionTitle}>Zugang & Tarif</h3>

@@ -8,7 +8,7 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isAuthInfrastructureError, register } from "@/lib/api/auth";
+import { isAuthInfrastructureError, login, register } from "@/lib/api/auth";
 import { getPasswordPolicyChecks, isPasswordPolicySatisfied } from "@/lib/password-policy";
 import {
   isSelfServeCheckoutPlan,
@@ -28,7 +28,6 @@ function RegisterPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,7 +41,9 @@ function RegisterPageContent() {
         ? "/settings"
         : "/onboarding";
   const nextTarget = searchParams.get("next") || defaultNext;
-  const loginHref = `/login?intent=${encodeURIComponent(intent)}&next=${encodeURIComponent(nextTarget)}`;
+  const loginParams = new URLSearchParams({ intent, next: nextTarget });
+  if (checkoutPlan) loginParams.set("plan", checkoutPlan);
+  const loginHref = `/login?${loginParams.toString()}`;
   const [role, setRole] = useState(intent === "vnb-pilot" ? "netzbetreiber" : "projektierer");
 
   const passwordChecks = useMemo(() => getPasswordPolicyChecks(password), [password]);
@@ -58,7 +59,6 @@ function RegisterPageContent() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setMessage(null);
 
     if (!email.trim() || !isPasswordPolicySatisfied(password)) {
       setError(
@@ -70,12 +70,11 @@ function RegisterPageContent() {
     setIsSubmitting(true);
     try {
       await register({ email: email.trim(), password, role, full_name: fullName.trim() || undefined });
-      setMessage("Registrierung erfolgreich. Bitte einloggen – danach fuehrt Sie die Einfuehrung zu Ihrer ersten Analyse.");
-      setPassword("");
+      await login({ email: email.trim(), password });
+      window.location.href = nextTarget;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Registrierung fehlgeschlagen";
       setError(msg);
-    } finally {
       setIsSubmitting(false);
     }
   }
@@ -107,10 +106,10 @@ function RegisterPageContent() {
                 <span className="text-sm font-semibold text-white">{intentProfile.label}</span>
               </div>
               <p className="mt-3 text-sm leading-6 text-white/90">{intentProfile.summary}</p>
-              <p className="mt-2 text-xs leading-5 text-text-muted">Nach Registrierung und Login: {intentProfile.nextStep}</p>
+              <p className="mt-2 text-xs leading-5 text-text-muted">Nach Registrierung: {intentProfile.nextStep}</p>
               {checkoutPlan && offerIdForCheckoutPlan(checkoutPlan) ? (
                 <p className="mt-2 text-xs leading-5 text-brand-cyan">
-                  Gewaehltes Paket: {checkoutPlan}. Nach dem Login startet Stripe Checkout in den Einstellungen.
+                  Gewaehltes Paket: {checkoutPlan}. Nach der Registrierung startet Stripe Checkout automatisch.
                 </p>
               ) : null}
             </div>
@@ -137,9 +136,15 @@ function RegisterPageContent() {
                   Konto zuerst, Routing danach
                 </p>
                 <p className="mt-2 text-sm leading-6 text-text-muted">
-                  Das Frontend fuehrt nach dem Einloggen gezielt weiter zu{" "}
+                  Nach der Registrierung geht es direkt weiter zu{" "}
                   <span className="font-medium text-white">
-                    {nextTarget === "/settings" ? "Tarif & Analyse-History" : "Ihren Projekten"}
+                    {nextTarget.includes("checkout=1")
+                      ? "Stripe Checkout"
+                      : nextTarget === "/settings"
+                        ? "Tarif & Analyse-History"
+                        : nextTarget === "/onboarding"
+                          ? "der Einfuehrung"
+                          : "Ihren Projekten"}
                   </span>
                   .
                 </p>
@@ -251,11 +256,6 @@ function RegisterPageContent() {
                 </div>
               </div>
 
-              {message ? (
-                <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                  {message}
-                </div>
-              ) : null}
               {error ? (
                 <div className="space-y-2">
                   <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -278,14 +278,26 @@ function RegisterPageContent() {
                 disabled={isSubmitting}
                 className="h-11 w-full rounded-xl bg-brand-orange text-white hover:bg-brand-orangeHover"
               >
-                {isSubmitting ? "Konto wird angelegt..." : "Konto anlegen"}
+                {isSubmitting
+                  ? checkoutPlan
+                    ? "Konto wird angelegt, Checkout startet..."
+                    : "Konto wird angelegt..."
+                  : checkoutPlan
+                    ? "Konto anlegen und fortfahren"
+                    : "Konto anlegen"}
               </Button>
             </form>
 
             <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-text-muted">
-              Nach dem ersten Login geht es weiter zu{" "}
+              Nach der Registrierung werden Sie automatisch angemeldet und weitergeleitet zu{" "}
               <span className="font-medium text-white">
-                {nextTarget === "/settings" ? "Tarif & Analyse-History" : "Ihren Projekten"}
+                {nextTarget.includes("checkout=1")
+                  ? "Stripe Checkout"
+                  : nextTarget === "/settings"
+                    ? "Tarif & Analyse-History"
+                    : nextTarget === "/onboarding"
+                      ? "der Einfuehrung"
+                      : "Ihren Projekten"}
               </span>
               . Den direkten Frontend-Einstieg finden Sie ausserdem im{" "}
               <Link className="font-medium text-brand-cyan" href="/projektierer">
