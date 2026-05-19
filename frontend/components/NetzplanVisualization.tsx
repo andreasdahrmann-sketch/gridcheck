@@ -282,6 +282,10 @@ function buildBadges(
       label: result.n1.dso_daten_vorhanden ? "DSO-Daten verifiziert" : "DSO-Daten offen",
       tone: result.n1.dso_daten_vorhanden ? "good" : "warn",
     },
+    {
+      label: "OSM-Infrastrukturhinweise: nicht angebunden",
+      tone: "warn",
+    },
     ...(meta?.kundentyp
       ? [
           {
@@ -380,6 +384,7 @@ function buildAssumptions(
       ? "Die Netz-Topologie ist noch nicht verifiziert."
       : `Die visuelle Struktur folgt der Topologieannahme ${TOPOLOGIE_LABELS[input.topologie]}.`,
     "NAP-, Stations- und NVP-Positionen werden fuer die UX aus Distanz-, Topologie- und Belastungsdaten heuristisch entlang des Korridors abgeleitet.",
+    "OpenStreetMap-Asset-Hinweise (Trafo, Umspannwerk) sind im MVP noch nicht als Kartenebene angebunden; nur der Projektstandort ist georeferenziert.",
   ]).slice(0, 5);
 }
 
@@ -510,7 +515,7 @@ export default function NetzplanVisualization({
           </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_360px]">
+        <div className="grid gap-5 lg:grid-cols-1 xl:grid-cols-[minmax(0,1.7fr)_360px]">
           <NetzplanMapPanel
             input={input}
             result={result}

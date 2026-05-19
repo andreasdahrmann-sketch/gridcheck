@@ -12,7 +12,11 @@ import type { GridCheckInput, GridCheckResult } from "@/types";
 const LeafletMap = dynamic(() => import("./NetzplanLeafletMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex min-h-[420px] items-center justify-center rounded-[24px] border border-white/10 bg-black/20 text-sm text-text-muted">
+    <div
+      className="flex min-h-[280px] animate-pulse items-center justify-center rounded-[24px] border border-white/10 bg-black/20 text-sm text-text-muted sm:min-h-[420px]"
+      role="status"
+      aria-live="polite"
+    >
       Lade Mapbox-Kartenausschnitt...
     </div>
   ),
@@ -87,7 +91,10 @@ export default function NetzplanMapPanel({
         : "PLZ-Heuristik noch nicht verfuegbar.";
 
   return (
-    <div className="rounded-[26px] border border-border/60 bg-bg-card/70 p-4">
+    <section
+      className="rounded-[26px] border border-border/60 bg-bg-card/70 p-4"
+      aria-label="Netzplan-Karte mit Projektstandort und heuristischen Netzpfaden"
+    >
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <div className="text-xs uppercase tracking-[0.22em] text-text-dim">Netzplan auf Mapbox-Basis</div>
@@ -108,13 +115,16 @@ export default function NetzplanMapPanel({
             <Network className="h-3.5 w-3.5 text-brand-mint" />
             VNB-Lookup: {vnbSummary}
           </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-500/10 px-3 py-1 text-amber-100">
+            Datenquelle {result.daten_confidence}
+          </span>
         </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_300px]">
         <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(3,14,14,0.96)_0%,rgba(6,24,24,0.98)_100%)]">
           {!mapboxReady && (
-            <div className="flex min-h-[420px] items-center justify-center p-6">
+            <div className="flex min-h-[280px] items-center justify-center p-6 sm:min-h-[420px]">
               <div className="max-w-md rounded-[22px] border border-amber-400/25 bg-amber-500/10 p-5 text-sm text-amber-100">
                 <div className="flex items-start gap-3">
                   <ShieldAlert className="mt-0.5 h-5 w-5 text-amber-300" />
@@ -131,13 +141,17 @@ export default function NetzplanMapPanel({
           )}
 
           {mapboxReady && locationStatus.kind === "loading" && (
-            <div className="flex min-h-[420px] items-center justify-center text-sm text-text-muted">
+            <div
+              className="flex min-h-[280px] animate-pulse items-center justify-center text-sm text-text-muted sm:min-h-[420px]"
+              role="status"
+              aria-live="polite"
+            >
               Loese Projektstandort via Mapbox auf...
             </div>
           )}
 
           {mapboxReady && locationStatus.kind === "error" && (
-            <div className="flex min-h-[420px] items-center justify-center p-6">
+            <div className="flex min-h-[280px] items-center justify-center p-6 sm:min-h-[420px]">
               <div className="max-w-md rounded-[22px] border border-rose-400/25 bg-rose-500/10 p-5 text-sm text-rose-100">
                 <div className="font-semibold text-white">Kartenausschnitt konnte nicht geladen werden.</div>
                 <p className="mt-2 leading-6">{locationStatus.message}</p>
@@ -267,10 +281,17 @@ export default function NetzplanMapPanel({
                 <span className="text-brand-orange">•</span>
                 <span>VNB-Zuordnung kommt weiterhin aus dem bestehenden heuristischen PLZ-Lookup; die Farben zeigen keine verbindliche Kapazitaet.</span>
               </li>
+              <li className="flex gap-2">
+                <span className="text-brand-orange">•</span>
+                <span>
+                  OSM-Infrastrukturhinweise (Trafo, Umspannwerk) sind im MVP noch nicht als Kartenebene
+                  angebunden – nur der Projektstandort ist georeferenziert.
+                </span>
+              </li>
             </ul>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

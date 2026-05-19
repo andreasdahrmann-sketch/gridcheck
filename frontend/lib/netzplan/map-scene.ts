@@ -195,6 +195,16 @@ function stableBearingFromPlz(plz: string): number {
   return 25 + ((seed * 19) % 285);
 }
 
+export function buildNvpCapacityDetail(result: GridCheckResult): string {
+  if (result.n1.dso_daten_vorhanden && result.nvp_freie_kapazitaet_kw > 0) {
+    return `Vom Netzbetreiber gemeldete Kapazitaetsangabe: ${formatNumber(result.nvp_freie_kapazitaet_kw, 0)} kW`;
+  }
+  if (result.nvp_freie_kapazitaet_kw > 0) {
+    return `Eingabe-/Screeningwert ${formatNumber(result.nvp_freie_kapazitaet_kw, 0)} kW – keine verifizierte freie Netzkapazitaet`;
+  }
+  return "Keine verifizierte freie Netzkapazitaet; OSM liefert keine Kapazitaetsaussage.";
+}
+
 export function buildNetzplanMapScene({
   input,
   result,
@@ -331,10 +341,7 @@ export function buildNetzplanMapScene({
       id: "nvp",
       kind: "nvp",
       label: result.nvp_bezeichnung,
-      detail:
-        result.nvp_freie_kapazitaet_kw > 0
-          ? `Kapazitaetsindikation ${formatNumber(result.nvp_freie_kapazitaet_kw, 0)} kW`
-          : "Keine verifizierte freie Netzkapazitaet uebergeben.",
+      detail: buildNvpCapacityDetail(result),
       tone: upstreamTone,
       approximate: true,
       position: nvp,

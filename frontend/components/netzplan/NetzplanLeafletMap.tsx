@@ -182,7 +182,8 @@ export default function NetzplanLeafletMap({ scene }: { scene: NetzplanMapScene 
       zoom={10}
       zoomControl={false}
       scrollWheelZoom={false}
-      className="h-full min-h-[420px] w-full rounded-[24px]"
+      className="h-full min-h-[280px] w-full rounded-[24px] sm:min-h-[420px]"
+      aria-label="Interaktive Netzplan-Karte mit Projektstandort und heuristischen Netzpfaden"
     >
       <ZoomControl position="bottomright" />
       <FitSceneBounds scene={scene} />

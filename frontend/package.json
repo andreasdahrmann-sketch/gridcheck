@@ -12,6 +12,7 @@
     "lint": "next lint",
     "icons:png": "node scripts/generate-pwa-icons.mjs",
     "verify:toolchain": "node scripts/verify-toolchain.mjs",
+    "test:netzplan": "node --test lib/netzplan/map-scene.nvp-detail.test.mjs",
     "prebuild": "node scripts/verify-toolchain.mjs",
     "native:add:android": "npx @capacitor/cli@8.3.3 add android",
     "native:add:ios": "npx @capacitor/cli@8.3.3 add ios",
