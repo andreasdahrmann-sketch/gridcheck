@@ -1,9 +1,10 @@
 """V1-Endpoints fuer geo-bezogene Lookups (PLZ -> VNB-Kandidaten, OSM-Nahbauten)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Path, Query, Request
 
 from core.errors import AnalysisError
+from core.rate_limit import enforce_rate_limit, get_client_ip
 from geo.osm_nearby import lookup_osm_nearby
 from geo.plz_lookup import lookup_plz
 from geo.schemas import OsmNearbyResponse, PlzLookupResponse
@@ -24,8 +25,16 @@ router = APIRouter(prefix="/api/v1/geo", tags=["v1-geo"])
     ),
 )
 def get_plz(
+    request: Request,
     plz: str = Path(..., description="Deutsche PLZ, genau 5 Ziffern."),
 ) -> PlzLookupResponse:
+    enforce_rate_limit(
+        f"geo:plz:ip:{get_client_ip(request)}",
+        limit=40,
+        window_seconds=60,
+        message="Zu viele PLZ-Lookups",
+        hint="Bitte kurz warten und die Anfrage erneut senden.",
+    )
     try:
         return lookup_plz(plz)
     except AnalysisError as e:
@@ -52,6 +61,7 @@ def get_plz(
     ),
 )
 def get_osm_nearby(
+    request: Request,
     lat: float | None = Query(default=None, ge=-90, le=90, description="Breitengrad WGS84."),
     lon: float | None = Query(default=None, ge=-180, le=180, description="Laengengrad WGS84."),
     plz: str | None = Query(default=None, description="Deutsche PLZ (5 Ziffern), falls keine Koordinaten."),
@@ -75,6 +85,13 @@ def get_osm_nearby(
                 "hint": "lat und lon gemeinsam angeben.",
             },
         )
+    enforce_rate_limit(
+        f"geo:osm-nearby:ip:{get_client_ip(request)}",
+        limit=20,
+        window_seconds=60,
+        message="Zu viele OSM-Nahbauten-Anfragen",
+        hint="Bitte kurz warten — die Anfragerate ist begrenzt.",
+    )
     try:
         return lookup_osm_nearby(lat=lat, lon=lon, plz=plz, radius_m=radius_m)
     except AnalysisError as e:

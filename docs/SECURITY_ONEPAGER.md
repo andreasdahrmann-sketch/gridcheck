@@ -35,7 +35,8 @@
 | **Refresh-Token** | JWT, TTL **7 Tage**, HttpOnly-Cookie (`gridcheck_refresh`) |
 | **Passwörter** | **bcrypt**, 12 Rounds; Policy: min. **12** Zeichen, Groß/Klein, Ziffer, Sonderzeichen |
 | **CSRF** | Pflicht auf cookie-basierten Schreib-Endpoints (`X-CSRF-Token` + CSRF-Cookie) |
-| **Rate-Limits** | Auth (Register/Login): **10 / 5 Min** pro E-Mail; Analyse/Report-Export scoped (IP/User) |
+| **Rate-Limits** | Auth Register/Login: **10 / 5 Min** pro E-Mail; Forgot-Password: **5 / 5 Min**; Geo PLZ/OSM: **40+20 / Min** pro IP; Analyse/Report scoped (IP/User, siehe `core/rate_limit.py`) |
+| **E-Mail** | Transaktional (Welcome, Passwort-Reset) via Resend oder SMTP — siehe [EMAIL_SETUP.md](./EMAIL_SETUP.md) |
 | **Host-Schutz** | `TrustedHostMiddleware` — `TRUSTED_HOSTS` in Prod setzen |
 | **CORS** | Explizite Origins (`CORS_ORIGINS`) + optional Regex für Vercel-Previews |
 | **Admin-Registrierung** | Öffentlich **gesperrt** (403) |
