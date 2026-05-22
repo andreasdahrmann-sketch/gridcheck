@@ -115,6 +115,18 @@ def _latest_report_revision(report_type: str) -> ReportRevisionRecord:
         db.close()
 
 
+def _report_revision_count(report_type: str) -> int:
+    db = SessionLocal()
+    try:
+        return int(
+            db.query(ReportRevisionRecord)
+            .filter(ReportRevisionRecord.report_type == report_type)
+            .count()
+        )
+    finally:
+        db.close()
+
+
 def _engine_result_base() -> dict:
     return {
         "status": "OK",
@@ -429,6 +441,33 @@ def test_post_vnb_report_pdf_query_format(
     assert r.headers.get("x-gridcheck-report-revision-hash") == latest.hash
     assert r.headers.get("x-gridcheck-report-revision-uuid") == latest.uuid
     assert r.headers.get("x-gridcheck-report-verify-path", "").endswith(latest.hash)
+
+
+def test_pdf_quality_failure_does_not_persist_report_revision(
+    isolierte_revisionen,
+    isolierte_report_revisionen,
+    monkeypatch,
+):
+    _mock_report_analysis(monkeypatch, _engine_result_base())
+
+    from api import v2_reports as reports_api
+
+    monkeypatch.setattr(
+        reports_api,
+        "run_pre_pdf_quality_checks",
+        lambda *args, **kwargs: ["forced quality failure"],
+    )
+
+    before = _report_revision_count("vnb")
+    r = client.post(
+        "/api/v2/reports/vnb?format=pdf",
+        json={"analyze_request": _report_request()},
+        headers=_auth_headers(),
+    )
+
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["code"] == "REPORT_PDF_QUALITY_FAILED"
+    assert _report_revision_count("vnb") == before
 
 
 def test_post_invest_report_pdf_body_output_format(
