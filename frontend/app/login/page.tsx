@@ -16,6 +16,7 @@ import {
   settingsCheckoutHref,
 } from "@/lib/billing-plans";
 import { getPurchaseIntentProfile, normalizePurchaseIntent } from "@/lib/purchase-intents";
+import { safeNextPath } from "@/lib/safe-next-path";
 
 const cardClass = "rounded-[28px] border border-white/10 bg-bg-card/80 p-6 shadow-[0_12px_42px_rgba(0,0,0,0.18)]";
 const fieldClass =
@@ -45,7 +46,7 @@ function LoginPageContent() {
       : intent === "upgrade" || intent === "pro"
         ? "/settings"
         : "/projects";
-  const nextTarget = searchParams.get("next") || defaultNext;
+  const nextTarget = safeNextPath(searchParams.get("next"), defaultNext);
   const registerParams = new URLSearchParams({ intent, next: nextTarget });
   if (checkoutPlan) registerParams.set("plan", checkoutPlan);
   const registerHref = `/register?${registerParams.toString()}`;
