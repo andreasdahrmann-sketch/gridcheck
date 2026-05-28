@@ -10,7 +10,6 @@ Visual system reference: docs/PDF_REPORTS.md (Layout-Stand).
 """
 from __future__ import annotations
 
-import copy
 import hashlib
 import io
 import json
@@ -147,8 +146,13 @@ _DISCLAIMER_LINE = (
 # Hash + ID helpers
 # ============================================================================
 def _canonical_input_for_hash(report: dict[str, Any]) -> str:
-    """Stable JSON of report payload with self-referential metadata stripped."""
-    snapshot = copy.deepcopy(report)
+    """Stable JSON of report payload with self-referential metadata stripped.
+
+    perf: shallow copy ist ausreichend, weil nur Top-Level-Keys via pop()
+    entfernt werden; json.dumps liest danach nur und mutiert die Nested-Daten
+    nicht. deepcopy auf grossen Report-Dicts war ein messbarer Hotspot.
+    """
+    snapshot = dict(report)
     for key in _SELF_REFERENTIAL_KEYS:
         snapshot.pop(key, None)
     return json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

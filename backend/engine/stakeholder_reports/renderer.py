@@ -1,12 +1,12 @@
 ﻿from __future__ import annotations
 
-import copy
 import hashlib
 import json
 import uuid
 from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -44,7 +44,14 @@ def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+@lru_cache(maxsize=1)
 def _template_env() -> Environment:
+    """Cached Jinja Environment.
+
+    perf: Environment-Erzeugung lud bisher pro Request die Templates frisch
+    vom Filesystem; Jinja's eigener Cache wirkt erst, wenn die Env-Instanz
+    wiederverwendet wird. Templates aendern sich nicht zur Laufzeit.
+    """
     base_dir = Path(__file__).resolve().parent / "templates"
     return Environment(
         loader=FileSystemLoader(str(base_dir)),
@@ -82,7 +89,9 @@ def build_report_verify_path(hash_value: str) -> str:
 
 
 def compute_report_checksum(report_data: dict[str, Any]) -> str:
-    normalized = copy.deepcopy(report_data)
+    # perf: shallow copy reicht — nur Top-Level-Keys werden gepoppt,
+    # _sha256/json.dumps liest die Nested-Daten anschliessend nur.
+    normalized = dict(report_data)
     for key in _SELF_REFERENTIAL_REPORT_KEYS:
         normalized.pop(key, None)
     return _sha256(normalized)
@@ -126,7 +135,10 @@ def enrich_report_with_revision_metadata(
     report_checksum: str,
     html_checksum: str | None = None,
 ) -> dict[str, Any]:
-    enriched = copy.deepcopy(report_data)
+    # perf: shallow copy reicht — wir setzen ausschliesslich Top-Level-Keys
+    # (audit_hash, report_generated_at, report_revision, ...) und mutieren
+    # keine verschachtelten Strukturen aus report_data.
+    enriched = dict(report_data)
     source_revision_hash = (
         str(
             enriched.get("source_revision_hash")

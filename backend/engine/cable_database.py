@@ -1,6 +1,7 @@
 """Kabeldaten nach VDE 0276-603 / IEC 60228 fuer Grid-Connection-Screening v2."""
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Literal, TypedDict
 
 
@@ -63,11 +64,15 @@ def get_cable_resistance_at_temp(
     return r20 * (1 + alpha * (operating_temp_c - 20))
 
 
+@lru_cache(maxsize=128)
 def get_cable_params(
     material: Literal["copper", "aluminum"],
     cross_section: int | float,
     voltage_level: Literal["low", "medium"],
 ) -> CableParameters | None:
+    # perf: pro Grid-Check wird die Funktion 3x mit identischen Argumenten
+    # aufgerufen (Spannungsfall, Kurzschluss, Thermik); Tabelle ist
+    # konstant und das Ergebnis-Dict darf gemeinsam gelesen werden.
     key = f"{material}_mv_underground" if voltage_level == "medium" else f"{material}_underground"
     section = int(round(float(cross_section)))
     table = CABLE_DATABASE.get(key, {})
