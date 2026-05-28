@@ -42,6 +42,12 @@ if (rawBackendUrl && /\/api(\/v\d+)?\/?$/i.test(rawBackendUrl)) {
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // perf: lucide-react exportiert >1.000 Icons; ohne Per-Icon-Tree-Shaking
+  // landet ein grosser Teil im initial bundle. optimizePackageImports
+  // erzwingt Per-Icon-Auflösung (Next 14.2+).
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
   async rewrites() {
     if (!rawBackendUrl || isLocalBackendUrl) return [];
     return [
