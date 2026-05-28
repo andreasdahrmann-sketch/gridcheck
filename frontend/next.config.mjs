@@ -59,4 +59,29 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * perf: Bundle-Analyzer (BL-PERF-006) nur aktiv bei ANALYZE=true.
+ *
+ * Wrapper ist optional — wenn `@next/bundle-analyzer` nicht installiert
+ * ist (z. B. frischer Clone vor `npm install`), bleibt die Config
+ * unverändert. Top-level await ist in ESM (.mjs) ab Node 14.8 erlaubt
+ * und wird von Next 14.2 + Node 20 unterstützt (siehe .nvmrc / engines).
+ *
+ * Output: frontend/.next/analyze/{client,nodejs,edge}.html
+ * Doku: docs/PERF_BASELINE.md
+ */
+let withBundleAnalyzer = (cfg) => cfg;
+if (process.env.ANALYZE === "true") {
+  try {
+    const ba = (await import("@next/bundle-analyzer")).default;
+    withBundleAnalyzer = ba({ enabled: true });
+  } catch (err) {
+    console.warn(
+      "[next.config] ANALYZE=true gesetzt, aber @next/bundle-analyzer nicht installiert. " +
+        "Bitte `npm install` ausführen (siehe docs/PERF_BASELINE.md). Build läuft ohne Analyzer.",
+      err?.message ?? err,
+    );
+  }
+}
+
+export default withBundleAnalyzer(nextConfig);

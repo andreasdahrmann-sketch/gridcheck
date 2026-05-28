@@ -98,3 +98,10 @@ tsc-out.txt
 .skills_extract.txt
 .skills_struct.txt
 gridcheck_form_dump.txt
+
+# Perf-Baseline-Outputs (BL-PERF-006, siehe docs/PERF_BASELINE.md)
+backend/.benchmarks/
+frontend/.next/analyze/
+lighthouse-baseline.html
+frontend/lighthouse-*.html
+*.prof

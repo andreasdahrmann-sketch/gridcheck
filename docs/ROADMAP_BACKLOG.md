@@ -311,19 +311,32 @@ Refetch zentral steuern.
 
 ### BL-PERF-006 — Profiling-Setup (Voraussetzung für TIER 2 Messung)
 
+**STATUS:** in_progress (Setup geliefert, Baseline-Runs ausstehend).
+Harness im Repo, Doku unter `docs/PERF_BASELINE.md`. Erste Bench-Werte
+trägt der Nutzer nach dem manuellen Bootstrap nach.
+
 **Ziel:** Vor jeder weiteren TIER-2-Massnahme reale Latenz- und
 Bundle-Daten erheben statt zu schätzen.
 
 **Scope:**
 - Backend: `pytest-benchmark` für die heisse Engine-Sequenz
   (`calculate_grid_connection_from_engine` + `build_stakeholder_report_pdf`).
+  → geliefert: `backend/requirements-dev.txt`,
+  `backend/tests/perf/{conftest.py,test_perf_grid_calc.py,test_perf_pdf_render.py,test_perf_cable_lookup.py}`,
+  Skip-Logik via `backend/pytest.ini` (`norecursedirs = perf`) + Perf-Conftest.
 - Frontend: `next build --profile` + Bundle-Analyzer
   (`@next/bundle-analyzer`) zur Diff-Messung initial / nach Optimierung.
+  → geliefert: `frontend/package.json` (`build:analyze`, `build:profile`,
+  devDeps), `frontend/next.config.mjs` (conditional ANALYZE-Wrapper, no-op
+  ohne installiertes Paket).
 - Lighthouse-CI als Smoke-Job (Performance, Accessibility, Best-Practices).
+  → ausstehend: aktuell nur dokumentierter `npx lighthouse`-Aufruf, CI-Job
+  bleibt Folge-Story (out-of-scope hier).
 
 **Akzeptanzkriterien:**
 - Reproduzierbare Bench-Suite mit dokumentierten Baselines im Repo
-  (`docs/PERF_BASELINE.md`).
+  (`docs/PERF_BASELINE.md`). → Setup ✅, Baseline-Zeilen werden vom Nutzer
+  nach dem ersten `--benchmark-save=baseline_initial` eingetragen.
 
 **Aufwand:** M.
 

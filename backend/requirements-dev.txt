@@ -1,0 +1,15 @@
+# === Dev-/Profiling-Dependencies ===
+# Nicht für den App-Runtime erforderlich. Installation nur lokal / in CI für
+# Perf-Baselines (siehe docs/PERF_BASELINE.md, BL-PERF-006).
+#
+# Installation:
+#   pip install -r requirements-dev.txt
+#
+# WICHTIG: Diese Datei ergänzt requirements.txt, ersetzt sie nicht.
+# Für den normalen Backend-Lauf bleibt requirements.txt verbindlich.
+
+# Perf-Benchmarks für Engine-Hotpaths (calculate_grid_connection,
+# build_stakeholder_report_pdf, get_cable_params). cProfile bleibt Stdlib
+# und wird ad-hoc für Hot-Path-Visualisierung genutzt — daher KEIN
+# zusätzlicher Profiler im Lockfile (siehe ADR-Toolchain-Matrix).
+pytest-benchmark>=4.0.0,<5.0.0
