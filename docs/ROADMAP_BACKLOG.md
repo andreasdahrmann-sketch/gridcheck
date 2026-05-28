@@ -234,24 +234,37 @@ Risiko von Regressionen).
 
 ### BL-PERF-002 — ReportLab Style-Reuse in `pdf_layout.py`
 
-**Ziel:** Per-Render-Allokation von `ParagraphStyle`-Objekten reduzieren.
+**STATUS:** done (commit-pending).
 
-**Scope:**
-- `body_style(palette)`, `body_bold_style(palette)`, `muted_style(palette)`,
-  `section_style(palette)`, `subtitle_style(palette)`, `title_style(palette)`
-  per `lru_cache`-Wrapper mit `palette.label` als Cache-Key (Palette ist
-  `@dataclass(frozen=True)`, hashbar).
-- Achtung: In `brand_header` wird `title_p.style.alignment` lokal mutiert —
-  vor Cache-Migration sicherstellen, dass keine geteilte Style-Instanz für
-  diese Mutation verwendet wird (entweder Style klonen statt mutieren oder
-  nicht-cached Style behalten).
+**Umgesetzt (Strategy A — `@lru_cache` auf hashbarer `StakeholderPalette`):**
+- 8 Style-Funktionen mit `@lru_cache(maxsize=None)` versehen:
+  `title_style`, `subtitle_style`, `section_style`, `body_style`,
+  `body_bold_style`, `muted_style`, `hero_value_style`, `hero_label_style`.
+- `StakeholderPalette` ist bereits `@dataclass(frozen=True)` → trivial hashbar,
+  keine Palette-Typ-Refaktorierung nötig.
+- **Mutations-Ausnahme aufgelöst:** Die einzigen `.style.alignment = 2`-
+  Mutationen in `brand_header()` (`title_p.style.alignment`, `sub_p.style.alignment`)
+  wurden entfernt und stattdessen als `alignment=TA_RIGHT` in die Style-
+  Definitionen von `title_style`/`subtitle_style` verbacken. Damit ist KEINE
+  Style-Funktion vom Cache ausgenommen.
+- Mutations-Audit (`Grep` `.alignment = | .fontSize = | …` im gesamten
+  `engine/stakeholder_reports/`-Pfad) bestätigt: nach dem Refactor existiert
+  in den Modulen keine Mutation cached-Style-Instanzen mehr.
+
+**Verhaltens-Erhalt:**
+- Neuer Regressionstest `backend/tests/test_perf_002_pdf_byte_identity.py`
+  rendert pro Stakeholder (projektierer/vnb/invest) das PDF zweimal sowie ein
+  drittes Mal nach `_style.cache_clear()` und vergleicht SHA-256 — alle Hashes
+  müssen identisch sein. `reportlab.rl_config.invariant` wird im Test auf `1`
+  gesetzt, um `/CreationDate`, `/ModDate` und Random-File-ID stillzulegen.
 
 **Akzeptanzkriterien:**
 - PDF-Output ist byte-identisch zum aktuellen Stand (Hash-Test grün).
-- Profiler zeigt ≤ 50 % `ParagraphStyle.__init__`-Aufrufe pro Report.
+- Profiler zeigt ≤ 50 % `ParagraphStyle.__init__`-Aufrufe pro Report
+  (Verifikation durch Nutzer-Bench gegen `baseline_initial`).
 
-**Risiko/Aufwand:** S/M (hohes Regressionsrisiko bei Mutation, daher mit
-Hash-Test absichern).
+**Risiko/Aufwand:** S/M (umgesetzt; Regressionsrisiko durch Hash-Test
+abgesichert).
 
 ---
 

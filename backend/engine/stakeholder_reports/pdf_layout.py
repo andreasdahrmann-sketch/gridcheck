@@ -8,10 +8,12 @@ stakeholder layouts (Projektierer, VNB, Invest) with consistent quality.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_RIGHT
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, Paragraph, Spacer, Table, TableStyle
@@ -90,6 +92,16 @@ FONT_REGULAR = "Helvetica"
 FONT_BOLD = "Helvetica-Bold"
 
 
+# BL-PERF-002: ParagraphStyle-Objekte werden pro Render mehrfach instanziiert
+# (siehe pdf_builder._build_*_story); StakeholderPalette ist @dataclass(frozen=True)
+# und damit hashbar -> @lru_cache liefert pro Palette genau eine geteilte Instanz.
+# Mutations-Audit (Stand BL-PERF-002): die einzigen `.style.alignment = 2`-Mutationen
+# in brand_header() wurden entfernt; alignment ist jetzt in title_style/subtitle_style
+# fest verbacken. Alle uebrigen Style-Funktionen werden nirgends nach dem Aufruf
+# mutiert, das Caching ist daher verhaltens-erhaltend.
+
+
+@lru_cache(maxsize=None)
 def title_style(palette: StakeholderPalette) -> ParagraphStyle:
     return ParagraphStyle(
         "title",
@@ -98,9 +110,11 @@ def title_style(palette: StakeholderPalette) -> ParagraphStyle:
         textColor=colors.white,
         leading=22,
         leftIndent=0,
+        alignment=TA_RIGHT,
     )
 
 
+@lru_cache(maxsize=None)
 def subtitle_style(palette: StakeholderPalette) -> ParagraphStyle:
     return ParagraphStyle(
         "subtitle",
@@ -108,9 +122,11 @@ def subtitle_style(palette: StakeholderPalette) -> ParagraphStyle:
         fontSize=10,
         textColor=colors.HexColor("#FFFFFFCC"),
         leading=12,
+        alignment=TA_RIGHT,
     )
 
 
+@lru_cache(maxsize=None)
 def section_style(palette: StakeholderPalette) -> ParagraphStyle:
     return ParagraphStyle(
         "section",
@@ -123,6 +139,7 @@ def section_style(palette: StakeholderPalette) -> ParagraphStyle:
     )
 
 
+@lru_cache(maxsize=None)
 def body_style(palette: StakeholderPalette) -> ParagraphStyle:
     return ParagraphStyle(
         "body",
@@ -133,6 +150,7 @@ def body_style(palette: StakeholderPalette) -> ParagraphStyle:
     )
 
 
+@lru_cache(maxsize=None)
 def body_bold_style(palette: StakeholderPalette) -> ParagraphStyle:
     return ParagraphStyle(
         "body_bold",
@@ -143,6 +161,7 @@ def body_bold_style(palette: StakeholderPalette) -> ParagraphStyle:
     )
 
 
+@lru_cache(maxsize=None)
 def muted_style(palette: StakeholderPalette) -> ParagraphStyle:
     return ParagraphStyle(
         "muted",
@@ -153,6 +172,7 @@ def muted_style(palette: StakeholderPalette) -> ParagraphStyle:
     )
 
 
+@lru_cache(maxsize=None)
 def hero_value_style(palette: StakeholderPalette) -> ParagraphStyle:
     return ParagraphStyle(
         "hero_value",
@@ -163,6 +183,7 @@ def hero_value_style(palette: StakeholderPalette) -> ParagraphStyle:
     )
 
 
+@lru_cache(maxsize=None)
 def hero_label_style(palette: StakeholderPalette) -> ParagraphStyle:
     return ParagraphStyle(
         "hero_label",
@@ -474,8 +495,9 @@ def brand_header(
             ]
         )
     )
-    title_p.style.alignment = 2  # right
-    sub_p.style.alignment = 2
+    # alignment=TA_RIGHT ist Bestandteil von title_style/subtitle_style (BL-PERF-002);
+    # frueher per `title_p.style.alignment = 2` lokal mutiert -- inkompatibel mit
+    # geteilten Cache-Instanzen, daher in die Style-Definition gezogen.
 
     banner = Table([[left, right]], colWidths=[doc_width * 0.30, doc_width * 0.70])
     banner.setStyle(

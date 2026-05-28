@@ -136,10 +136,19 @@ Nach jedem Bench-Lauf eintragen. Mean/Median/StdDev sind aus dem
 pytest-benchmark-Output (`min/median/mean/stddev`, in ms). „Notizen" zeigt
 Auffälligkeiten, Hardware-Wechsel, Hintergrundlast etc.
 
-| Datum | Commit | Bench | Mean (ms) | Median (ms) | StdDev (ms) | Notizen |
-|-------|--------|-------|-----------|-------------|-------------|---------|
-| _YYYY-MM-DD_ | `efdf9aa` | `grid_calc::calculate_grid_connection_medium` | _t.b.d._ | _t.b.d._ | _t.b.d._ | Baseline nach TIER 1 |
-| _YYYY-MM-DD_ | `efdf9aa` | `pdf_render::projektierer` | _t.b.d._ | _t.b.d._ | _t.b.d._ | Baseline nach TIER 1 |
+| Datum | Commit | Bench | Mean | Median | StdDev | Notizen |
+|-------|--------|-------|------|--------|--------|---------|
+| 2026-05-28 | `efdf9aa` + BL-PERF-002 (lokal, uncommitted) | `cable_lookup::hot_path` | 4.70 µs | 1.40 µs | 164.53 µs | StdDev hoch (Hintergrundlast?), Median ist robuster |
+| 2026-05-28 | `efdf9aa` + BL-PERF-002 (lokal) | `cable_lookup::cold_then_warm` | 15.81 µs | 3.50 µs | 636.06 µs | Median 3.5 µs — `lru_cache`-Wirkung sichtbar |
+| 2026-05-28 | `efdf9aa` + BL-PERF-002 (lokal) | `grid_calc::small` (100 kW) | 1235.51 µs | 219.40 µs | 4111.23 µs | Hoher StdDev — Re-Bench bei reduzierter Hintergrundlast empfohlen |
+| 2026-05-28 | `efdf9aa` + BL-PERF-002 (lokal) | `grid_calc::medium` (1 MW) | 593.64 µs | 218.65 µs | 2118.29 µs | Median ~219 µs ist die belastbare Zahl |
+| 2026-05-28 | `efdf9aa` + BL-PERF-002 (lokal) | `grid_calc::large` (10 MW) | 548.46 µs | 208.50 µs | 3266.65 µs | Median ~209 µs |
+| 2026-05-28 | `efdf9aa` + BL-PERF-002 (lokal) | `pdf_render::projektierer` | 68.84 ms | 62.84 ms | 21.41 ms | StdDev ~31 % vom Mean → unzuverlässig, mehrere Runs |
+| 2026-05-28 | `efdf9aa` + BL-PERF-002 (lokal) | `pdf_render::vnb` | 76.19 ms | 75.28 ms | 3.95 ms | StdDev sauber, belastbar |
+| 2026-05-28 | `efdf9aa` + BL-PERF-002 (lokal) | `pdf_render::invest` | 60.46 ms | 57.65 ms | 22.20 ms | StdDev ~37 % vom Mean → unzuverlässig |
+
+> **Hinweis:** Erste Baseline wurde *nach* lokaler Anwendung von BL-PERF-002 erzeugt. Der reine Effekt von BL-PERF-002 ist daher *nicht* aus diesem Run ableitbar; künftige Bench-Compares gegen `baseline_initial` messen Änderungen *gegenüber* diesem Stand.
+> Mehrere `pdf_render`- und `grid_calc`-Tests zeigen StdDev > 20–30 % vom Mean → für TIER-2-Entscheidungen ggf. mit `--benchmark-min-rounds 50` re-bench oder Hintergrundlast reduzieren.
 
 Frontend (manuell aus `client.html` ablesen — Initial-JS, Total-JS, größte
 Chunks):
