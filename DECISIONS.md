@@ -13,6 +13,32 @@
 | 009 | 2026-05-10 | Docker Desktop als verbindliche Laufzeitumgebung fuer alle Services | Reproduzierbarkeit, lokale Datenhoheit, kein Cloud-Vendor|
 | 010 | 2026-05-10 | Schema-Management ausschliesslich via Alembic                       | Revisionssicher; Base.metadata.create_all() entfernt     |
 | 011 | 2026-05-11 | PostgreSQL-only gilt auch fuer Tests, Skripte und Verifikation      | Keine aktive SQLite-Unterstuetzung mehr im Repo-Pfad     |
+| 013 | 2026-05-24 | Kumulations-Check + NB-Georeferenz (Variante A für Projektierer, Variante C für verifizierte NBs) — **Vorgeschlagen** | Painpoint NB-Dashboard adressieren ohne Stack-Wechsel; PostGIS + bestehender Verifikations-Pfad genutzt |
+
+---
+
+## ADR-013: Kumulations-Check und NB-Georeferenz-Sicht
+
+**Status:** Vorgeschlagen (Detailbegründung siehe `docs/decisions/ADR-013-kumulations-check-und-nb-georeferenz.md`)
+**Datum:** 2026-05-24
+
+### Beschluss (Kurzfassung)
+- Neue Tabelle `grid_requests` (PostGIS, append-only Audit) als Cross-Project-Schicht.
+- **Projektierer (eigene Daten):** Detailsicht.
+- **Projektierer (fremde Daten):** nur aggregiert, k ≥ 3, PLZ-Centroid oder gerundeter Radius-Centroid.
+- **Verifizierter NB (`vnb_verification_status='approved'`):** Detail im eigenen Gebiet, ohne Klarname Projektierer, mit View-Audit-Log.
+- **Heatmap (Variante B):** **nicht** als Standard-Sicht für fremde Projektierer.
+- Stack bleibt FastAPI + PostgreSQL + Alembic + Next.js 14 (kein Supabase, kein Stack-Wechsel — siehe ADR-007-DETAIL und `docs/PAINPOINT_NB_DASHBOARD.md` §7).
+
+### Konsequenzen
+- Migrations: neue Alembic-Migration `grid_requests` + Audit, rückwärts kompatibel (siehe BL-NB-001).
+- Privacy: Aggregat-Endpoint hat k-Anonymität und Rate-Limit als Akzeptanzkriterien (BL-NB-003).
+- VNB-Map ist neue gated Frontend-Route (BL-NB-004).
+- „Digitale Vor-Einspeisezusage" (BL-NB-005) bleibt **nach** rechtlicher Klärung; GridCheck nur Trägermedium, VNB ist Aussteller.
+
+### Status / nächste Schritte
+- **Vor Code-Beginn:** Nutzer-Entscheidung zu offenen Fragen (`docs/PAINPOINT_NB_DASHBOARD.md` §8).
+- **Erster Code-Schritt nach Freigabe:** BL-NB-001 (Schema + Alembic).
 
 ---
 
