@@ -194,3 +194,152 @@ ADR-013 angenommen
 ```
 
 **Out-of-scope dieser Iteration:** BL-NB-006 (MaStR-Bestandsdaten als zusätzliche Cluster-Schicht — eigene ADR und eigene Story).
+
+---
+
+## Performance
+
+Statisch identifiziert beim Perf-Audit (siehe Commits `perf(...)`). TIER 1 (sofort
+umsetzbare Quick-Wins) wurde implementiert; TIER 2/3 sind Folgearbeiten mit
+mittlerem bis hohem Aufwand. Voraussetzung für TIER 2 ist meist ein
+Profiling-Setup (siehe BL-PERF-006).
+
+### BL-PERF-001 — `GridCheckForm.tsx` Render-Reduktion
+
+**Ziel:** Wiederholte Re-Renders der 1.700-Zeilen-Komponente reduzieren, ohne
+das Formularverhalten zu ändern.
+
+**Scope:**
+- `useMemo` für abgeleitete Listen (z. B. `ERZEUGUNGS_OPTIONEN[kundentyp]`,
+  Step-spezifische Hint-Maps, `BillingAnalysisOption[]`-Map).
+- `useCallback` für Submit-/Reset-/Step-Handler, die an Kind-Komponenten
+  gereicht werden.
+- `React.memo` für die schweren Unter-Sektionen
+  (`ProjectProfileFields`, `NetzplanVisualization`, `GridCalculationV2Panel`,
+  `N1AssessmentPanel`, `BillingUpgradePrompt`, `ProductDecisionGuide`).
+- Lokales State-Splitting: getrennte States für `input`, `meta`, `result`,
+  `errorState` bereits vorhanden — prüfen, ob `result`-Tree-Updates die ganze
+  Form re-rendern.
+- Draft-Storage (`gridcheck_check_form_draft`) bereits localStorage; sicherstellen,
+  dass es nicht in `useEffect`-Deps landet, die jeden Tastendruck triggern.
+
+**Akzeptanzkriterien:**
+- React-DevTools-Profiler zeigt ≥ 50 % weniger Commits pro Tasteneingabe.
+- Keine API-/Verhaltensänderung (Form-Snapshot-Tests grün).
+
+**Risiko/Aufwand:** L (Risiko mittel: 1.700-Zeilen-Refactor; ohne Profiling
+Risiko von Regressionen).
+
+---
+
+### BL-PERF-002 — ReportLab Style-Reuse in `pdf_layout.py`
+
+**Ziel:** Per-Render-Allokation von `ParagraphStyle`-Objekten reduzieren.
+
+**Scope:**
+- `body_style(palette)`, `body_bold_style(palette)`, `muted_style(palette)`,
+  `section_style(palette)`, `subtitle_style(palette)`, `title_style(palette)`
+  per `lru_cache`-Wrapper mit `palette.label` als Cache-Key (Palette ist
+  `@dataclass(frozen=True)`, hashbar).
+- Achtung: In `brand_header` wird `title_p.style.alignment` lokal mutiert —
+  vor Cache-Migration sicherstellen, dass keine geteilte Style-Instanz für
+  diese Mutation verwendet wird (entweder Style klonen statt mutieren oder
+  nicht-cached Style behalten).
+
+**Akzeptanzkriterien:**
+- PDF-Output ist byte-identisch zum aktuellen Stand (Hash-Test grün).
+- Profiler zeigt ≤ 50 % `ParagraphStyle.__init__`-Aufrufe pro Report.
+
+**Risiko/Aufwand:** S/M (hohes Regressionsrisiko bei Mutation, daher mit
+Hash-Test absichern).
+
+---
+
+### BL-PERF-003 — DB-Indizes für häufige Filterfelder
+
+**Ziel:** Sequenz-Scans bei wachsender Tabellengrösse vermeiden. Aktuell sind
+die Tabellen klein, sodass Postgres seq-scant — bei Skalierung wird das spürbar.
+
+**Scope (neue Alembic-Revision, gemäss ADR-010):**
+- `analysis_runs (user_id, status)` — `billing_service.count_consumed_free_checks`.
+- `users (role)` — Listing-Endpoints für Admin/VNB-Übersicht (separat von
+  `vnb_verification_status`, sobald > 10 k User).
+- `projects (role, deleted_at)` — Filter in Rollen-Dashboards.
+
+**Akzeptanzkriterien:**
+- Migration reversibel (down dropt alle erzeugten Indizes).
+- `EXPLAIN ANALYZE` zeigt `Index Scan` statt `Seq Scan` auf einer Test-DB
+  mit 100 k Zeilen.
+- Doku-Update in `DECISIONS.md` (Eintrag in ADR-010-Detail oder neuer ADR).
+
+**Aufwand:** S.
+
+---
+
+### BL-PERF-004 — Server Components & Selective `"use client"`
+
+**Ziel:** Initiale Bundle-Grösse pro Route reduzieren.
+
+**Scope:**
+- Audit aller Dateien unter `frontend/app/**/page.tsx` und
+  `frontend/components/**`: alle ohne State/Effekt/Browser-API auf
+  Server Components umstellen (kein `"use client"`-Header).
+- Beispielkandidaten: `app/agb/page.tsx`, `app/datenschutz/page.tsx`,
+  `app/impressum/page.tsx`, `app/about/page.tsx`, `app/preise/page.tsx` —
+  reine Statik.
+
+**Aufwand:** M (Audit pro Datei, viele Dateien).
+
+---
+
+### BL-PERF-005 — `@tanstack/react-query` für API-Calls in `lib/api/*`
+
+**Ziel:** Doppelte Fetches durch parallele Komponenten verhindern; Cache &
+Refetch zentral steuern.
+
+**Scope:**
+- `lib/api/auth.me`, `lib/api/billing.getBillingStatus`,
+  `lib/api/analytics.*`: in `useQuery`/`useMutation` einhüllen, statt direkte
+  `fetch`/`ky`-Calls aus Komponenten.
+- Query-Keys konsistent halten (`["billing", "status"]`, `["auth", "me"]`).
+- Stale-while-revalidate für Read-Heavy-Endpoints (`getBillingStatus`,
+  `listProjects`).
+
+**Aufwand:** M.
+
+---
+
+### BL-PERF-006 — Profiling-Setup (Voraussetzung für TIER 2 Messung)
+
+**Ziel:** Vor jeder weiteren TIER-2-Massnahme reale Latenz- und
+Bundle-Daten erheben statt zu schätzen.
+
+**Scope:**
+- Backend: `pytest-benchmark` für die heisse Engine-Sequenz
+  (`calculate_grid_connection_from_engine` + `build_stakeholder_report_pdf`).
+- Frontend: `next build --profile` + Bundle-Analyzer
+  (`@next/bundle-analyzer`) zur Diff-Messung initial / nach Optimierung.
+- Lighthouse-CI als Smoke-Job (Performance, Accessibility, Best-Practices).
+
+**Akzeptanzkriterien:**
+- Reproduzierbare Bench-Suite mit dokumentierten Baselines im Repo
+  (`docs/PERF_BASELINE.md`).
+
+**Aufwand:** M.
+
+---
+
+### TIER 3 (nur Doku, nicht implementieren)
+
+- **BL-PERF-T3-A:** CDN für statische Assets (Vercel Edge ist meist
+  ausreichend; eigener CDN nur bei eigenem Hosting).
+- **BL-PERF-T3-B:** PostgreSQL-Read-Replicas / pgBouncer-Tuning — erst bei
+  > 50 req/s.
+- **BL-PERF-T3-C:** Backend-Worker-Pool für ReportLab-PDF-Generierung
+  (Background-Jobs statt synchroner Endpoint) — erst wenn PDF-Latenz
+  > 2 s im Median.
+- **BL-PERF-T3-D:** HTTP/2 Push / Resource Hints für initial render
+  (`<link rel="preload">` für critical fonts).
+- **BL-PERF-T3-E:** WebSocket statt Polling für Analyse-Progress
+  (`AnalysisProgressPanel`) — nur wenn Polling tatsächlich >5 % CPU.
+
