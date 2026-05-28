@@ -9,7 +9,9 @@ out/
 
 # Python
 venv/
+.venv/
 backend/venv/
+backend/.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -21,6 +23,10 @@ __pycache__/
 .env.local
 .env.production
 .env.prod.example
+.env.check
+.env.vercel-*
+frontend/.env.check
+frontend/.env.vercel-*
 railway-variables.generated.txt
 
 # Backups & Temp
@@ -72,3 +78,23 @@ _pytest_out.txt
 _revisions_out*.txt
 pytest_tranche1_out.txt
 report/
+reports/*.pdf
+reports/example-seed-manifest.json
+
+# Test request bodies (ad-hoc API smoke tests)
+body.json
+body-*.json
+*-body.json
+backend/body.json
+
+# Build / TypeScript buildinfo
+frontend/tsconfig.tsbuildinfo
+frontend/build-out.txt
+frontend/tsc-out.txt
+build-out.txt
+tsc-out.txt
+
+# Local extraction / dump artifacts
+.skills_extract.txt
+.skills_struct.txt
+gridcheck_form_dump.txt

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   clearCompareSnapshots,
+  getScenarioSlots,
   listCompareSnapshots,
   snapshotFromResult,
   type ScenarioCompareSnapshot,
@@ -114,6 +115,13 @@ export default function ScenarioComparePanel({ projectId, currentResult }: Props
 
   const snapshots = useMemo(() => {
     void refresh;
+    const slots = getScenarioSlots(projectId);
+    if (slots.A && slots.B) {
+      return [slots.A, slots.B];
+    }
+    if (slots.A) {
+      return [slots.A, slots.B].filter(Boolean) as ScenarioCompareSnapshot[];
+    }
     const stored = listCompareSnapshots(projectId);
     if (stored.length >= 2) return stored;
     if (currentResult && stored.length === 0) {
@@ -122,8 +130,8 @@ export default function ScenarioComparePanel({ projectId, currentResult }: Props
     return stored;
   }, [projectId, currentResult, refresh]);
 
-  const left = snapshots[0] ?? null;
-  const right = snapshots[1] ?? null;
+  const left = snapshots[0] ?? getScenarioSlots(projectId).A ?? null;
+  const right = snapshots[1] ?? getScenarioSlots(projectId).B ?? null;
 
   const [scenarioA, setScenarioA] = useState("");
   const [scenarioB, setScenarioB] = useState("");

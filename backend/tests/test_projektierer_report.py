@@ -133,6 +133,35 @@ def test_projektierer_pdf_bytes_smoke():
     assert len(pdf_bytes) > 1000
 
 
+def test_projektierer_pdf_has_report_id_and_disclaimer():
+    from io import BytesIO
+
+    from pypdf import PdfReader
+
+    report = build_projektierer_report(_engine_result())
+    pdf_bytes = build_stakeholder_report_pdf(report)
+    reader = PdfReader(BytesIO(pdf_bytes))
+    assert len(reader.pages) >= 2, "Projektierer-Report sollte >= 2 Seiten haben"
+    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    assert "Report-ID" in text, "Footer/Header sollte Report-ID enthalten"
+    assert (
+        "Vorl" in text and "ufige Diagnose" in text
+    ), "Disclaimer-Zeile sollte im Report stehen"
+    assert "GridCheck" in text
+    assert "SHA-256" in text
+
+
+def test_projektierer_pdf_hash_is_deterministic():
+    """Hash im Footer muss reproduzierbar sein (gleicher Input -> gleicher Hash)."""
+    from engine.stakeholder_reports.pdf_builder import compute_footer_hash
+
+    report = build_projektierer_report(_engine_result())
+    h1 = compute_footer_hash(report)
+    h2 = compute_footer_hash(report)
+    assert h1 == h2
+    assert len(h1) == 64
+
+
 def test_build_and_render_smoke():
     report = build_projektierer_report(_engine_result())
     html = render_projektierer_html(report)

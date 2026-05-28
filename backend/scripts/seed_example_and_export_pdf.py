@@ -23,8 +23,10 @@ if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
 from engine.revision import speichere_revision
+from engine.stakeholder_reports.invest import build_invest_report
 from engine.stakeholder_reports.pdf_builder import build_stakeholder_report_pdf
 from engine.stakeholder_reports.projektierer import build_projektierer_report
+from engine.stakeholder_reports.vnb import build_vnb_report
 from services.v1_analysis_service import run_v1_analysis
 
 DEMO_SEED_EMAIL = "demo.seed@gridcheck.example"
@@ -237,21 +239,33 @@ def main() -> int:
     pdf_paths: list[Path] = []
 
     print("=== GridCheck Beispieldaten + PDF ===")
+    stakeholder_builders: dict[str, Any] = {
+        "projektierer": build_projektierer_report,
+        "vnb": build_vnb_report,
+        "invest": build_invest_report,
+    }
     for scenario in EXAMPLE_SCENARIOS:
         print(f"[Analyse] {scenario['id']} …")
         result = _run_scenario(scenario)
         results.append(result)
-        report = build_projektierer_report(result)
-        pdf_name = f"gridcheck-{scenario['id']}.pdf"
-        size = _write_pdf(report, out_dir / pdf_name)
-        pdf_paths.append(out_dir / pdf_name)
         entscheidung = (result.get("fazit") or {}).get("entscheidung", "?")
-        print(f"[PDF] {out_dir / pdf_name} ({size} bytes, Entscheidung={entscheidung})")
+        for stakeholder, builder in stakeholder_builders.items():
+            report = builder(result)
+            pdf_name = f"gridcheck-{stakeholder}-{scenario['id']}.pdf"
+            size = _write_pdf(report, out_dir / pdf_name)
+            if stakeholder == "projektierer":
+                pdf_paths.append(out_dir / pdf_name)
+            print(
+                f"[PDF/{stakeholder}] {out_dir / pdf_name} "
+                f"({size} bytes, Entscheidung={entscheidung})"
+            )
 
     primary = next((s for s in EXAMPLE_SCENARIOS if s["id"] == args.primary_id), EXAMPLE_SCENARIOS[0])
     primary_idx = EXAMPLE_SCENARIOS.index(primary)
     primary_path = out_dir / "example-gridcheck-report.pdf"
-    primary_path.write_bytes((out_dir / f"gridcheck-{primary['id']}.pdf").read_bytes())
+    primary_path.write_bytes(
+        (out_dir / f"gridcheck-projektierer-{primary['id']}.pdf").read_bytes()
+    )
     print(f"[PDF] Hauptreport: {primary_path}")
 
     manifest = {
@@ -259,7 +273,10 @@ def main() -> int:
             {
                 "id": s["id"],
                 "label": s["label"],
-                "pdf": str(out_dir / f"gridcheck-{s['id']}.pdf"),
+                "pdfs": {
+                    stakeholder: str(out_dir / f"gridcheck-{stakeholder}-{s['id']}.pdf")
+                    for stakeholder in ("projektierer", "vnb", "invest")
+                },
                 "entscheidung": (results[i].get("fazit") or {}).get("entscheidung"),
                 "revision_hash": (results[i].get("revision") or {}).get("hash"),
             }

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type {
@@ -9,14 +9,12 @@ import type {
   Topologie,
 } from "../types";
 import VnbBanner from "./VnbBanner";
-import { AnalysisDisclaimer } from "@/components/legal/AnalysisDisclaimer";
 import NetzplanVisualization from "./NetzplanVisualization";
 import BillingUpgradePrompt from "./BillingUpgradePrompt";
-import AnalysisProgressPanel from "@/components/analysis/AnalysisProgressPanel";
 import ProductDecisionGuide from "./billing/ProductDecisionGuide";
 import N1AssessmentPanel from "./N1AssessmentPanel";
+import GridCalculationV2Panel from "./GridCalculationV2Panel";
 import { analyzeGridcheck, AnalyzeApiError, exportStakeholderPdf } from "../lib/api/analyze";
-import { downloadBlobFile } from "../lib/download-blob";
 import ProjectProfileFields from "./ProjectProfileFields";
 import { submitKiFeedback } from "../lib/api/ki";
 import { me, type AuthUser } from "@/lib/api/auth";
@@ -41,17 +39,7 @@ import {
   resolveStakeholderProductPath,
 } from "@/lib/stakeholder-product";
 import { buildSiteMarkerHref } from "@/lib/app-flow";
-import {
-  estimateCableLength,
-  formatConnectionType,
-  getPowerLimitHints,
-  hasNetzplanResult,
-  resolveCosPhiDefault,
-} from "@/lib/gridcheck-engine";
-import GridCalculationV2Panel from "./GridCalculationV2Panel";
 import { readUserPreferences } from "@/lib/user-preferences";
-import DemoCaseLoader, { type DemoCase } from "./DemoCaseLoader";
-import DemoModeBanner from "./DemoModeBanner";
 
 type CustomerType = "projektierer" | "speicherbetreiber" | "netzbetreiber" | "investor";
 
@@ -141,7 +129,6 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
   const [isStartingCheckout, setIsStartingCheckout] = useState(false);
   const [selectedOfferId, setSelectedOfferId] = useState<string>("free");
   const [packageSelectionTouched, setPackageSelectionTouched] = useState(false);
-  const [activeDemoId, setActiveDemoId] = useState<string | null>(null);
 
   const ct = meta.kundentyp as CustomerType;
   const stakeholderPath = resolveStakeholderProductPath({
@@ -150,32 +137,9 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
   });
   const stakeholderCopy = getStakeholderProductCopy(stakeholderPath);
   const showDeepTechnicalDetails = canViewDeepTechnicalDetails(stakeholderPath);
-  const powerLimitHints = getPowerLimitHints(input.spannungsebene, input.anschlussleistung_kw);
-  const cableLengthHint = estimateCableLength(input);
-  const cosPhiHint = resolveCosPhiDefault(input);
 
   const updateInput = (patch: Partial<GridCheckInput>) => setInput(prev => ({ ...prev, ...patch }));
   const updateMeta = (patch: Partial<MetaData>) => setMeta(prev => ({ ...prev, ...patch }));
-
-  const applyDemoCase = (demo: DemoCase) => {
-    const demoCustomerType = demo.kundentyp as CustomerType;
-    setInput((prev) => ({ ...INITIAL_INPUT, ...prev, ...demo.input }));
-    setMeta((prev) => ({
-      ...prev,
-      kundentyp: forcedCustomerType ?? demoCustomerType ?? prev.kundentyp,
-      ort: demo.input.ort ?? prev.ort,
-      projektname: prev.projektname || demo.label.replace("[DEMO] ", "").trim(),
-      erzeugungstyp:
-        prev.erzeugungstyp ||
-        (demo.input.anlagentyp === "batterie" ? "BESS" : demo.input.anlagentyp === "solar" ? "PV" : ""),
-    }));
-    setActiveDemoId(demo.id);
-    setResult(null);
-    setAnalysisError(null);
-    if (!forcedCustomerType && demoCustomerType) {
-      setStep(1);
-    }
-  };
 
   const buildCombinedInput = (): GridCheckInput => ({
     ...input,
@@ -379,14 +343,6 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
   };
 
   const handlePdfExport = async () => {
-    if (!authUser) {
-      setAnalysisError("Bitte zuerst einloggen, um den PDF-Report herunterzuladen.");
-      return;
-    }
-    if (!result) {
-      setAnalysisError("Bitte zuerst eine Analyse durchfuehren, bevor der PDF-Report exportiert wird.");
-      return;
-    }
     setIsExporting(true);
     setAnalysisError(null);
     setPaywallBilling(null);
@@ -395,22 +351,25 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
       const exportScope = selectedAnalysisOption?.report_scope ?? selectedPackageScope ?? "report";
       const { blob, filename } = await exportStakeholderPdf(buildCombinedInput(), stakeholder, {
         requestedOfferId: selectedOfferId === "free" ? "free" : selectedOfferId,
-        analysisRunId: result.history?.analysis_run_id,
+        analysisRunId: result?.history?.analysis_run_id,
       });
-      downloadBlobFile(blob, filename || `gridcheck-${stakeholder}-${exportScope}.pdf`);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename || `gridcheck-${stakeholder}-${exportScope}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
     } catch (err) {
       if (err instanceof AnalyzeApiError) {
         setAnalysisError(err.message);
-        if (err.status === 401) {
-          setAuthUser(null);
-          setBillingStatus(null);
-        }
         if (err.status === 402) {
           setPaywallBilling(err.detail?.billing ?? null);
           await refreshBillingStatus();
         }
       } else {
-        setAnalysisError("PDF-Export konnte nicht gestartet werden. Bitte erneut versuchen.");
+        setAnalysisError("PDF-Export konnte nicht gestartet werden.");
       }
     } finally {
       setIsExporting(false);
@@ -524,7 +483,6 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
     setAnalysisRunId(createAnalysisRunId());
     setSelectedOfferId("free");
     setPackageSelectionTouched(false);
-    setActiveDemoId(null);
     window.localStorage.removeItem(DRAFT_STORAGE_KEY);
   };
 
@@ -612,14 +570,6 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
         <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100">
           {stakeholderCopy.visibilityNote}
         </div>
-
-        <DemoCaseLoader onSelect={applyDemoCase} />
-        {activeDemoId ? (
-          <DemoModeBanner
-            title="Beispieldaten aktiv"
-            description="Die Eingaben stammen aus einem Demo-Fall ohne echte Netzbetreiberdaten. Ergebnisse dienen der Produktdemonstration."
-          />
-        ) : null}
 
         <div className={sectionClass}>
           <h3 className={sectionTitle}>Zugang & Tarif</h3>
@@ -919,20 +869,8 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
             <div>
               <label className={labelClass}>Entfernung NVP (km)</label>
               <input type="number" step="0.1" className={inputClass} value={input.entfernung_km ?? ""} onChange={e => updateInput({ entfernung_km: e.target.value ? Number(e.target.value) : undefined })} placeholder="auto" />
-              <p className="mt-1 text-xs text-gray-500">{cableLengthHint.annahme}</p>
             </div>
           </div>
-          <p className="mt-3 rounded-xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs leading-5 text-blue-100">
-            <span className="font-semibold">Leistungsrichtwert {powerLimitHints.label}:</span> typisch bis ca.{" "}
-            {powerLimitHints.typicalMaxKw.toLocaleString("de-DE")} kW (Screening bis ca.{" "}
-            {powerLimitHints.screeningUpperKw.toLocaleString("de-DE")} kW). {powerLimitHints.hinweis}
-            {powerLimitHints.ueberTypischemRichtwert ? " Ihre Eingabe liegt über dem typischen Richtwert." : ""}
-          </p>
-          {cosPhiHint.quelle === "rolle_default" ? (
-            <p className="mt-2 text-xs text-gray-500">
-              cos φ Standard für diese Anlagenrolle: {cosPhiHint.cosPhi} (kann im Feld überschrieben werden).
-            </p>
-          ) : null}
         </div>
 
         <ProjectProfileFields value={input} onChange={(next) => setInput((prev) => ({ ...prev, ...next }))} />
@@ -962,55 +900,11 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
               <input type="number" step="0.1" className={inputClass} value={input.trafo_uk_pct ?? ""} onChange={e => updateInput({ trafo_uk_pct: e.target.value ? Number(e.target.value) : undefined })} placeholder="auto" />
             </div>
             <div>
-              <label className={labelClass}>Trafo-Bestandsauslastung (%)</label>
-              <input
-                type="number"
-                step="1"
-                min={0}
-                max={150}
-                className={inputClass}
-                value={input.vorbelastung_pct ?? ""}
-                onChange={(e) =>
-                  updateInput({ vorbelastung_pct: e.target.value ? Number(e.target.value) : undefined })
-                }
-                placeholder="VNB/Planer"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Optional — für ONT-Screening; ohne Angabe keine Trafo-Auslastung in %.
-              </p>
-            </div>
-            <div>
-              <label className={labelClass}>Leitungsführung</label>
-              <select
-                className={inputClass}
-                value={input.leitungsart ?? "kabel"}
-                onChange={(e) =>
-                  updateInput({ leitungsart: e.target.value as GridCheckInput["leitungsart"] })
-                }
-              >
-                <option value="kabel">Erdkabel</option>
-                <option value="freileitung">Freileitung</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>VNB-Kapazitätsangabe (kW)</label>
-              <input
-                type="number"
-                className={inputClass}
-                value={input.netzkapazitaet_kw ?? ""}
-                onChange={(e) =>
-                  updateInput({ netzkapazitaet_kw: e.target.value ? Number(e.target.value) : undefined })
-                }
-                placeholder="optional"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Nur als Nutzer- oder VNB-Hinweis – keine verifizierte freie Netzkapazität ohne belastbare VNB-Daten.
-              </p>
+              <label className={labelClass}>Freie Kapazität (kW)</label>
+              <input type="number" className={inputClass} value={input.netzkapazitaet_kw ?? ""} onChange={e => updateInput({ netzkapazitaet_kw: e.target.value ? Number(e.target.value) : undefined })} placeholder="auto" />
             </div>
           </div>
         </div>
-
-        {isAnalyzing ? <AnalysisProgressPanel active className="mb-4" /> : null}
 
         {analysisError && (
           <div className="rounded-2xl border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
@@ -1113,7 +1007,6 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
 
     return (
       <div className="mx-auto max-w-5xl space-y-6">
-        <AnalysisDisclaimer />
         {/* Header */}
         <div className="rounded-[28px] border border-gray-700 bg-gray-900/60 p-5 md:p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -1155,118 +1048,6 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
             </div>
           </div>
         </div>
-
-        {(result.connection_type_label || result.power_limit_hints) ? (
-          <div className={sectionClass}>
-            <h3 className={sectionTitle}>Anschluss & Leistungsrahmen</h3>
-            <div className="grid gap-3 text-sm text-gray-300 md:grid-cols-2">
-              {result.connection_type_label ? (
-                <p>
-                  <span className="text-gray-400">Anschlussart:</span>{" "}
-                  <span className="text-white font-medium">{result.connection_type_label}</span>
-                </p>
-              ) : null}
-              {result.power_limit_hints ? (
-                <p>
-                  <span className="text-gray-400">Leistungsrichtwert {result.power_limit_hints.label}:</span>{" "}
-                  typisch bis ca. {result.power_limit_hints.typical_max_kw.toLocaleString("de-DE")} kW
-                  {result.power_limit_hints.ueber_typischem_richtwert ? " — Eingabe über typischem Richtwert." : ""}
-                </p>
-              ) : null}
-            </div>
-            {result.power_limit_hints?.hinweis ? (
-              <p className="mt-2 text-xs leading-5 text-gray-500">{result.power_limit_hints.hinweis}</p>
-            ) : null}
-          </div>
-        ) : null}
-
-        {result.warnings.length > 0 ? (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
-            <h4 className="text-sm font-semibold text-amber-200">Hinweise & Warnungen</h4>
-            <ul className="mt-2 space-y-1 text-sm text-amber-100">
-              {result.warnings.map((w, i) => (
-                <li key={i}>{w}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {result.grid_calculation_v2 ? (
-          <GridCalculationV2Panel
-            data={result.grid_calculation_v2}
-            sectionClass={sectionClass}
-            sectionTitle={sectionTitle}
-            fmt={fmt}
-          />
-        ) : null}
-
-        {result.technical_details ? (
-          <div className={sectionClass}>
-            <h3 className={sectionTitle}>Technische Details (vorläufig)</h3>
-            <div className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-lg bg-gray-900 p-3">
-                <div className="text-xs text-gray-400">Spannungsfall</div>
-                <div className="mt-1 font-mono text-white">
-                  {fmt(result.technical_details.spannungsfall?.delta_u_prozent ?? result.delta_u_pct, 2)} %
-                </div>
-                <div className="mt-1 text-xs text-gray-500">
-                  {result.technical_details.spannungsfall?.bewertung ?? result.spannungsbewertung}
-                  {result.technical_details.spannungsfall?.cos_phi_annahme
-                    ? ` · ${result.technical_details.spannungsfall.cos_phi_annahme}`
-                    : ""}
-                </div>
-              </div>
-              <div className="rounded-lg bg-gray-900 p-3">
-                <div className="text-xs text-gray-400">Kurzschluss Ik</div>
-                <div className="mt-1 font-mono text-white">
-                  {fmt(
-                    result.technical_details.kurzschluss?.ik_referenz_ka ??
-                      result.technical_details.kurzschluss?.ik_max_ka ??
-                      result.kurzschluss.ik_max_kA,
-                    1,
-                  )}{" "}
-                  kA
-                </div>
-                <div className="mt-1 text-xs text-gray-500">
-                  {result.technical_details.kurzschluss?.vorlaeufig
-                    ? "Vorläufig (Band nach Spannungsebene)"
-                    : "Berechnet"}
-                  {result.technical_details.kurzschluss?.hinweis
-                    ? ` · ${result.technical_details.kurzschluss.hinweis}`
-                    : ""}
-                </div>
-              </div>
-              <div className="rounded-lg bg-gray-900 p-3">
-                <div className="text-xs text-gray-400">Leitung / Querschnitt</div>
-                <div className="mt-1 font-mono text-white">
-                  {result.technical_details.leitung?.querschnitt_mm2
-                    ? `${result.technical_details.leitung.querschnitt_mm2} mm²`
-                    : "—"}
-                </div>
-                <div className="mt-1 text-xs text-gray-500">
-                  {result.technical_details.leitung?.typ ?? "Typ aus Annahme"}
-                  {result.technical_details.leitung?.i_max_a
-                    ? ` · Imax ${fmt(result.technical_details.leitung.i_max_a, 0)} A`
-                    : ""}
-                </div>
-              </div>
-              <div className="rounded-lg bg-gray-900 p-3">
-                <div className="text-xs text-gray-400">Trasse</div>
-                <div className="mt-1 font-mono text-white">
-                  {fmt(result.technical_details.trasse?.entfernung_km ?? result.nvp_entfernung_km, 2)} km
-                </div>
-                <div className="mt-1 text-xs text-gray-500">
-                  {result.technical_details.trasse?.heuristisch
-                    ? "Heuristische Entfernung (keine GPS-Messung)"
-                    : "Nutzereingabe"}
-                  {result.technical_details.trasse?.annahme
-                    ? ` · ${result.technical_details.trasse.annahme}`
-                    : ""}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -1451,21 +1232,19 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
           </div>
         </div>
 
-        {hasNetzplanResult(result) ? (
-          <NetzplanVisualization
-            input={input}
-            result={result}
-            meta={{
-              kundentyp: meta.kundentyp,
-              projektname: meta.projektname,
-              ort: meta.ort,
-              erzeugungstyp: meta.erzeugungstyp,
-            }}
-          />
-        ) : null}
-
         {showDeepTechnicalDetails ? (
           <>
+            <NetzplanVisualization
+              input={input}
+              result={result}
+              meta={{
+                kundentyp: meta.kundentyp,
+                projektname: meta.projektname,
+                ort: meta.ort,
+                erzeugungstyp: meta.erzeugungstyp,
+              }}
+            />
+
             <N1AssessmentPanel result={result} />
 
             <div className={sectionClass}>
@@ -1594,25 +1373,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
           <div className={sectionClass}>
             <h3 className={sectionTitle}>Kosten / Zeit</h3>
             <div className="space-y-2 text-sm text-gray-300">
-              {costBand ? (
-                <>
-                  <p>
-                    Bandbreite (indikativ):{" "}
-                    <span className="text-white font-semibold">
-                      {costBand.niedrig.toLocaleString("de-DE")} – {costBand.hoch.toLocaleString("de-DE")} EUR
-                    </span>
-                  </p>
-                  <p>Basiswert: {costBand.basis.toLocaleString("de-DE")} EUR</p>
-                  {costBand.confidence ? <p>Confidence: {costBand.confidence}%</p> : null}
-                </>
-              ) : (
-                <p>
-                  Indikation (einzelwert, unsicher): ca.{" "}
-                  <span className="text-white font-semibold">
-                    {result.kosten_indikation_eur.toLocaleString("de-DE")} EUR
-                  </span>
-                </p>
-              )}
+              <p>Indikation: <span className="text-white font-semibold">{result.kosten_indikation_eur.toLocaleString("de-DE")} EUR</span></p>
               <p>Kostenklasse: {result.kostenklasse}</p>
               <p>Bearbeitungszeit: ca. {result.geschaetzte_bearbeitungszeit_wochen} Wochen</p>
               <p>Netzausbau: {result.netzausbau_erforderlich ? "Ja" : "Nein"}</p>
@@ -1710,10 +1471,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
 
         <div className="grid md:grid-cols-2 gap-4">
           <div className={sectionClass}>
-            <h3 className={sectionTitle}>KI-Lernprofil (unterstuetzend)</h3>
-            <p className="mb-2 text-xs text-gray-500">
-              Assoziative Einordnung aus historischem Feedback – ersetzt keine deterministische Normpruefung.
-            </p>
+            <h3 className={sectionTitle}>KI-Lernprofil</h3>
             <div className="space-y-2 text-sm text-gray-300">
               <p>KI-Konfidenz: <span className="text-white font-semibold">{fmt(result.ki.konfidenz_prozent, 0)}%</span></p>
               <p>Aehnliche Faelle: {result.ki.aehnliche_faelle}</p>
@@ -1813,15 +1571,130 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
           </div>
         ) : null}
 
-        {/* Einschraenkungen */}
-        {result.einschraenkungen.length > 0 && (
-          <div className="bg-yellow-900/30 border border-yellow-700 rounded-xl p-4">
-            <h4 className="text-yellow-400 font-semibold text-sm mb-2">Einschraenkungen</h4>
-            <ul className="text-sm text-yellow-200 space-y-1">
-              {result.einschraenkungen.map((e, i) => <li key={i}>{e}</li>)}
+        {/* Technische Detailwerte aus der Engine */}
+        {result.technical_details ? (
+          <div className={sectionClass}>
+            <h3 className={sectionTitle}>Technische Detailwerte</h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg bg-gray-900 p-3">
+                <div className="text-xs uppercase tracking-wide text-gray-400">Spannungsfall</div>
+                <div className="mt-1 text-white">
+                  Delta u {fmt(result.technical_details.spannungsfall?.delta_u_prozent ?? result.delta_u_pct, 2)} %
+                  {result.technical_details.spannungsfall?.richtung
+                    ? ` (${result.technical_details.spannungsfall.richtung})`
+                    : ""}
+                </div>
+                {result.technical_details.spannungsfall?.bewertung ? (
+                  <p className="mt-1 text-xs text-gray-400">{result.technical_details.spannungsfall.bewertung}</p>
+                ) : null}
+                {typeof result.technical_details.spannungsfall?.cos_phi === "number" ? (
+                  <p className="mt-1 text-xs text-gray-500">
+                    cos phi: {fmt(result.technical_details.spannungsfall.cos_phi, 2)}
+                    {result.technical_details.spannungsfall?.cos_phi_quelle
+                      ? ` (${result.technical_details.spannungsfall.cos_phi_quelle})`
+                      : ""}
+                  </p>
+                ) : null}
+                {result.technical_details.spannungsfall?.cos_phi_annahme ? (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Annahme: {result.technical_details.spannungsfall.cos_phi_annahme}
+                  </p>
+                ) : null}
+              </div>
+              <div className="rounded-lg bg-gray-900 p-3">
+                <div className="text-xs uppercase tracking-wide text-gray-400">Kurzschluss</div>
+                <div className="mt-1 text-white">
+                  Ik max {fmt(result.technical_details.kurzschluss?.ik_max_ka ?? result.kurzschluss.ik_max_kA, 2)} kA · Ik min{" "}
+                  {fmt(result.technical_details.kurzschluss?.ik_min_ka ?? result.kurzschluss.ik_min_kA, 2)} kA
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Sk: {fmt(result.technical_details.kurzschluss?.sk_mva ?? result.kurzschluss.sk_am_nvp_mva, 2)} MVA
+                  {typeof result.technical_details.kurzschluss?.ik_band_min_ka === "number" &&
+                  typeof result.technical_details.kurzschluss?.ik_band_max_ka === "number"
+                    ? ` · Band ${fmt(result.technical_details.kurzschluss.ik_band_min_ka, 2)}–${fmt(
+                        result.technical_details.kurzschluss.ik_band_max_ka,
+                        2,
+                      )} kA`
+                    : ""}
+                </p>
+                {result.technical_details.kurzschluss?.vorlaeufig ? (
+                  <p className="mt-1 text-xs text-amber-200">
+                    Vorlaeufig: Sk vom VNB pruefen lassen.
+                  </p>
+                ) : null}
+                {result.technical_details.kurzschluss?.hinweis ? (
+                  <p className="mt-1 text-xs text-gray-400">{result.technical_details.kurzschluss.hinweis}</p>
+                ) : null}
+              </div>
+              <div className="rounded-lg bg-gray-900 p-3">
+                <div className="text-xs uppercase tracking-wide text-gray-400">Leitung</div>
+                <div className="mt-1 text-white">
+                  {result.technical_details.leitung?.typ ?? "-"}
+                  {typeof result.technical_details.leitung?.querschnitt_mm2 === "number"
+                    ? ` · ${fmt(result.technical_details.leitung.querschnitt_mm2, 0)} mm²`
+                    : ""}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Material: {result.technical_details.leitung?.material ?? "-"}
+                  {typeof result.technical_details.leitung?.i_max_a === "number"
+                    ? ` · I_max ${fmt(result.technical_details.leitung.i_max_a, 0)} A`
+                    : ""}
+                </p>
+              </div>
+              <div className="rounded-lg bg-gray-900 p-3">
+                <div className="text-xs uppercase tracking-wide text-gray-400">Trasse</div>
+                <div className="mt-1 text-white">
+                  Entfernung {fmt(result.technical_details.trasse?.entfernung_km ?? result.nvp_entfernung_km, 2)} km
+                </div>
+                {result.technical_details.trasse?.heuristisch ? (
+                  <p className="mt-1 text-xs text-amber-200">Heuristische Schaetzung.</p>
+                ) : null}
+                {result.technical_details.trasse?.annahme ? (
+                  <p className="mt-1 text-xs text-gray-500">{result.technical_details.trasse.annahme}</p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Engine-Warnungen (Vorrang vor harten/weichen Hinweisen) */}
+        {result.warnings && result.warnings.length > 0 ? (
+          <div className="rounded-xl border border-amber-700 bg-amber-900/30 p-4">
+            <h4 className="mb-2 text-sm font-semibold text-amber-300">Warnungen aus der Engine</h4>
+            <ul className="space-y-1 text-sm text-amber-100">
+              {result.warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
             </ul>
           </div>
-        )}
+        ) : null}
+
+        {/* Strukturierte Vorpruefung v2 */}
+        {result.grid_calculation_v2 ? (
+          <GridCalculationV2Panel
+            data={result.grid_calculation_v2}
+            sectionClass={sectionClass}
+            sectionTitle={sectionTitle}
+            fmt={fmt}
+          />
+        ) : null}
+
+        {/* Einschraenkungen (harte + weiche Hinweise, Score-relevant) */}
+        {(() => {
+          const warningSet = new Set(result.warnings ?? []);
+          const additional = result.einschraenkungen.filter((item) => !warningSet.has(item));
+          if (additional.length === 0) return null;
+          return (
+            <div className="bg-yellow-900/30 border border-yellow-700 rounded-xl p-4">
+              <h4 className="text-yellow-400 font-semibold text-sm mb-2">Einschraenkungen</h4>
+              <ul className="text-sm text-yellow-200 space-y-1">
+                {additional.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        })()}
 
         <div className={sectionClass}>
           <h3 className={sectionTitle}>Transparenz / Annahmen</h3>
@@ -1847,8 +1720,6 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
           </div>
         </div>
 
-        <AnalysisDisclaimer variant="compact" className="border-t border-gray-700 pt-4" />
-
         {/* Buttons */}
         <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <button
@@ -1865,9 +1736,8 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
               Neue Analyse
             </button>
             <button
-              type="button"
               onClick={handlePdfExport}
-              disabled={isExporting || !result || !authUser}
+              disabled={isExporting}
               className="rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
             >
               {isExporting ? "Export laeuft..." : stakeholderCopy.exportLabel}

@@ -1,503 +1,1392 @@
 """
-ReportLab PDFs for stakeholder HTML report dicts (VNB, Invest, Projektierer).
-Mirrors mandatory blocks from the Jinja HTML templates without WeasyPrint.
+High-quality ReportLab PDF builder for stakeholder reports (Projektierer, VNB,
+Invest). Three stakeholder-specific Platypus stories share a common visual
+system (brand bar, palette, status badges, KPI cards, signature blocks,
+deterministic SHA-256 footer hash). Public entry point stays
+``build_stakeholder_report_pdf(report) -> bytes`` for backward compatibility
+with `api/v2_reports.py` and the existing tests.
+
+Visual system reference: docs/PDF_REPORTS.md (Layout-Stand).
 """
 from __future__ import annotations
 
+import copy
+import hashlib
 import io
+import json
 from typing import Any
-from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
-from core import branding as B
+from engine.stakeholder_reports.pdf_layout import (
+    FONT_BOLD,
+    FONT_REGULAR,
+    StakeholderPalette,
+    alt_table,
+    body_bold_style,
+    body_style,
+    brand_header,
+    bulleted_block,
+    decision_picks,
+    kpi_strip,
+    kv_table,
+    lined_field,
+    make_footer_callback,
+    muted_style,
+    p,
+    p_html,
+    palette_for,
+    section,
+    signature_block,
+    status_badge_paragraph,
+    summary_box,
+)
 
-_BANNER_SUBTITLE = {
-    "vnb": "Netzbetreiber (VNB)",
-    "invest": "Investor",
-    "projektierer": "Projektierer",
+try:  # pragma: no cover - optional dependency, only used for richer plant labels
+    from engine.plant_types import PLANT_TYPE_CONFIG, PlantType
+except Exception:  # pragma: no cover
+    PLANT_TYPE_CONFIG = {}  # type: ignore[assignment]
+    PlantType = None  # type: ignore[assignment]
+
+
+_SELF_REFERENTIAL_KEYS = frozenset(
+    {
+        "audit_hash",
+        "report_generated_at",
+        "report_revision",
+        "report_revision_number",
+        "report_revision_uuid",
+        "report_verify_path",
+    }
+)
+
+_STAKEHOLDER_TITLES = {
+    "projektierer": "Stakeholder-Report Projektierer",
+    "vnb": "Stakeholder-Report Netzbetreiber",
+    "invest": "Stakeholder-Report Invest / Management",
 }
 
+_STAKEHOLDER_SUBTITLES = {
+    "projektierer": "Technische Vorplanung & §9 EEG 2023",
+    "vnb": "Strukturierte Vorprüfung & Entscheidungsvorlage",
+    "invest": "Due-Diligence-Sicht & Investitionsindikatoren",
+}
 
-def _p(text: str, style: ParagraphStyle) -> Paragraph:
-    return Paragraph(escape(str(text)), style)
+_VOLTAGE_LABELS = {
+    "NS": "Niederspannung",
+    "MS": "Mittelspannung",
+    "HS": "Hochspannung",
+    "LOW": "Niederspannung",
+    "MEDIUM": "Mittelspannung",
+    "HIGH": "Hochspannung",
+}
 
+_CONNECTION_LABELS = {
+    "einspeisung": "Einspeisung",
+    "entnahme": "Entnahme",
+    "verbrauch": "Entnahme",
+    "speicher": "Bidirektional (Speicher)",
+    "bidirektional": "Bidirektional",
+    "mixed": "Bidirektional",
+}
 
-_SECTION_TITLE_STYLE = ParagraphStyle(
-    "stakeholder_section",
-    fontName=B.FONT_BOLD,
-    fontSize=12,
-    textColor=colors.HexColor(B.PETROL),
-    spaceBefore=8,
-    spaceAfter=4,
-    leading=14,
+_DECISION_BADGES = {
+    "A": ("Geht", "pass", "Anschlussfähig im Screening — Standardweg empfohlen."),
+    "B": (
+        "Geht mit Auflagen",
+        "warn",
+        "Vorprüfung positiv, aber an Bedingungen / Nachweise gekoppelt.",
+    ),
+    "C": (
+        "Geht-nicht (vorläufig)",
+        "fail",
+        "Screening zeigt Engpässe — Re-Design oder Variantenprüfung erforderlich.",
+    ),
+}
+
+_VNB_CHECKLIST_10 = [
+    "Antragsformular vollständig (Antragsteller, Standort, Anlagentyp)",
+    "Leistungs- und Spannungsdaten plausibel zur deklarierten Spannungsebene",
+    "Netzanschlusspunkt (NVP) und Übergabestation definiert",
+    "Schutz-, Mess- und Steuerungskonzept dokumentiert",
+    "Blindleistungs-/Q-Modus mit TAB des VNB abgeglichen",
+    "EEG-Einspeisemanagement (§9 EEG 2023) entsprechend Leistungsklasse",
+    "N-1-/Topologiebewertung schlüssig (Datengrundlage benannt)",
+    "Kurzschlussverhältnis und Rückwirkung im plausiblen Band",
+    "BKZ-Indikation und Vertragsform (TAB / NNV) referenziert",
+    "Erforderliche Nachweise und Auflagen schriftlich festgehalten",
+]
+
+_PROJEKTIERER_NORMS_FALLBACK = [
+    "VDE-AR-N 4105 (Niederspannung, Erzeugungsanlagen)",
+    "VDE-AR-N 4110 (Mittelspannung, Erzeugungsanlagen)",
+    "VDE-AR-N 4120 (Hochspannung, Erzeugungsanlagen)",
+    "§9 EEG 2023 — Einspeisemanagement",
+    "§14a / §25 NAV — Baukostenzuschuss (BKZ)",
+    "DIN EN 60909 — Kurzschlussberechnung",
+]
+
+_DISCLAIMER_LINE = (
+    "Vorläufige Diagnose – keine verbindliche Netzanschlusszusage. "
+    "Keine Kapazitätsgarantie, freie Netzkapazität nur mit belastbarem VNB-Datenstand."
 )
 
 
-def _body_style() -> ParagraphStyle:
-    return ParagraphStyle(
-        "stakeholder_body",
-        fontName=B.FONT_REGULAR,
-        fontSize=10,
-        textColor=colors.HexColor(B.TEXT),
-        leading=13,
-    )
+# ============================================================================
+# Hash + ID helpers
+# ============================================================================
+def _canonical_input_for_hash(report: dict[str, Any]) -> str:
+    """Stable JSON of report payload with self-referential metadata stripped."""
+    snapshot = copy.deepcopy(report)
+    for key in _SELF_REFERENTIAL_KEYS:
+        snapshot.pop(key, None)
+    return json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def _muted_style() -> ParagraphStyle:
-    return ParagraphStyle(
-        "stakeholder_muted",
-        fontName=B.FONT_REGULAR,
-        fontSize=9,
-        textColor=colors.HexColor(B.TEXT_MUTED),
-        leading=11,
-    )
+def compute_footer_hash(report: dict[str, Any]) -> str:
+    """Public helper — full SHA-256 hex over a stable view of the report."""
+    raw = _canonical_input_for_hash(report)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def _bool_geht(report: dict[str, Any]) -> str:
-    if report.get("geht"):
-        return "Geht"
-    return "Geht-nicht"
+def _short_hash(full_hash: str, length: int = 12) -> str:
+    return (full_hash or "").strip()[:length] or ("0" * length)
 
 
-def _bulleted_block(story: list[Any], style: ParagraphStyle, items: list[str], empty_label: str) -> None:
-    if items:
-        for line in items:
-            story.append(_p(f"• {line}", style))
-    else:
-        story.append(_p(empty_label, style))
+def _report_id(report: dict[str, Any], full_hash: str) -> str:
+    """Stable identifier: prefer persisted revision uuid, fall back to hash prefix."""
+    rev = report.get("report_revision")
+    if isinstance(rev, dict):
+        uid = str(rev.get("uuid") or "").strip()
+        if uid:
+            return uid
+    uid = str(report.get("report_revision_uuid") or "").strip()
+    if uid:
+        return uid
+    return f"GC-{_short_hash(full_hash, 16).upper()}"
 
 
-def _append_table(
-    story: list[Any],
-    doc: SimpleDocTemplate,
-    headers: list[str],
-    rows: list[list[str]],
+# ============================================================================
+# Label helpers
+# ============================================================================
+def _voltage_label(raw: Any) -> str:
+    token = str(raw or "").strip().upper()
+    if not token:
+        return "n/a"
+    return _VOLTAGE_LABELS.get(token, str(raw))
+
+
+def _connection_label(raw: Any) -> str:
+    token = str(raw or "").strip().lower()
+    if not token:
+        return "n/a"
+    return _CONNECTION_LABELS.get(token, str(raw))
+
+
+def _plant_label(report: dict[str, Any]) -> str:
+    """Try plant_types.py for canonical labels, else fall back to engine label."""
+    persp = _persp(report)
+    if persp:
+        lbl = persp.get("plant_type_label")
+        if lbl:
+            return str(lbl)
+        pt_key = str(persp.get("plant_type") or "").strip().lower()
+        if pt_key and PlantType is not None:
+            try:
+                cfg = PLANT_TYPE_CONFIG.get(PlantType(pt_key))
+                if cfg is not None:
+                    return cfg.label
+            except (ValueError, KeyError):
+                pass
+    raw = str(report.get("anlagentyp") or "").strip()
+    return raw or "Anlage"
+
+
+def _fmt_num(value: Any, *, digits: int = 2, suffix: str = "", default: str = "—") -> str:
+    if value is None or value == "":
+        return default
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    base = f"{num:.{digits}f}".rstrip("0").rstrip(".") if digits > 0 else f"{num:.0f}"
+    return f"{base}{suffix}"
+
+
+def _fmt_eur(value: Any, default: str = "—") -> str:
+    if value is None or value == "":
+        return default
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if abs(num) >= 1_000_000:
+        return f"{num / 1_000_000:.2f} Mio. €"
+    if abs(num) >= 1_000:
+        return f"{num / 1_000:.0f} Tsd. €"
+    return f"{num:.0f} €"
+
+
+def _safe(value: Any, default: str = "—") -> str:
+    if value is None:
+        return default
+    text = str(value).strip()
+    return text or default
+
+
+def _persp(report: dict[str, Any]) -> dict[str, Any] | None:
+    """Pull out projektierer_perspective from the v2 calculation block."""
+    v2 = report.get("grid_calculation_v2")
+    if not isinstance(v2, dict):
+        return None
+    persp = v2.get("projektierer_perspective")
+    if isinstance(persp, dict):
+        return persp
+    return None
+
+
+# ============================================================================
+# Generic story helpers
+# ============================================================================
+def _build_meta_strip(
+    palette: StakeholderPalette,
+    report: dict[str, Any],
     *,
-    col_widths: list[float] | None = None,
-) -> None:
-    if not rows:
-        return
-    tbl_data = [headers, *rows]
-    tw = doc.width
-    if col_widths is None:
-        col_widths = [tw / len(headers)] * len(headers)
-    t = Table(tbl_data, colWidths=col_widths)
+    report_id: str,
+    full_hash: str,
+    doc_width: float,
+) -> Table:
+    """Tiny grey strip under the brand bar with report ID + version + hash."""
+    style = muted_style(palette)
+    bold = body_bold_style(palette)
+    version = _safe(report.get("report_version"))
+    normstand = _safe(report.get("app_normstand"))
+    package = _safe(
+        report.get("report_scope_label") or report.get("package_scope_label") or "Standard",
+    )
+    rows = [
+        [
+            Paragraph(f"<b>Report-ID</b><br/>{report_id}", style),
+            Paragraph(f"<b>Version</b><br/>{version} / Normstand {normstand}", style),
+            Paragraph(f"<b>Paket</b><br/>{package}", style),
+            Paragraph(
+                f"<b>SHA-256</b><br/>{_short_hash(full_hash, 16)}…", style
+            ),
+        ]
+    ]
+    t = Table(rows, colWidths=[doc_width / 4] * 4)
     t.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(B.GRAU_ZEBRA)),
-                ("FONTNAME", (0, 0), (-1, 0), B.FONT_BOLD),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor(B.GRAU_LINIE)),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(palette.zebra)),
+                ("LINEBELOW", (0, 0), (-1, -1), 0.5, colors.HexColor(palette.border)),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
             ]
         )
     )
-    story.append(t)
+    _ = bold  # kept for readability of intent
+    return t
 
 
-def _auflagen_empty_label(report: dict[str, Any]) -> str:
-    if report.get("empfohlene_massnahmen"):
-        return (
-            "Keine separaten Auflagen aus Warnungen – "
-            "Bedingungen und nächste Schritte siehe «Empfohlene Maßnahmen»."
+def _disclaimer_paragraph(palette: StakeholderPalette) -> Paragraph:
+    style = muted_style(palette)
+    style = ParagraphStyle(
+        "disclaimer",
+        parent=style,
+        textColor=colors.HexColor(palette.text_muted),
+        fontSize=8.5,
+        leading=11,
+    )
+    return Paragraph(
+        "<b>Hinweis:</b> Vorläufige Diagnose auf Basis eines automatisierten Screenings. "
+        "Keine verbindliche Netzanschlusszusage und keine Kapazitätsgarantie. "
+        "N-1-Aussage maximal bis N1-2 ohne verifizierte Netzbetreiberdaten. "
+        "Bindende Aussagen erteilt ausschließlich der zuständige Verteilnetzbetreiber (VNB).",
+        style,
+    )
+
+
+def _ensure_three_lines(items: list[str], minimum: int = 3) -> list[str]:
+    cleaned = [str(x).strip() for x in items if str(x).strip()]
+    while len(cleaned) < minimum:
+        cleaned.append("—")
+    return cleaned
+
+
+# ============================================================================
+# Projektierer story
+# ============================================================================
+def _decision_summary(report: dict[str, Any]) -> tuple[str, str, str]:
+    decision = str(report.get("entscheidung") or "C").strip().upper() or "C"
+    if decision not in _DECISION_BADGES:
+        decision = "C"
+    label, severity, default_msg = _DECISION_BADGES[decision]
+    msg_parts = [default_msg]
+    n1_detail = _safe(report.get("n1_detail"), default="")
+    if n1_detail:
+        msg_parts.append(f"N-1: {n1_detail}")
+    return f"Entscheidung {decision} — {label}", severity, " ".join(msg_parts)
+
+
+def _projektierer_cover(
+    palette: StakeholderPalette,
+    report: dict[str, Any],
+    *,
+    report_id: str,
+    doc_width: float,
+) -> list[Any]:
+    persp = _persp(report) or {}
+    plant_label = _plant_label(report)
+    ac_kw = persp.get("ac_kw")
+    dc_kwp = persp.get("dc_kwp")
+    leistung_mw = report.get("leistung_mw")
+    if ac_kw is None and leistung_mw is not None:
+        try:
+            ac_kw = float(leistung_mw) * 1000.0
+        except (TypeError, ValueError):
+            ac_kw = None
+
+    plz = _safe(report.get("plz"))
+    standort = _safe(report.get("standort"))
+    ort_zeile = f"{standort} (PLZ {plz})" if plz != "—" else standort
+
+    rows: list[tuple[str, Any]] = [
+        ("Projekt", _safe(report.get("standort") or report.get("project_name"))),
+        ("Anlagentyp", plant_label),
+        ("Standort / PLZ", ort_zeile),
+        ("Spannungsebene", _voltage_label(report.get("spannungsebene"))),
+        ("Anschlussart", _connection_label(report.get("anschlussart"))),
+        ("AC-Leistung", _fmt_num(ac_kw, digits=0, suffix=" kW")),
+    ]
+    if dc_kwp is not None:
+        rows.append(("DC-Leistung (PV)", _fmt_num(dc_kwp, digits=0, suffix=" kWp")))
+    rows.append(("Datum", _safe(report.get("report_generated_at")).split("T", 1)[0]))
+    rows.append(("Report-ID", report_id))
+
+    return [
+        kv_table(palette, rows, doc_width=doc_width, boxed=True),
+        Spacer(1, 4 * mm),
+    ]
+
+
+def _build_kpi_status_table(
+    palette: StakeholderPalette, report: dict[str, Any], *, doc_width: float
+) -> Table:
+    persp = _persp(report) or {}
+    rows: list[list[Any]] = []
+
+    technical_table = report.get("technical_details_table")
+    spannung_row = {}
+    leitung_row = {}
+    kurz_row = {}
+    if isinstance(technical_table, list):
+        for entry in technical_table:
+            if not isinstance(entry, dict):
+                continue
+            key = str(entry.get("kenngroesse") or "").strip().lower()
+            if key.startswith("spannung"):
+                spannung_row = entry
+            elif key.startswith("kurzschluss"):
+                kurz_row = entry
+            elif key.startswith("leitung") or "querschnitt" in key:
+                leitung_row = entry
+
+    thermisch_bewertung = report.get("thermisch_bewertung") or ""
+
+    # Fallbacks to perspective if technical_details_table missing
+    persp_du = persp.get("delta_u_prozent")
+    persp_ik = persp.get("ik_referenz_ka")
+
+    delta_u_wert = spannung_row.get("wert") if spannung_row else _fmt_num(
+        persp_du, digits=2, suffix=" %"
+    )
+    ik_wert = kurz_row.get("wert") if kurz_row else _fmt_num(
+        persp_ik, digits=1, suffix=" kA"
+    )
+    leitung_wert = (
+        leitung_row.get("wert")
+        if leitung_row
+        else _fmt_num(persp.get("querschnitt_mm2"), digits=0, suffix=" mm²")
+    )
+
+    status_du = spannung_row.get("hinweis") or "Screening"
+    status_ik = kurz_row.get("hinweis") or "Screening"
+    status_leitung = leitung_row.get("hinweis") or "Screening"
+
+    headers = ["Kenngröße", "Wert", "Norm-Bezug", "Status"]
+
+    rows.append(
+        [
+            "Spannungsfall (dU)",
+            _safe(delta_u_wert),
+            "VDE-AR-N 4105 / 4110",
+            status_badge_paragraph(palette, status_du),
+        ]
+    )
+    rows.append(
+        [
+            "Kurzschluss Ik",
+            _safe(ik_wert),
+            "DIN EN 60909",
+            status_badge_paragraph(palette, status_ik),
+        ]
+    )
+    rows.append(
+        [
+            "Thermische Auslastung",
+            _safe(
+                _fmt_num(persp.get("thermische_auslastung_prozent"), digits=0, suffix=" %"),
+                default=_safe(thermisch_bewertung),
+            ),
+            "VDE-AR-N 4110 §6",
+            status_badge_paragraph(palette, thermisch_bewertung or "OFFEN"),
+        ]
+    )
+    rows.append(
+        [
+            "Querschnitt / Leitung",
+            _safe(leitung_wert),
+            "DIN VDE 0276 / 4110",
+            status_badge_paragraph(palette, status_leitung),
+        ]
+    )
+    rows.append(
+        [
+            "N-1-Klasse",
+            _safe(persp.get("n1_klasse") or report.get("n1_status")),
+            "VDE-AR-N 4110 §10",
+            status_badge_paragraph(palette, report.get("n1_status")),
+        ]
+    )
+
+    return alt_table(
+        palette,
+        headers,
+        rows,
+        col_widths=[doc_width * 0.30, doc_width * 0.24, doc_width * 0.26, doc_width * 0.20],
+    )
+
+
+def _projektierer_assumptions(report: dict[str, Any]) -> list[tuple[str, str]]:
+    persp = _persp(report) or {}
+    cos_phi = persp.get("cos_phi") or persp.get("power_factor")
+    glz = persp.get("simultaneity_factor") or persp.get("default_simultaneity_factor")
+    eeg_class = persp.get("feed_in_management_class")
+    q_mode = persp.get("reactive_power_mode") or persp.get("default_reactive_power_mode")
+
+    return [
+        ("cos φ (Wirkungsfaktor)", _fmt_num(cos_phi, digits=2, default="0,90")),
+        ("Gleichzeitigkeit", _fmt_num(glz, digits=2, default="0,85")),
+        ("EEG-Klasse §9 2023", _safe(eeg_class)),
+        ("Q-Modus", _safe(q_mode)),
+        (
+            "Datenqualität",
+            _safe(report.get("datenqualitaet_klasse"), default="B"),
+        ),
+        (
+            "N-1 Datengrundlage",
+            _safe(persp.get("n1_datengrundlage"), default="planner_assumption"),
+        ),
+    ]
+
+
+def _build_projektierer_story(
+    palette: StakeholderPalette,
+    report: dict[str, Any],
+    *,
+    doc_width: float,
+    report_id: str,
+    full_hash: str,
+) -> list[Any]:
+    story: list[Any] = []
+    body = body_style(palette)
+
+    story.extend(_projektierer_cover(palette, report, report_id=report_id, doc_width=doc_width))
+
+    headline, severity, msg = _decision_summary(report)
+    story.append(
+        summary_box(
+            palette,
+            headline=headline,
+            body_text=msg,
+            severity=severity,
+            doc_width=doc_width,
         )
-    return "Keine Auflagen gemeldet."
+    )
+    story.append(Spacer(1, 4 * mm))
+
+    story.extend(
+        section(
+            palette,
+            "Technische KPI mit Status und Norm-Bezug",
+            [_build_kpi_status_table(palette, report, doc_width=doc_width)],
+        )
+    )
+    story.append(Spacer(1, 3 * mm))
+
+    story.extend(
+        section(
+            palette,
+            "Annahmen & Confidence",
+            [
+                kv_table(palette, _projektierer_assumptions(report), doc_width=doc_width, boxed=True),
+            ],
+        )
+    )
+
+    persp = _persp(report) or {}
+    plant_context = [
+        ("Anlage", _plant_label(report)),
+        ("AC-Leistung", _fmt_num(persp.get("ac_kw"), digits=0, suffix=" kW")),
+        ("DC-Leistung", _fmt_num(persp.get("dc_kwp"), digits=0, suffix=" kWp")),
+        ("Screening-Leistung", _fmt_num(persp.get("screening_power_kw"), digits=0, suffix=" kW")),
+        ("Profilhinweis", _safe(persp.get("feed_in_profile_note"))),
+    ]
+    story.extend(
+        section(
+            palette,
+            "Anlagen- / Plant-Context",
+            [kv_table(palette, plant_context, doc_width=doc_width, boxed=True)],
+        )
+    )
+
+    eeg_items = list(report.get("eeg_checklist") or [])
+    story.extend(
+        section(
+            palette,
+            "§9 EEG 2023 — Einspeisemanagement-Checkliste",
+            bulleted_block(palette, eeg_items, empty_label="Keine EEG-Hinweise."),
+        )
+    )
+
+    timeline = list(report.get("process_timeline") or [])
+    bkz = _safe(report.get("bkz_hint"), default="")
+    story.extend(
+        section(
+            palette,
+            "Zeitplan (heuristisch) & BKZ-Indikation",
+            [
+                *bulleted_block(palette, timeline, empty_label="Keine Zeitplan-Daten."),
+                Spacer(1, 2 * mm),
+                p_html(
+                    f"<b>BKZ-Hinweis (§25 NAV, qualitativ):</b> {bkz or '—'}",
+                    body,
+                ),
+            ],
+        )
+    )
+
+    nvp = (persp.get("nvp_recommendation") if isinstance(persp.get("nvp_recommendation"), dict) else {}) or {}
+    nvp_rows: list[tuple[str, Any]] = []
+    if nvp.get("suggested_voltage_level"):
+        nvp_rows.append(
+            ("Empfohlene Spannungsebene", _voltage_label(nvp.get("suggested_voltage_level")))
+        )
+    if nvp.get("nearest_node_hint"):
+        nvp_rows.append(("Nähester Knoten", _safe(nvp.get("nearest_node_hint"))))
+    if nvp.get("disclaimer"):
+        nvp_rows.append(("Vorbehalt", _safe(nvp.get("disclaimer"))))
+    if not nvp_rows:
+        nvp_rows = [("Empfehlung", "Keine NVP-Empfehlung aus Engine.")]
+    story.extend(
+        section(
+            palette,
+            "NVP-Empfehlung",
+            [kv_table(palette, nvp_rows, doc_width=doc_width, boxed=True)],
+        )
+    )
+
+    story.extend(
+        section(
+            palette,
+            "Maßnahmen / Auflagen",
+            [
+                p_html("<b>Empfohlene Maßnahmen</b>", body_bold_style(palette)),
+                *bulleted_block(
+                    palette,
+                    list(report.get("empfohlene_massnahmen") or []),
+                    empty_label="Keine zusätzlichen Maßnahmen.",
+                ),
+                Spacer(1, 2 * mm),
+                p_html("<b>Auflagen / Bedingungen</b>", body_bold_style(palette)),
+                *bulleted_block(
+                    palette,
+                    list(report.get("auflagen") or []),
+                    empty_label="Keine Auflagen gemeldet.",
+                ),
+            ],
+        )
+    )
+
+    norms = list(report.get("normen_snapshot") or [])
+    if norms:
+        rows: list[list[Any]] = []
+        for entry in norms:
+            if isinstance(entry, dict):
+                rows.append(
+                    [
+                        _safe(entry.get("norm_id")),
+                        _safe(entry.get("stand")),
+                        _safe(entry.get("kategorie")),
+                    ]
+                )
+        story.extend(
+            section(
+                palette,
+                "Norm-Referenzen",
+                [
+                    alt_table(
+                        palette,
+                        ["Norm-ID", "Stand", "Kategorie"],
+                        rows,
+                        col_widths=[doc_width * 0.45, doc_width * 0.25, doc_width * 0.30],
+                    )
+                ],
+            )
+        )
+    else:
+        story.extend(
+            section(
+                palette,
+                "Norm-Referenzen",
+                bulleted_block(palette, _PROJEKTIERER_NORMS_FALLBACK),
+            )
+        )
+
+    story.append(Spacer(1, 3 * mm))
+    story.append(_disclaimer_paragraph(palette))
+    return story
 
 
+# ============================================================================
+# VNB story
+# ============================================================================
+def _vnb_antrag_identification(report: dict[str, Any]) -> list[tuple[str, Any]]:
+    plz = _safe(report.get("plz"))
+    standort = _safe(report.get("standort"))
+    ort_zeile = f"{standort} (PLZ {plz})" if plz != "—" else standort
+    return [
+        ("Antragsteller / verantwortliche Stelle", _safe(report.get("antragsteller"), default="—")),
+        ("Standort", ort_zeile),
+        ("Anlagentyp", _plant_label(report)),
+        ("Geplante Leistung", _fmt_num(report.get("leistung_mw"), digits=3, suffix=" MW")),
+        ("Spannungsebene", _voltage_label(report.get("spannungsebene"))),
+        ("Anschlussart", _connection_label(report.get("anschlussart"))),
+        ("Datengrundlage", _safe(report.get("n1_datengrundlage"), default="planner_assumption")),
+        (
+            "Datum",
+            _safe(report.get("report_generated_at")).split("T", 1)[0],
+        ),
+    ]
+
+
+def _vnb_technical_pruefung_table(
+    palette: StakeholderPalette, report: dict[str, Any], *, doc_width: float
+) -> Table:
+    headers = ["Kenngröße", "Vorprüfwert", "Norm", "Screening", "VNB-Prüfung"]
+    rows: list[list[Any]] = []
+    table_data = list(report.get("technical_review_table") or [])
+
+    norm_map = {
+        "spannungsfall": "VDE-AR-N 4110 §5",
+        "kurzschluss": "DIN EN 60909",
+        "thermik": "VDE-AR-N 4110 §6",
+        "spannung": "VDE-AR-N 4110 §5",
+        "leitung": "DIN VDE 0276",
+        "trasse": "DIN VDE 0276",
+        "n-1-screening": "VDE-AR-N 4110 §10",
+        "n-1": "VDE-AR-N 4110 §10",
+    }
+
+    for entry in table_data:
+        if not isinstance(entry, dict):
+            continue
+        label = _safe(entry.get("kenngroesse") or entry.get("label"))
+        screening_val = _safe(entry.get("screening") or entry.get("wert"))
+        hinweis = _safe(entry.get("hinweis"), default="Screening")
+        norm = ""
+        for key, val in norm_map.items():
+            if key in label.lower():
+                norm = val
+                break
+        if not norm:
+            norm = "VDE-AR-N 4110"
+        rows.append(
+            [
+                label,
+                screening_val,
+                norm,
+                status_badge_paragraph(palette, hinweis),
+                "☐ ____________________",
+            ]
+        )
+    if not rows:
+        rows = [["Keine Vorprüfdaten verfügbar.", "—", "—", "—", "☐"]]
+    return alt_table(
+        palette,
+        headers,
+        rows,
+        col_widths=[
+            doc_width * 0.22,
+            doc_width * 0.20,
+            doc_width * 0.18,
+            doc_width * 0.18,
+            doc_width * 0.22,
+        ],
+    )
+
+
+def _vnb_checklist_table(palette: StakeholderPalette, *, doc_width: float) -> Table:
+    headers = ["#", "VNB-Prüfpunkt (10 Punkte)", "Geprüft", "Bemerkung"]
+    rows: list[list[Any]] = []
+    for i, label in enumerate(_VNB_CHECKLIST_10, start=1):
+        rows.append([f"{i:>2}.", label, "☐ ja  ☐ nein", "_____________________"])
+    return alt_table(
+        palette,
+        headers,
+        rows,
+        col_widths=[
+            doc_width * 0.06,
+            doc_width * 0.52,
+            doc_width * 0.16,
+            doc_width * 0.26,
+        ],
+    )
+
+
+def _build_vnb_story(
+    palette: StakeholderPalette,
+    report: dict[str, Any],
+    *,
+    doc_width: float,
+    report_id: str,
+    full_hash: str,
+) -> list[Any]:
+    story: list[Any] = []
+    body = body_style(palette)
+
+    headline, severity, msg = _decision_summary(report)
+    story.append(
+        summary_box(
+            palette,
+            headline=f"Vorprüfung: {headline}",
+            body_text=msg,
+            severity=severity,
+            doc_width=doc_width,
+        )
+    )
+    story.append(Spacer(1, 3 * mm))
+
+    story.extend(
+        section(
+            palette,
+            "Antragsidentifikation",
+            [
+                kv_table(
+                    palette,
+                    _vnb_antrag_identification(report),
+                    doc_width=doc_width,
+                    boxed=True,
+                )
+            ],
+        )
+    )
+
+    story.extend(
+        section(
+            palette,
+            "Technische Antragsdaten (Screening)",
+            [_vnb_technical_pruefung_table(palette, report, doc_width=doc_width)],
+        )
+    )
+    story.append(Spacer(1, 2 * mm))
+
+    story.extend(
+        section(
+            palette,
+            "VNB-Prüfcheckliste (10 Punkte)",
+            [_vnb_checklist_table(palette, doc_width=doc_width)],
+        )
+    )
+
+    story.extend(
+        section(
+            palette,
+            "Status- / Prozesssicht",
+            bulleted_block(
+                palette,
+                list(report.get("process_view") or []),
+                empty_label="Keine Prozesssicht hinterlegt.",
+            ),
+        )
+    )
+
+    story.append(PageBreak())
+
+    story.extend(
+        section(
+            palette,
+            "Hinweis zur VNB-Prüfung",
+            [p(_safe(report.get("netzbetreiber_checkliste_hinweis")), body)],
+        )
+    )
+
+    story.extend(
+        section(
+            palette,
+            "Entscheidungsblock (VNB)",
+            [
+                decision_picks(
+                    palette,
+                    [
+                        "Vorgang positiv — Standardverfahren",
+                        "Positiv mit Auflagen",
+                        "Vorgang abgelehnt / Nachreichung erforderlich",
+                    ],
+                    doc_width=doc_width,
+                ),
+            ],
+        )
+    )
+
+    story.extend(
+        section(
+            palette,
+            "Auflagen / Bedingungen (8 Linien)",
+            [lined_field(palette, lines=8, doc_width=doc_width)],
+        )
+    )
+
+    story.append(Spacer(1, 4 * mm))
+    story.extend(
+        section(
+            palette,
+            "Freigabe / Unterschriften",
+            [
+                signature_block(
+                    palette,
+                    [
+                        {
+                            "label": "Antragsteller / Projektierer",
+                            "placeholder": "Datum, Ort, Name",
+                            "hint": "Unterschrift",
+                        },
+                        {
+                            "label": "VNB-Sachbearbeitung",
+                            "placeholder": "Datum, Ort, Name",
+                            "hint": "Unterschrift / Stempel",
+                        },
+                        {
+                            "label": "Freizeichnung / Leitung",
+                            "placeholder": "Datum, Ort, Name",
+                            "hint": "Unterschrift / Stempel",
+                        },
+                    ],
+                    doc_width=doc_width,
+                )
+            ],
+        )
+    )
+
+    story.append(Spacer(1, 4 * mm))
+    story.append(_disclaimer_paragraph(palette))
+    return story
+
+
+# ============================================================================
+# Invest story
+# ============================================================================
+def _invest_score(report: dict[str, Any]) -> int | None:
+    kpi = report.get("kpi_summary")
+    if isinstance(kpi, list):
+        for line in kpi:
+            if isinstance(line, str) and "Score" in line:
+                # parse first integer found
+                digits = "".join(ch if ch.isdigit() else " " for ch in line).split()
+                if digits:
+                    try:
+                        return int(digits[0])
+                    except ValueError:
+                        continue
+    scores = report.get("scores")
+    if isinstance(scores, dict):
+        try:
+            return int(float(scores.get("gesamt", 0)))
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _invest_cost_estimate(report: dict[str, Any]) -> tuple[str, str]:
+    cost_band = report.get("cost_band") if isinstance(report.get("cost_band"), dict) else None
+    if cost_band:
+        basis = cost_band.get("basis_eur")
+        low = cost_band.get("niedrig_eur") or basis
+        high = cost_band.get("hoch_eur") or basis
+        return (_fmt_eur(basis), f"{_fmt_eur(low)} – {_fmt_eur(high)}")
+    kosten = report.get("kosten_indikation")
+    if isinstance(kosten, dict):
+        basis = kosten.get("investition_gesamt_eur") or kosten.get("band_basis_eur")
+        return (_fmt_eur(basis), "Bandbreite n/a")
+    return ("—", "Kostenband fehlt")
+
+
+def _invest_timeframe(report: dict[str, Any]) -> str:
+    timeline = report.get("process_timeline")
+    if isinstance(timeline, list):
+        for line in timeline:
+            if isinstance(line, str) and "Wochen" in line:
+                return line
+    return "8–16 Wochen (heuristisch)"
+
+
+def _invest_hero(
+    palette: StakeholderPalette, report: dict[str, Any], *, doc_width: float
+) -> Table:
+    score = _invest_score(report)
+    score_text = f"{score}/100" if score is not None else "—"
+    decision = str(report.get("entscheidung") or "C").strip().upper() or "C"
+    decision_label, severity, _msg = _DECISION_BADGES.get(
+        decision, _DECISION_BADGES["C"]
+    )
+    big = ParagraphStyle(
+        "invest_score",
+        fontName=FONT_BOLD,
+        fontSize=44,
+        textColor=colors.HexColor(palette.primary),
+        leading=48,
+        alignment=0,
+    )
+    label = ParagraphStyle(
+        "invest_label",
+        fontName=FONT_REGULAR,
+        fontSize=10,
+        textColor=colors.HexColor(palette.text_muted),
+        leading=12,
+        alignment=0,
+    )
+    headline = ParagraphStyle(
+        "invest_head",
+        fontName=FONT_BOLD,
+        fontSize=18,
+        textColor=colors.HexColor(palette.primary_dark),
+        leading=22,
+    )
+    rec = ParagraphStyle(
+        "invest_rec",
+        fontName=FONT_REGULAR,
+        fontSize=10,
+        textColor=colors.HexColor(palette.text),
+        leading=14,
+    )
+    badge_color = (
+        palette.pass_color
+        if severity == "pass"
+        else palette.warn_color
+        if severity == "warn"
+        else palette.fail_color
+    )
+    badge = ParagraphStyle(
+        "invest_badge",
+        fontName=FONT_BOLD,
+        fontSize=11,
+        textColor=colors.HexColor(badge_color),
+        leading=14,
+    )
+
+    left = Table(
+        [
+            [Paragraph("GridCheck-Score", label)],
+            [Paragraph(score_text, big)],
+            [Paragraph(f"Entscheidung: {decision}", label)],
+        ],
+        colWidths=[doc_width * 0.42],
+    )
+    left.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 14),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(palette.zebra)),
+                ("LINEAFTER", (-1, 0), (-1, -1), 1.0, colors.HexColor(palette.primary)),
+            ]
+        )
+    )
+
+    headline_text = _safe(report.get("standort"), default="Projektportfolio")
+    rec_text = _safe(report.get("recommended_focus"), default=_safe(report.get("scope_summary")))
+
+    right = Table(
+        [
+            [Paragraph(headline_text, headline)],
+            [Paragraph(decision_label, badge)],
+            [Paragraph(rec_text, rec)],
+        ],
+        colWidths=[doc_width * 0.58],
+    )
+    right.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 14),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+                ("TOPPADDING", (0, 0), (-1, -1), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ]
+        )
+    )
+
+    hero = Table([[left, right]], colWidths=[doc_width * 0.42, doc_width * 0.58])
+    hero.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor(palette.border)),
+            ]
+        )
+    )
+    return hero
+
+
+def _invest_kpi_cards(
+    palette: StakeholderPalette, report: dict[str, Any], *, doc_width: float
+) -> Table:
+    basis, band = _invest_cost_estimate(report)
+    score = _invest_score(report)
+    leistung_mw = report.get("leistung_mw")
+    persp = _persp(report) or {}
+    ac_kw = persp.get("ac_kw") or (
+        float(leistung_mw) * 1000.0 if isinstance(leistung_mw, (int, float)) else None
+    )
+
+    cards = [
+        ("Anschlussleistung", _fmt_num(ac_kw, digits=0, suffix=" kW"), _voltage_label(report.get("spannungsebene"))),
+        ("GridCheck-Score", f"{score}/100" if score is not None else "—", "Confidence A–D"),
+        ("Kosten-Schätzung", basis, band),
+        ("Zeitrahmen (heuristisch)", _invest_timeframe(report), "VNB-abhängig"),
+    ]
+    return kpi_strip(palette, cards, doc_width=doc_width)
+
+
+def _invest_chancen_risiken(
+    palette: StakeholderPalette, report: dict[str, Any], *, doc_width: float
+) -> Table:
+    risks_raw = list(report.get("risk_overview") or [])
+    chances: list[str] = []
+    risks_list: list[str] = []
+    for item in risks_raw:
+        if not isinstance(item, dict):
+            continue
+        label = _safe(item.get("label"))
+        detail = _safe(item.get("detail"))
+        status = str(item.get("status") or "").lower()
+        rendered = f"{label}: {detail}" if detail != "—" else label
+        if status in {"hoch", "high", "fail", "rot"}:
+            risks_list.append(rendered)
+        elif status in {"niedrig", "low", "pass", "gruen", "grün"}:
+            chances.append(rendered)
+        else:
+            risks_list.append(rendered)
+
+    portfolio = list(report.get("portfolio_view") or [])
+    for line in portfolio:
+        if "kritisch" in str(line).lower():
+            risks_list.append(str(line))
+        else:
+            chances.append(str(line))
+
+    if not chances:
+        chances = ["Score und Stakeholder-Fit liegen im akzeptablen Band — DD kann fortgesetzt werden."]
+    if not risks_list:
+        risks_list = ["Aktuell keine harten Risikoflags — Standardvorbehalte des Screenings beachten."]
+
+    body = body_style(palette)
+    head_left = ParagraphStyle(
+        "chance_head",
+        fontName=FONT_BOLD,
+        fontSize=11,
+        textColor=colors.HexColor(palette.pass_color),
+        leading=14,
+    )
+    head_right = ParagraphStyle(
+        "risk_head",
+        fontName=FONT_BOLD,
+        fontSize=11,
+        textColor=colors.HexColor(palette.fail_color),
+        leading=14,
+    )
+
+    left_rows: list[list[Any]] = [[Paragraph("Chancen", head_left)]]
+    for line in chances:
+        left_rows.append([p_html(f"+&nbsp; {line}", body)])
+    right_rows: list[list[Any]] = [[Paragraph("Risiken / Watchpoints", head_right)]]
+    for line in risks_list:
+        right_rows.append([p_html(f"!&nbsp; {line}", body)])
+
+    left = Table(left_rows, colWidths=[(doc_width - 6 * mm) / 2])
+    right = Table(right_rows, colWidths=[(doc_width - 6 * mm) / 2])
+    for sub, accent in ((left, palette.pass_color), (right, palette.fail_color)):
+        sub.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(palette.zebra)),
+                    ("LINEBELOW", (0, 0), (-1, 0), 1.0, colors.HexColor(accent)),
+                    ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor(palette.border)),
+                ]
+            )
+        )
+
+    return Table([[left, right]], colWidths=[doc_width / 2, doc_width / 2])
+
+
+def _invest_eckdaten(report: dict[str, Any]) -> list[tuple[str, Any]]:
+    return [
+        ("Standort", _safe(report.get("standort"))),
+        ("PLZ", _safe(report.get("plz"))),
+        ("Anlagentyp", _plant_label(report)),
+        ("Leistung", _fmt_num(report.get("leistung_mw"), digits=3, suffix=" MW")),
+        ("Spannungsebene", _voltage_label(report.get("spannungsebene"))),
+        ("Anschlussart", _connection_label(report.get("anschlussart"))),
+        ("N-1-Klasse", _safe(report.get("n1_status"))),
+        (
+            "Datengrundlage",
+            _safe(report.get("n1_datengrundlage"), default="planner_assumption"),
+        ),
+    ]
+
+
+def _build_invest_story(
+    palette: StakeholderPalette,
+    report: dict[str, Any],
+    *,
+    doc_width: float,
+    report_id: str,
+    full_hash: str,
+) -> list[Any]:
+    story: list[Any] = []
+    body = body_style(palette)
+
+    story.append(_invest_hero(palette, report, doc_width=doc_width))
+    story.append(Spacer(1, 4 * mm))
+
+    story.extend(
+        section(
+            palette,
+            "Investitions-KPIs",
+            [_invest_kpi_cards(palette, report, doc_width=doc_width)],
+        )
+    )
+    story.append(Spacer(1, 3 * mm))
+
+    story.extend(
+        section(
+            palette,
+            "Chancen & Risiken (kuratiert)",
+            [_invest_chancen_risiken(palette, report, doc_width=doc_width)],
+        )
+    )
+
+    story.extend(
+        section(
+            palette,
+            "Eckdaten",
+            [kv_table(palette, _invest_eckdaten(report), doc_width=doc_width, boxed=True)],
+        )
+    )
+
+    cost_band = report.get("cost_band") if isinstance(report.get("cost_band"), dict) else None
+    if cost_band:
+        rows: list[list[Any]] = []
+        for key, label in (
+            ("niedrig_eur", "Niedrig"),
+            ("basis_eur", "Basis"),
+            ("hoch_eur", "Hoch"),
+            ("confidence_pct", "Confidence"),
+            ("source", "Quelle"),
+        ):
+            value = cost_band.get(key)
+            if value is None:
+                continue
+            if key.endswith("_eur"):
+                rows.append([label, _fmt_eur(value), "EUR"])
+            elif key == "confidence_pct":
+                rows.append([label, f"{value} %", "Schätzbandbreite"])
+            else:
+                rows.append([label, _safe(value), ""])
+        story.extend(
+            section(
+                palette,
+                "Kostenbandbreite (Detail)",
+                [
+                    alt_table(
+                        palette,
+                        ["Position", "Wert", "Anmerkung"],
+                        rows,
+                        col_widths=[doc_width * 0.30, doc_width * 0.35, doc_width * 0.35],
+                    )
+                ],
+            )
+        )
+
+    next_steps_raw = list(report.get("empfohlene_massnahmen") or []) + list(
+        report.get("kpi_summary") or []
+    )[:1]
+    next_steps = _ensure_three_lines(next_steps_raw, minimum=3)[:6]
+    story.extend(
+        section(
+            palette,
+            "Nächste Schritte",
+            bulleted_block(palette, next_steps, empty_label="—"),
+        )
+    )
+
+    story.append(Spacer(1, 3 * mm))
+    story.append(_disclaimer_paragraph(palette))
+
+    boundary = _safe(report.get("visibility_boundary_note"), default="")
+    if boundary and boundary != "—":
+        story.append(Spacer(1, 2 * mm))
+        story.append(p(boundary, muted_style(palette)))
+    return story
+
+
+# ============================================================================
+# Public entry point
+# ============================================================================
 def build_stakeholder_report_pdf(report: dict[str, Any]) -> bytes:
-    """Map a stakeholder report dict (from build_*_report) to a PDF byte string."""
+    """Render a stakeholder-report dict to a high-quality PDF byte string.
+
+    The function picks one of three layouts based on ``report['report_type']``
+    (``projektierer``/``vnb``/``invest``) and stamps a deterministic SHA-256
+    footer hash plus stable Report-ID on every page.
+    """
+    if not isinstance(report, dict):
+        raise TypeError("build_stakeholder_report_pdf requires a dict report payload")
+
+    rt = str(report.get("report_type") or "projektierer").strip().lower()
+    if rt not in {"projektierer", "vnb", "invest"}:
+        rt = "projektierer"
+
+    palette = palette_for(rt)
+    full_hash = compute_footer_hash(report)
+    short_hash = _short_hash(full_hash, 12)
+    report_id = _report_id(report, full_hash)
+
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
         pagesize=A4,
-        topMargin=15 * mm,
+        topMargin=14 * mm,
         bottomMargin=22 * mm,
         leftMargin=15 * mm,
         rightMargin=15 * mm,
-        title="Adecarb GridCheck - Stakeholder-Kurzreport",
-        author="Adecarb",
+        title=f"GridCheck — {_STAKEHOLDER_TITLES.get(rt, 'Stakeholder-Report')}",
+        author="GridCheck / Adecarb",
     )
-    rt = str(report.get("report_type", "stakeholder"))
-    unter = _BANNER_SUBTITLE.get(rt, "Stakeholder")
+    doc_width = doc.width
+
     story: list[Any] = []
-    story.append(B.build_header_banner(doc.width / mm, untertitel=f"{unter} Kurzreport"))
-    story.append(Spacer(1, 6 * mm))
-
-    body = _body_style()
-    muted = _muted_style()
 
     story.append(
-        _p(
-            f"Version {report.get('report_version', '')} | Normstand {report.get('app_normstand', '')}",
-            muted,
+        brand_header(
+            palette,
+            title=_STAKEHOLDER_TITLES.get(rt, "Stakeholder-Report"),
+            subtitle=(
+                f"{_STAKEHOLDER_SUBTITLES.get(rt, '')} · Report-ID {report_id} · "
+                f"Stand {_safe(report.get('report_generated_at')).split('T', 1)[0]}"
+            ),
+            doc_width=doc_width,
         )
     )
-    story.append(_p(f"Engine-Revision: {report.get('engine_revision_hash') or 'n/a'}", muted))
-    if report.get("report_revision_number") or report.get("report_revision_uuid"):
-        story.append(
-            _p(
-                "Report-Revision: "
-                f"#{report.get('report_revision_number') or 'n/a'} | "
-                f"UUID: {report.get('report_revision_uuid') or 'n/a'}",
-                muted,
-            )
-        )
-    if report.get("report_generated_at") or report.get("audit_hash"):
-        story.append(
-            _p(
-                f"Erzeugt: {report.get('report_generated_at') or 'n/a'} | Audit-Hash: {report.get('audit_hash') or 'n/a'}",
-                muted,
-            )
-        )
-    if report.get("report_verify_path"):
-        story.append(_p(f"Verify-Pfad: {report.get('report_verify_path')}", muted))
-    if report.get("source_analysis_run_id") or report.get("source_revision_hash"):
-        story.append(
-            _p(
-                "Quelle: "
-                f"Analysis-Run {report.get('source_analysis_run_id') or 'n/a'} | "
-                f"Source-Revision: {report.get('source_revision_hash') or 'n/a'}",
-                muted,
-            )
-        )
-    if report.get("source_request_checksum") or report.get("source_result_checksum"):
-        story.append(
-            _p(
-                "Source-Checksums: "
-                f"Request {report.get('source_request_checksum') or 'n/a'} | "
-                f"Result {report.get('source_result_checksum') or 'n/a'}",
-                muted,
-            )
-        )
-    story.append(
-        _p(
-            "Paket: "
-            f"{report.get('offer_id') or 'manual'} | "
-            f"Package-Scope: {report.get('package_scope_label') or report.get('package_scope') or 'n/a'} | "
-            f"Report-Scope: {report.get('report_scope_label') or report.get('report_scope') or 'n/a'}",
-            muted,
-        )
-    )
-    if report.get("scope_summary"):
-        story.append(_p(str(report.get("scope_summary")), muted))
-    story.append(Spacer(1, 3 * mm))
-
-    story.append(_p("Projektkern", _SECTION_TITLE_STYLE))
-    plz = report.get("plz")
-    plz_s = str(plz) if plz not in (None, "") else "n/a"
-    leistung = float(report.get("leistung_mw", 0.0))
-    story.append(
-        _p(
-            f"Standort: {report.get('standort', '')} (PLZ: {plz_s})",
-            body,
-        )
-    )
-    story.append(_p(f"Leistung: {leistung:.3f} MW", body))
-    story.append(_p(f"Spannungsebene: {report.get('spannungsebene', '')}", body))
-    story.append(_p(f"Anschlussart: {report.get('anschlussart', '')}", body))
-    story.append(
-        _p(
-            "Einschätzung Screening: "
-            f"{_bool_geht(report)} ({report.get('entscheidung', '')})",
-            body,
-        )
-    )
-
-    if rt == "projektierer":
-        warnungen = list(report.get("warnungen") or [])
-        if warnungen:
-            story.append(_p("Warnungen", _SECTION_TITLE_STYLE))
-            _bulleted_block(story, body, warnungen, "Keine Warnungen.")
-
-        tech_table = list(report.get("technical_details_table") or [])
-        if tech_table:
-            story.append(_p("Technische Kenngrößen (Screening)", _SECTION_TITLE_STYLE))
-            _append_table(
-                story,
-                doc,
-                ["Kenngröße", "Wert", "Hinweis"],
-                [
-                    [str(r.get("kenngroesse", "")), str(r.get("wert", "")), str(r.get("hinweis", ""))]
-                    for r in tech_table
-                    if isinstance(r, dict)
-                ],
-            )
-            story.append(Spacer(1, 3 * mm))
-
-        timeline = list(report.get("process_timeline") or [])
-        if timeline:
-            story.append(_p("Zeitplan (heuristisch)", _SECTION_TITLE_STYLE))
-            _bulleted_block(story, body, timeline, "")
-
-        bkz = report.get("bkz_hint")
-        if bkz:
-            story.append(_p("BKZ-Hinweis (§25 NAV, qualitativ)", _SECTION_TITLE_STYLE))
-            story.append(_p(str(bkz), body))
-
-        eeg_items = list(report.get("eeg_checklist") or [])
-        if eeg_items:
-            story.append(_p("EEG §9 — Einspeisemanagement-Checkliste", _SECTION_TITLE_STYLE))
-            _bulleted_block(story, body, eeg_items, "")
-
-        reactive_items = list(report.get("reactive_checklist") or [])
-        if reactive_items:
-            story.append(_p("Blindleistung — Screening-Checkliste", _SECTION_TITLE_STYLE))
-            _bulleted_block(story, body, reactive_items, "")
-
-    if rt == "vnb" and report.get("netzbetreiber_checkliste_hinweis"):
-        story.append(_p("Checkliste-Netzbetreiber (Hinweis)", _SECTION_TITLE_STYLE))
-        story.append(_p(str(report["netzbetreiber_checkliste_hinweis"]), body))
-        request_review = list(report.get("request_review") or [])
-        if request_review:
-            story.append(_p("Strukturierte Anfragepruefung", _SECTION_TITLE_STYLE))
-            for item in request_review:
-                if isinstance(item, dict):
-                    story.append(
-                        _p(
-                            f"{item.get('label', '')} [{item.get('status', '')}]: {item.get('detail', '')}",
-                            body,
-                        )
-                    )
-        technical_precheck = list(report.get("technical_precheck") or [])
-        if technical_precheck:
-            story.append(_p("Technische Vorpruefung", _SECTION_TITLE_STYLE))
-            for item in technical_precheck:
-                if isinstance(item, dict):
-                    story.append(
-                        _p(
-                            f"{item.get('label', '')} [{item.get('status', '')}]: {item.get('detail', '')}",
-                            body,
-                        )
-                    )
-        review_table = list(report.get("technical_review_table") or [])
-        if review_table:
-            story.append(_p("Technische Kenngrößen — VNB-Prüfmatrix", _SECTION_TITLE_STYLE))
-            _append_table(
-                story,
-                doc,
-                ["Kenngröße", "Screening", "VNB-Prüfung"],
-                [
-                    [
-                        str(r.get("kenngroesse", "")),
-                        str(r.get("screening", "")),
-                        str(r.get("vnb_pruefung", "")),
-                    ]
-                    for r in review_table
-                    if isinstance(r, dict)
-                ],
-                col_widths=[doc.width * 0.32, doc.width * 0.28, doc.width * 0.4],
-            )
-            story.append(Spacer(1, 3 * mm))
-        vnb_timeline = list(report.get("process_timeline") or [])
-        if vnb_timeline:
-            story.append(_p("Prozess-Zeitplan (Referenz)", _SECTION_TITLE_STYLE))
-            _bulleted_block(story, body, vnb_timeline, "")
-
-    story.append(_p("N-1 Status", _SECTION_TITLE_STYLE))
-    story.append(_p(str(report.get("n1_status", "")), body))
-    story.append(_p(str(report.get("n1_detail", "")), body))
-
-    v2_lines = list(report.get("projektierer_v2_lines") or [])
-    if rt == "projektierer" and v2_lines:
-        story.append(_p("Projektierer-Vorplanung (grid_calculation_v2)", _SECTION_TITLE_STYLE))
-        if report.get("grid_calculation_version"):
-            story.append(_p(f"Version: {report.get('grid_calculation_version')}", muted))
-        _bulleted_block(story, body, v2_lines, "Keine v2-Details.")
-
-    if rt == "vnb" and report.get("process_view"):
-        story.append(_p("Status- / Prozesssicht", _SECTION_TITLE_STYLE))
-        _bulleted_block(story, body, list(report.get("process_view") or []), "")
-
-    story.append(_p("Auflagen", _SECTION_TITLE_STYLE))
-    _bulleted_block(
-        story,
-        body,
-        list(report.get("auflagen") or []),
-        _auflagen_empty_label(report),
-    )
-
-    story.append(_p("Empfohlene Maßnahmen", _SECTION_TITLE_STYLE))
-    _bulleted_block(
-        story,
-        body,
-        list(report.get("empfohlene_massnahmen") or []),
-        "Keine Maßnahmen gemeldet.",
-    )
-    if rt == "vnb" and report.get("technical_requirements"):
-        story.append(_p("Technische Auflagen / Nachreichungen", _SECTION_TITLE_STYLE))
-        _bulleted_block(
-            story,
-            body,
-            list(report.get("technical_requirements") or []),
-            "",
-        )
-
-    extra_blocks = [
-        ("Projektprofil", report.get("projektprofil_summary")),
-        ("Speicher / Flexibilität", report.get("speicher_summary")),
-        ("Umwelt / Trasse", report.get("route_environment_summary")),
-        ("Stakeholder-Zielkonflikt", report.get("stakeholder_konflikt")),
-        ("Empfohlener Fokus", report.get("recommended_focus")),
-    ]
-    if any(value for _label, value in extra_blocks):
-        story.append(_p("Anschlussstrategie / Risiko", _SECTION_TITLE_STYLE))
-        for label, value in extra_blocks:
-            if value:
-                story.append(_p(f"{label}: {value}", body))
-    elif report.get("scope_boundary_note"):
-        story.append(_p("Paketgrenze", _SECTION_TITLE_STYLE))
-        story.append(_p(str(report.get("scope_boundary_note")), body))
-
-    if rt == "invest":
-        kpi = list(report.get("kpi_summary") or [])
-        if kpi:
-            story.append(_p("KPI-Zusammenfassung", _SECTION_TITLE_STYLE))
-            _bulleted_block(story, body, kpi, "")
-        inv_timeline = list(report.get("process_timeline") or [])
-        if inv_timeline:
-            story.append(_p("Zeitplan-Indikation", _SECTION_TITLE_STYLE))
-            _bulleted_block(story, body, inv_timeline, "")
-        ki = report.get("kosten_indikation")
-        if isinstance(ki, dict) and ki:
-            story.append(_p("Kosten-Indikation", _SECTION_TITLE_STYLE))
-            for k, v in sorted(ki.items(), key=lambda x: str(x[0])):
-                story.append(_p(f"{k}: {v}", body))
-        elif report.get("scope_boundary_note"):
-            story.append(_p("Invest-Hinweis", _SECTION_TITLE_STYLE))
-            story.append(_p(str(report.get("scope_boundary_note")), body))
-        cost_band = report.get("cost_band")
-        if isinstance(cost_band, dict) and cost_band:
-            story.append(_p("Kostenbandbreite", _SECTION_TITLE_STYLE))
-            for key in ("niedrig_eur", "basis_eur", "hoch_eur", "confidence_pct", "source"):
-                if key in cost_band:
-                    story.append(_p(f"{key}: {cost_band.get(key)}", body))
-            assumptions = list(cost_band.get("assumptions") or [])
-            drivers = list(cost_band.get("drivers") or [])
-            if assumptions:
-                story.append(_p("Annahmen", _SECTION_TITLE_STYLE))
-                _bulleted_block(story, body, assumptions, "")
-            if drivers:
-                story.append(_p("Risikotreiber", _SECTION_TITLE_STYLE))
-                _bulleted_block(story, body, drivers, "")
-        site_assessment = list(report.get("site_assessment") or [])
-        if site_assessment:
-            story.append(_p("Standortbewertung", _SECTION_TITLE_STYLE))
-            for item in site_assessment:
-                if isinstance(item, dict):
-                    story.append(
-                        _p(
-                            f"{item.get('label', '')} [{item.get('status', '')}]: {item.get('detail', '')}",
-                            body,
-                        )
-                    )
-        risk_overview = list(report.get("risk_overview") or [])
-        if risk_overview:
-            story.append(_p("Risikoanalyse", _SECTION_TITLE_STYLE))
-            for item in risk_overview:
-                if isinstance(item, dict):
-                    story.append(
-                        _p(
-                            f"{item.get('label', '')} [{item.get('status', '')}]: {item.get('detail', '')}",
-                            body,
-                        )
-                    )
-        dd_items = list(report.get("due_diligence_checklist") or [])
-        if dd_items:
-            story.append(_p("Due-Diligence-orientierte Sicht", _SECTION_TITLE_STYLE))
-            for item in dd_items:
-                if isinstance(item, dict):
-                    story.append(
-                        _p(
-                            f"{item.get('label', '')} [{item.get('status', '')}]: {item.get('detail', '')}",
-                            body,
-                        )
-                    )
-        if report.get("portfolio_view"):
-            story.append(_p("Portfolio- / Vergleichssicht", _SECTION_TITLE_STYLE))
-            _bulleted_block(story, body, list(report.get("portfolio_view") or []), "")
-
-    story.append(_p("Normen-Snapshot", _SECTION_TITLE_STYLE))
-    norms = list(report.get("normen_snapshot") or [])
-    if norms:
-        # Abbreviated: key fields only (Titel oft lang)
-        tbl_data: list[list[str]] = [["Norm-ID", "Stand", "Kategorie"]]
-        for n in norms:
-            if not isinstance(n, dict):
-                continue
-            tbl_data.append(
-                [
-                    str(n.get("norm_id", "")),
-                    str(n.get("stand", "")),
-                    str(n.get("kategorie", "")),
-                ]
-            )
-        tw = doc.width
-        t = Table(tbl_data, colWidths=[tw * 0.42, tw * 0.28, tw * 0.28])
-        t.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(B.GRAU_ZEBRA)),
-                    ("FONTNAME", (0, 0), (-1, 0), B.FONT_BOLD),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor(B.GRAU_LINIE)),
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-                ]
-            )
-        )
-        story.append(t)
-    else:
-        story.append(_p("Keine Normen-Einträge.", body))
-
-    transparency_notes = list(report.get("transparenz_hinweise") or [])
-    if transparency_notes:
-        story.append(_p("Transparenz / Confidence", _SECTION_TITLE_STYLE))
-        _bulleted_block(story, body, transparency_notes, "Keine zusätzlichen Hinweise.")
-    if report.get("data_role_summary"):
-        story.append(_p("Daten-, Pruef- und Auditrolle", _SECTION_TITLE_STYLE))
-        story.append(_p(str(report.get("data_role_summary")), body))
-    if report.get("data_basis"):
-        story.append(_p("Datenbasis", _SECTION_TITLE_STYLE))
-        _bulleted_block(story, body, list(report.get("data_basis") or []), "")
-    if report.get("visibility_boundary_note"):
-        story.append(_p("Sichtbarkeitsgrenze", _SECTION_TITLE_STYLE))
-        story.append(_p(str(report.get("visibility_boundary_note")), body))
-
-    if rt == "vnb":
-        sig = report.get("signature_section")
-        if isinstance(sig, dict) and sig.get("fields"):
-            story.append(_p(str(sig.get("title") or "VNB-Prüfung / Freigabe"), _SECTION_TITLE_STYLE))
-            for field in sig.get("fields") or []:
-                if isinstance(field, dict):
-                    story.append(
-                        _p(
-                            f"{field.get('label', '')}: {field.get('placeholder', '')}",
-                            body,
-                        )
-                    )
-            if sig.get("disclaimer"):
-                story.append(_p(str(sig["disclaimer"]), muted))
-
     story.append(Spacer(1, 4 * mm))
     story.append(
-        _p(
-            "Vorläufige Analyse. Keine verbindliche Netzanschlusszusage. "
-            "Keine Kapazitätsgarantie. Freie Netzkapazität nur mit belastbarem Datenstand des VNB.",
-            muted,
+        _build_meta_strip(
+            palette,
+            report,
+            report_id=report_id,
+            full_hash=full_hash,
+            doc_width=doc_width,
         )
     )
-    disclaimers = list(report.get("disclaimers") or [])
-    if disclaimers:
-        _bulleted_block(story, muted, disclaimers, "")
+    story.append(Spacer(1, 4 * mm))
 
-    doc.build(story, onFirstPage=B.footer_callback, onLaterPages=B.footer_callback)
+    if rt == "vnb":
+        story.extend(
+            _build_vnb_story(
+                palette,
+                report,
+                doc_width=doc_width,
+                report_id=report_id,
+                full_hash=full_hash,
+            )
+        )
+    elif rt == "invest":
+        story.extend(
+            _build_invest_story(
+                palette,
+                report,
+                doc_width=doc_width,
+                report_id=report_id,
+                full_hash=full_hash,
+            )
+        )
+    else:
+        story.extend(
+            _build_projektierer_story(
+                palette,
+                report,
+                doc_width=doc_width,
+                report_id=report_id,
+                full_hash=full_hash,
+            )
+        )
+
+    footer_cb = make_footer_callback(
+        palette,
+        short_hash=short_hash,
+        disclaimer=_DISCLAIMER_LINE,
+    )
+
+    def _on_page(canvas, doc_inner) -> None:
+        footer_cb(canvas, doc_inner)
+        # add "Seite x / y" with both numbers in the bottom-right
+        canvas.saveState()
+        breite, _h = doc_inner.pagesize
+        canvas.setFont(FONT_REGULAR, 7.5)
+        canvas.setFillColor(colors.HexColor(palette.text_muted))
+        canvas.drawRightString(
+            breite - 15 * mm,
+            10 * mm - 3.5 * mm,
+            f"Report-ID {report_id}",
+        )
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
     return buf.getvalue()

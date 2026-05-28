@@ -1,7 +1,11 @@
 import type { GridCheckResult, Szenario } from "@/types";
 
 const STORAGE_PREFIX = "gridcheck:compare:";
+const SLOT_STORAGE_PREFIX = "gridcheck:compare-slots:";
 const MAX_SNAPSHOTS = 2;
+
+/** Session key for Projektierer-Check ohne Projekt-ID */
+export const STANDALONE_COMPARE_PROJECT_ID = "projektierer-check";
 
 export type ScenarioCompareSnapshot = {
   id: string;
@@ -81,4 +85,36 @@ export function pushCompareSnapshot(projectId: string | number, result: GridChec
 export function clearCompareSnapshots(projectId: string | number): void {
   if (typeof window === "undefined") return;
   window.sessionStorage.removeItem(storageKey(projectId));
+  window.sessionStorage.removeItem(`${SLOT_STORAGE_PREFIX}${projectId}`);
+}
+
+function slotStorageKey(projectId: string | number): string {
+  return `${SLOT_STORAGE_PREFIX}${projectId}`;
+}
+
+export type ScenarioSlot = "A" | "B";
+
+export function getScenarioSlots(projectId: string | number): Partial<Record<ScenarioSlot, ScenarioCompareSnapshot>> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.sessionStorage.getItem(slotStorageKey(projectId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Partial<Record<ScenarioSlot, ScenarioCompareSnapshot>>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveScenarioSlot(
+  projectId: string | number,
+  slot: ScenarioSlot,
+  result: GridCheckResult,
+  label?: string,
+): void {
+  if (typeof window === "undefined") return;
+  const slots = getScenarioSlots(projectId);
+  slots[slot] = snapshotFromResult(result, label ?? `Szenario ${slot}`);
+  window.sessionStorage.setItem(slotStorageKey(projectId), JSON.stringify(slots));
+  pushCompareSnapshot(projectId, result);
 }

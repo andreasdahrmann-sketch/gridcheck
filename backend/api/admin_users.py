@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from core.auth import require_admin_user, require_csrf
-from core.vnb_access import user_to_vnb_access_fields
+from core.vnb_access import VNB_STATUS_PENDING, user_to_vnb_access_fields
 from db.database import get_db
 from db.models import User
 from services.auth_service import approve_netzbetreiber
@@ -20,6 +20,34 @@ class AdminUserVnbResponse(BaseModel):
     full_name: str | None
     vnb_verification_status: str
     netzbetreiber_verified: bool
+
+
+@router.get("/pending-netzbetreiber", response_model=list[AdminUserVnbResponse])
+def list_pending_netzbetreiber(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_user),
+) -> list[AdminUserVnbResponse]:
+    rows = (
+        db.query(User)
+        .filter(User.role == "netzbetreiber")
+        .filter(User.vnb_verification_status == VNB_STATUS_PENDING)
+        .order_by(User.id.asc())
+        .all()
+    )
+    out: list[AdminUserVnbResponse] = []
+    for user in rows:
+        fields = user_to_vnb_access_fields(user)
+        out.append(
+            AdminUserVnbResponse(
+                id=user.id,
+                email=user.email,
+                role=user.role,
+                full_name=user.full_name,
+                vnb_verification_status=str(fields["vnb_verification_status"]),
+                netzbetreiber_verified=bool(fields["netzbetreiber_verified"]),
+            )
+        )
+    return out
 
 
 @router.post("/{user_id}/approve-netzbetreiber", response_model=AdminUserVnbResponse)

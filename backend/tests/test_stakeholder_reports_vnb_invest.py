@@ -160,6 +160,25 @@ def test_vnb_pdf_bytes_smoke():
     assert len(pdf_bytes) > 1000
 
 
+def test_vnb_pdf_contains_decision_block_and_signatures():
+    from io import BytesIO
+
+    from pypdf import PdfReader
+
+    report = build_vnb_report(_engine_result_base())
+    pdf_bytes = build_stakeholder_report_pdf(report)
+    reader = PdfReader(BytesIO(pdf_bytes))
+    assert len(reader.pages) >= 2, "VNB-Report sollte >= 2 Seiten haben"
+    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    assert "Report-ID" in text
+    assert "VNB-Pr" in text
+    assert "Antragsidentifikation" in text
+    assert "Entscheidungsblock" in text or "Standardverfahren" in text
+    assert "Auflagen" in text
+    assert "Unterschrift" in text or "Freigabe" in text
+    assert "Vorl" in text and "ufige Diagnose" in text
+
+
 def test_vnb_build_render_smoke():
     report = build_vnb_report(_engine_result_base())
     html = render_vnb_html(report)
@@ -217,6 +236,33 @@ def test_invest_pdf_bytes_smoke():
     pdf_bytes = build_stakeholder_report_pdf(report)
     assert pdf_bytes.startswith(b"%PDF")
     assert len(pdf_bytes) > 1000
+
+
+def test_invest_pdf_contains_score_and_kpis():
+    from io import BytesIO
+
+    from pypdf import PdfReader
+
+    er = _engine_result_base()
+    er["kosten"] = {
+        "investition_gesamt_eur": 1_250_000,
+        "band_niedrig_eur": 1_000_000,
+        "band_basis_eur": 1_250_000,
+        "band_hoch_eur": 1_650_000,
+        "konfidenz_prozent": 60,
+        "quelle": "Referenzwerte",
+    }
+    report = build_invest_report(er)
+    pdf_bytes = build_stakeholder_report_pdf(report)
+    reader = PdfReader(BytesIO(pdf_bytes))
+    assert len(reader.pages) >= 1, "Invest-Report sollte mindestens eine Seite haben"
+    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    assert "Report-ID" in text
+    assert "GridCheck-Score" in text or "Score" in text
+    assert "Kosten" in text
+    assert "Eckdaten" in text
+    assert "Chancen" in text or "Risiken" in text
+    assert "Vorl" in text and "ufige Diagnose" in text
 
 
 def test_invest_build_render_without_kosten():

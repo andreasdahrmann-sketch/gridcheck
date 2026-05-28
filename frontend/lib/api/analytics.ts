@@ -1,3 +1,5 @@
+import { hasAnalyticsConsent } from "@/lib/cookie-consent";
+
 const ANALYTICS_BASE = "/api/backend/api/v1/analytics";
 
 export type ConversionEventName =
@@ -12,6 +14,9 @@ export async function trackConversionEvent(
   properties: Record<string, unknown> = {},
   sessionId?: string,
 ): Promise<void> {
+  if (!hasAnalyticsConsent()) {
+    return;
+  }
   try {
     const res = await fetch(`${ANALYTICS_BASE}/events`, {
       method: "POST",
