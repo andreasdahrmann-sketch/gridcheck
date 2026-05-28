@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import Depends, HTTPException
 from sqlalchemy import inspect
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from core.auth import get_current_user
@@ -13,6 +14,28 @@ VNB_STATUS_PENDING = "pending"
 VNB_STATUS_APPROVED = "approved"
 _VNB_STATUSES = {VNB_STATUS_NONE, VNB_STATUS_PENDING, VNB_STATUS_APPROVED}
 
+# perf: information_schema-Lookup pro Engine nur einmal cachen.
+# Vorher hat jeder Aufruf von _read_status mit db != None die Spaltenliste
+# der users-Tabelle frisch via inspect() abgefragt. Bei VNB-Dashboard- und
+# Comms-Endpoints feuert das mehrfach pro Request (3x je
+# user_to_vnb_access_fields-Aufruf).
+_USERS_COLUMNS_CACHE: dict[int, frozenset[str]] = {}
+
+
+def _users_columns_for_bind(bind: Engine | None) -> frozenset[str]:
+    if bind is None:
+        return frozenset()
+    cache_key = id(bind)
+    cached = _USERS_COLUMNS_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    try:
+        columns = frozenset(col["name"] for col in inspect(bind).get_columns("users"))
+    except Exception:
+        columns = frozenset()
+    _USERS_COLUMNS_CACHE[cache_key] = columns
+    return columns
+
 
 def normalize_vnb_verification_status(raw: str | None) -> str:
     value = str(raw or VNB_STATUS_NONE).strip().lower()
@@ -23,10 +46,7 @@ def normalize_vnb_verification_status(raw: str | None) -> str:
 
 def _read_status(user: User, *, db: Session | None = None) -> str:
     if db is not None:
-        try:
-            columns = {col["name"] for col in inspect(db.get_bind()).get_columns("users")}
-        except Exception:
-            columns = set()
+        columns = _users_columns_for_bind(db.get_bind())
         if "vnb_verification_status" not in columns:
             return VNB_STATUS_NONE
     if hasattr(user, "vnb_verification_status"):

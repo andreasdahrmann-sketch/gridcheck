@@ -24,6 +24,12 @@ engine = create_engine(
     connect_args=_engine_connect_args(DATABASE_URL),
     pool_pre_ping=True,
     pool_timeout=30,
+    # perf/stability: Pool-Werte gemaess .cursor/rules/04-deployment.mdc
+    # explizit setzen (sonst SQLAlchemy-Defaults 5/10). pool_recycle haelt
+    # idle Connections auf Railway/pgbouncer unter dem Server-Timeout.
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=1800,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
