@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from core.vnb_access import _USERS_COLUMNS_CACHE, user_is_verified_netzbetreiber
 from db.database import Base, get_db
 from db.models import User
 from main import app
@@ -189,3 +190,27 @@ def test_approve_netzbetreiber_sets_verified_flags():
         assert body["vnb_verification_status"] == "approved"
     finally:
         _close_client(client)
+
+
+def test_stale_users_column_cache_does_not_deny_approved_netzbetreiber():
+    class DummySession:
+        def __init__(self) -> None:
+            self.bind = object()
+
+        def get_bind(self) -> object:
+            return self.bind
+
+    session = DummySession()
+    user = User(
+        email="stale-cache-vnb@example.com",
+        password_hash="unused",
+        role="netzbetreiber",
+        vnb_verification_status="approved",
+    )
+
+    _USERS_COLUMNS_CACHE.clear()
+    _USERS_COLUMNS_CACHE[id(session.bind)] = frozenset()
+    try:
+        assert user_is_verified_netzbetreiber(user, db=session) is True  # type: ignore[arg-type]
+    finally:
+        _USERS_COLUMNS_CACHE.clear()
