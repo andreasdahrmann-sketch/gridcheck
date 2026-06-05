@@ -347,6 +347,7 @@ export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { pr
     setPaywallBilling(null);
     try {
       const analysisResult = await analyzeGridcheck(buildProjectInput(), {
+        projectId,
         requestedOfferId: selectedOfferId === "free" ? "free" : selectedOfferId,
       });
       setResult(analysisResult);

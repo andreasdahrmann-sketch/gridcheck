@@ -32,8 +32,9 @@ def _users_columns_for_bind(bind: Engine | None) -> frozenset[str]:
     try:
         columns = frozenset(col["name"] for col in inspect(bind).get_columns("users"))
     except Exception:
-        columns = frozenset()
-    _USERS_COLUMNS_CACHE[cache_key] = columns
+        return frozenset()
+    if "vnb_verification_status" in columns:
+        _USERS_COLUMNS_CACHE[cache_key] = columns
     return columns
 
 
@@ -47,7 +48,7 @@ def normalize_vnb_verification_status(raw: str | None) -> str:
 def _read_status(user: User, *, db: Session | None = None) -> str:
     if db is not None:
         columns = _users_columns_for_bind(db.get_bind())
-        if "vnb_verification_status" not in columns:
+        if "vnb_verification_status" not in columns and not hasattr(user, "vnb_verification_status"):
             return VNB_STATUS_NONE
     if hasattr(user, "vnb_verification_status"):
         return normalize_vnb_verification_status(user.vnb_verification_status)
