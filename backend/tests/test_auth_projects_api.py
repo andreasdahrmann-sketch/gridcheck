@@ -734,6 +734,57 @@ def test_project_viewer_cannot_create_project_bound_analysis_runs():
         _close_client(client)
 
 
+def test_project_bound_analysis_run_persists_project_id(monkeypatch):
+    client = build_client()
+    try:
+        owner_tokens = _register_and_login(client, "owner-analysis-bind@example.com")
+        owner_headers = {"Authorization": f"Bearer {owner_tokens['access_token']}"}
+
+        created = client.post(
+            "/api/v1/projects",
+            headers=owner_headers,
+            json={
+                "name": "Bound Analysis Project",
+                "plz": "10115",
+                "typ": "pv",
+                "leistung_kw": 1200,
+                "role_inputs": _rich_project_inputs(customer_type="projektierer"),
+            },
+        )
+        assert created.status_code == 200, created.text
+        project_id = created.json()["id"]
+
+        from api import analyze_v2 as analyze_v2_api
+
+        monkeypatch.setattr(analyze_v2_api, "run_v1_analysis", lambda payload, **kwargs: _rich_analysis_result())
+
+        response = client.post(
+            "/api/v1/analyze",
+            headers=owner_headers,
+            json={
+                "project_id": project_id,
+                "nennspannung": 20,
+                "leistung_mw": 1.2,
+                "leitungstyp": "NA2XS2Y240",
+                "entfernung_km": 4.2,
+                "anschlussart": "Einspeisung",
+                "plz": "10115",
+                "anlagentyp": "PV",
+                "stakeholder_context": {"customer_type": "projektierer", "priority_focus": "netz"},
+            },
+        )
+        assert response.status_code == 200, response.text
+        run_id = response.json()["history"]["analysis_run_id"]
+
+        with _db_session(client) as db:
+            run = db.get(AnalysisRun, run_id)
+            assert run is not None
+            assert run.project_id == project_id
+            assert run.source == "project"
+    finally:
+        _close_client(client)
+
+
 def test_project_viewer_cannot_export_project_bound_reports_from_existing_run():
     client = build_client()
     try:
