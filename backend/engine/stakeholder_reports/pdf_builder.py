@@ -14,6 +14,7 @@ import hashlib
 import io
 import json
 from typing import Any
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -281,9 +282,12 @@ def _build_meta_strip(
     )
     rows = [
         [
-            Paragraph(f"<b>Report-ID</b><br/>{report_id}", style),
-            Paragraph(f"<b>Version</b><br/>{version} / Normstand {normstand}", style),
-            Paragraph(f"<b>Paket</b><br/>{package}", style),
+            Paragraph(f"<b>Report-ID</b><br/>{escape(report_id)}", style),
+            Paragraph(
+                f"<b>Version</b><br/>{escape(version)} / Normstand {escape(normstand)}",
+                style,
+            ),
+            Paragraph(f"<b>Paket</b><br/>{escape(package)}", style),
             Paragraph(
                 f"<b>SHA-256</b><br/>{_short_hash(full_hash, 16)}…", style
             ),
@@ -588,7 +592,7 @@ def _build_projektierer_story(
                 *bulleted_block(palette, timeline, empty_label="Keine Zeitplan-Daten."),
                 Spacer(1, 2 * mm),
                 p_html(
-                    f"<b>BKZ-Hinweis (§25 NAV, qualitativ):</b> {bkz or '—'}",
+                    f"<b>BKZ-Hinweis (§25 NAV, qualitativ):</b> {escape(bkz) if bkz else '—'}",
                     body,
                 ),
             ],
@@ -1039,9 +1043,9 @@ def _invest_hero(
 
     right = Table(
         [
-            [Paragraph(headline_text, headline)],
+            [p(headline_text, headline)],
             [Paragraph(decision_label, badge)],
-            [Paragraph(rec_text, rec)],
+            [p(rec_text, rec)],
         ],
         colWidths=[doc_width * 0.58],
     )
@@ -1144,10 +1148,10 @@ def _invest_chancen_risiken(
 
     left_rows: list[list[Any]] = [[Paragraph("Chancen", head_left)]]
     for line in chances:
-        left_rows.append([p_html(f"+&nbsp; {line}", body)])
+        left_rows.append([p_html(f"+&nbsp; {escape(str(line))}", body)])
     right_rows: list[list[Any]] = [[Paragraph("Risiken / Watchpoints", head_right)]]
     for line in risks_list:
-        right_rows.append([p_html(f"!&nbsp; {line}", body)])
+        right_rows.append([p_html(f"!&nbsp; {escape(str(line))}", body)])
 
     left = Table(left_rows, colWidths=[(doc_width - 6 * mm) / 2])
     right = Table(right_rows, colWidths=[(doc_width - 6 * mm) / 2])
