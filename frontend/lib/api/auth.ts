@@ -1,5 +1,6 @@
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
 import { bearerAuthHeaders, extractApiErrorMessage, setAccessToken } from "@/lib/api/session";
+import { clearAllCompareSnapshots } from "@/lib/scenario-compare-snapshots";
 
 export type AuthUser = {
   id: number;
@@ -200,6 +201,7 @@ export async function login(payload: { email: string; password: string }) {
     body: JSON.stringify(payload),
   });
   const tokens = await parse<TokenResponse>(res);
+  clearAllCompareSnapshots();
   setAccessToken(tokens.access_token);
   return tokens;
 }
@@ -239,6 +241,7 @@ export async function logout() {
     headers: { ...(csrf ? { "X-CSRF-Token": csrf } : {}), ...bearerAuthHeaders() },
   });
   const result = await parse<{ status: string }>(res);
+  clearAllCompareSnapshots();
   setAccessToken(null);
   return result;
 }

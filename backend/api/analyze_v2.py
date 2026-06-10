@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from core.auth import get_current_user, require_csrf
 from core.rate_limit import enforce_scoped_rate_limit
+from core.vnb_access import user_has_vnb_dashboard_access
 from db.database import get_db
 from db.models import User
 from services import project_service
@@ -291,6 +292,16 @@ class AnalysisHistoryItemResponse(BaseModel):
     created_at: datetime
 
 
+def _claims_verified_n1_data(req: AnalyzeRequest) -> bool:
+    if req.n1_datengrundlage == "dso_verified":
+        return True
+    if req.umspannwerk is None:
+        return False
+    if req.umspannwerk.datenquelle == "dso_verified":
+        return True
+    return any(abgang.datenquelle == "dso_verified" for abgang in req.umspannwerk.abgaenge)
+
+
 @router_v2.post("/analyze", response_model=None)
 def analyze_v2(
     request: Request,
@@ -315,6 +326,15 @@ def analyze_v2(
         hint="Bitte kurz warten und die Analyse danach erneut starten.",
     )
     ensure_analysis_allowed(db, current_user)
+    if _claims_verified_n1_data(req) and not user_has_vnb_dashboard_access(current_user, db=db):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "N1_DSO_VERIFICATION_FORBIDDEN",
+                "message": "VNB-verifizierte N-1-Daten duerfen nur von freigeschalteten Netzbetreiber-Konten genutzt werden.",
+                "hint": "Nutzen Sie planner_assumption/user_estimate oder lassen Sie das Netzbetreiber-Konto freischalten.",
+            },
+        )
     request_payload = req.model_dump(exclude_none=False)
     project_id = request_payload.get("project_id")
     access_context = package_access_context(
