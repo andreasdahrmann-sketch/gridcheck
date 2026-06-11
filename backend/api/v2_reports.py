@@ -515,6 +515,20 @@ def _export_stakeholder_report(
     )
     report["gridcheck_report_data"] = gridcheck_report_data
 
+    if out_fmt == "pdf":
+        gc_data = (
+            report.get("gridcheck_report_data")
+            if isinstance(report, dict)
+            else None
+        )
+        if not isinstance(gc_data, dict):
+            raise _report_pdf_quality_failed(
+                ["gridcheck_report_data fehlt oder ist ungueltig"]
+            )
+        quality_issues = run_pre_pdf_quality_checks(gc_data, report_wrapper=report)
+        if quality_issues:
+            raise _report_pdf_quality_failed(quality_issues)
+
     rev = persist_report_revision(
         report,
         render_html,
@@ -523,15 +537,6 @@ def _export_stakeholder_report(
         db=db,
         revision_uuid=revision_uuid,
     )
-    track_report_exported(
-        db,
-        current_user,
-        report_type=report_type,
-        output_format=out_fmt,
-        report_revision_uuid=str(rev.get("uuid") or revision_uuid),
-        analysis_run_id=report.get("source_analysis_run_id"),
-    )
-    db.commit()
     final_report = (
         rev.get("report_data") if isinstance(rev.get("report_data"), dict) else report
     )
@@ -542,21 +547,16 @@ def _export_stakeholder_report(
         else None
     )
     if out_fmt == "pdf":
-        gc_data = (
-            final_report.get("gridcheck_report_data")
-            if isinstance(final_report, dict)
-            else None
-        )
-        if not isinstance(gc_data, dict):
-            raise _report_pdf_quality_failed(
-                ["gridcheck_report_data fehlt oder ist ungueltig"]
-            )
-        quality_issues = run_pre_pdf_quality_checks(
-            gc_data, report_wrapper=final_report
-        )
-        if quality_issues:
-            raise _report_pdf_quality_failed(quality_issues)
         pdf_bytes = build_stakeholder_report_pdf(final_report)
+        track_report_exported(
+            db,
+            current_user,
+            report_type=report_type,
+            output_format=out_fmt,
+            report_revision_uuid=str(rev.get("uuid") or revision_uuid),
+            analysis_run_id=report.get("source_analysis_run_id"),
+        )
+        db.commit()
         return _pdf_attachment_response(
             pdf_bytes,
             report_type,
@@ -564,6 +564,15 @@ def _export_stakeholder_report(
             final_report,
             str(final_report.get("report_scope") or ""),
         )
+    track_report_exported(
+        db,
+        current_user,
+        report_type=report_type,
+        output_format=out_fmt,
+        report_revision_uuid=str(rev.get("uuid") or revision_uuid),
+        analysis_run_id=report.get("source_analysis_run_id"),
+    )
+    db.commit()
     return {
         "status": "OK",
         "report_type": report_type,
