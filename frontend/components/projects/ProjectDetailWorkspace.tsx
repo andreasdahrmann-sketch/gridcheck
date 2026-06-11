@@ -27,6 +27,7 @@ import {
 } from "@/lib/api/billing";
 import {
   getProject,
+  ProjectsApiError,
   shareProject,
   updateProject,
   type Project,
@@ -155,10 +156,11 @@ export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { pr
   });
 
   useEffect(() => {
-    if (projectQuery.isError) {
-      router.replace("/login");
-    }
-  }, [projectQuery.isError, router]);
+    if (!projectQuery.isError) return;
+    // Nur bei fehlender Session zum Login; 403/404/5xx zurueck zur Projektliste.
+    const status = projectQuery.error instanceof ProjectsApiError ? projectQuery.error.status : undefined;
+    router.replace(status === 401 ? "/login" : "/projects");
+  }, [projectQuery.isError, projectQuery.error, router]);
 
   useEffect(() => {
     if (!project) return;
@@ -347,6 +349,7 @@ export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { pr
     setPaywallBilling(null);
     try {
       const analysisResult = await analyzeGridcheck(buildProjectInput(), {
+        projectId,
         requestedOfferId: selectedOfferId === "free" ? "free" : selectedOfferId,
       });
       setResult(analysisResult);
@@ -407,7 +410,7 @@ export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { pr
       if (err instanceof AnalyzeApiError) {
         setAnalysisError(err.message);
         if (err.status === 401) {
-          await queryClient.invalidateQueries({ queryKey: ["auth-me"] });
+          await queryClient.invalidateQueries({ queryKey: ["me"] });
         }
       } else {
         setAnalysisError("Projekt-Report konnte nicht exportiert werden. Bitte erneut versuchen.");

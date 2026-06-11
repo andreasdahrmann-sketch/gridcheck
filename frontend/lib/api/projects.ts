@@ -24,10 +24,20 @@ export type Project = {
 
 const BASE = "/api/backend/api/v1/projects";
 
+export class ProjectsApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ProjectsApiError";
+    this.status = status;
+  }
+}
+
 async function parse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body?.detail?.message ?? "API request failed");
+    throw new ProjectsApiError(body?.detail?.message ?? "API request failed", res.status);
   }
   return res.json() as Promise<T>;
 }

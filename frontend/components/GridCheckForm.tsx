@@ -40,6 +40,7 @@ import {
 } from "@/lib/stakeholder-product";
 import { buildSiteMarkerHref } from "@/lib/app-flow";
 import { readUserPreferences } from "@/lib/user-preferences";
+import { pushCompareSnapshot, STANDALONE_COMPARE_PROJECT_ID } from "@/lib/scenario-compare-snapshots";
 
 type CustomerType = "projektierer" | "speicherbetreiber" | "netzbetreiber" | "investor";
 
@@ -320,6 +321,15 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
       setFeedbackComment("");
       setFeedbackMessage(null);
       window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      if (stakeholderPath === "projektierer") {
+        // Datenquelle fuer /projektierer/szenarien-vergleich (Standalone-Vergleich ohne Projekt).
+        pushCompareSnapshot(STANDALONE_COMPARE_PROJECT_ID, r);
+        try {
+          window.sessionStorage.setItem("gridcheck:last-check-result", JSON.stringify(r));
+        } catch {
+          // sessionStorage voll/nicht verfuegbar: Vergleichsseite zeigt dann nur gespeicherte Snapshots.
+        }
+      }
       setStep(2);
       await refreshBillingStatus();
     } catch (err) {
@@ -939,12 +949,15 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
                     : `Free Tier: ${billingStatus?.free_checks_remaining ?? "?"} kostenlose Checks verbleiben.`}
             </div>
             <div className="flex flex-col-reverse gap-3 sm:flex-row">
-              <button
-                onClick={() => setStep(0)}
-                className="rounded-xl border border-gray-600 px-5 py-2.5 text-sm text-gray-300 transition hover:text-white"
-              >
-                Zurueck
-              </button>
+              {/* Bei forcedCustomerType existiert kein Step 0 — Button wuerde sonst auf eine leere Ansicht fuehren. */}
+              {!forcedCustomerType && (
+                <button
+                  onClick={() => setStep(0)}
+                  className="rounded-xl border border-gray-600 px-5 py-2.5 text-sm text-gray-300 transition hover:text-white"
+                >
+                  Zurueck
+                </button>
+              )}
               <button
                 onClick={runAnalysis}
                 disabled={isAnalyzing || !canStartAnalysis}
@@ -1718,6 +1731,60 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
               </ul>
             </div>
           </div>
+
+          {result.transparenz.eingabe_quellen && result.transparenz.eingabe_quellen.length > 0 ? (
+            <div className="mt-5 border-t border-gray-700 pt-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-white font-medium">Eingabe-Quellen je Feld</h4>
+                <div className="flex flex-wrap gap-2 text-[11px]">
+                  <span className="rounded-full bg-green-900/40 px-2 py-0.5 text-green-300">Benutzer</span>
+                  <span className="rounded-full bg-amber-900/40 px-2 py-0.5 text-amber-300">Standardwert</span>
+                  <span className="rounded-full bg-blue-900/40 px-2 py-0.5 text-blue-300">Modell / Heuristik</span>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[480px] text-left text-sm">
+                  <thead>
+                    <tr className="text-xs uppercase tracking-wide text-gray-500">
+                      <th className="py-1 pr-3 font-medium">Feld</th>
+                      <th className="py-1 pr-3 font-medium">Wert</th>
+                      <th className="py-1 pr-3 font-medium">Quelle</th>
+                      <th className="py-1 font-medium">Begruendung</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.transparenz.eingabe_quellen.map((q) => {
+                      const badge =
+                        q.quelle === "nutzer"
+                          ? "bg-green-900/40 text-green-300"
+                          : q.quelle === "modell"
+                            ? "bg-blue-900/40 text-blue-300"
+                            : "bg-amber-900/40 text-amber-300";
+                      const quelleLabel =
+                        q.quelle === "nutzer" ? "Benutzer" : q.quelle === "modell" ? "Modell" : "Standardwert";
+                      return (
+                        <tr key={q.feld} className="border-t border-gray-800 align-top">
+                          <td className="py-2 pr-3 text-gray-300">{q.label}</td>
+                          <td className="py-2 pr-3 font-mono text-white">
+                            {q.wert ?? "—"}
+                            {q.einheit ? ` ${q.einheit}` : ""}
+                          </td>
+                          <td className="py-2 pr-3">
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] ${badge}`}>{quelleLabel}</span>
+                          </td>
+                          <td className="py-2 text-xs leading-5 text-gray-400">{q.begruendung ?? ""}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-gray-500">
+                Standardwerte und Modellannahmen sind konservative Platzhalter ohne verifizierte
+                Netzbetreiberdaten und keine Aussage ueber freie Netzkapazitaet.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {/* Buttons */}

@@ -75,11 +75,13 @@ Snapshots: `backend/daten/datenquellen_snapshots.jsonl` (append-only).
 | Letzte Snapshots | `Get-Content backend\daten\datenquellen_snapshots.jsonl -Tail 5` |
 | Letzter Lauf | Konsolen-Output des Skripts |
 | API erreichbar | `GET /health` auf Backend (Deploy-Version) |
-| Vollständiger Ops-Status | **Geplant:** `GET /api/v1/ops/data-sources` (Admin) — noch nicht implementiert |
+| Vollständiger Ops-Status | **Geplant:** `GET /api/v1/ops/data-sources` (Admin) — Story `BL-GIS-005` in `docs/ROADMAP_BACKLOG.md` |
 
 ## Naechster Meilenstein (GIS)
 
 - OSM/Overpass-ETL separat planen (eigener Worker, nicht `run_data_source_pipeline.py`).
+- **Sequenzierter Plan:** `docs/ROADMAP_BACKLOG.md` → Abschnitt „GIS-/Netzdatenpipeline" (BL-GIS-001…005).
+- Interaktive OSM-Umkreissuche ist bereits live (`backend/geo/osm_nearby.py`, `GET /api/v1/geo/osm/nearby`); offen ist die persistente ETL in `asset_candidates`.
 - Siehe `docs/OSM_FETCH_STUB.md` und `docs/RISIKO_STATUS.md` R-08.
 
 ## Code-Referenz

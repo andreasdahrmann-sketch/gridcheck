@@ -67,6 +67,7 @@
 - Regel: Statt "7,42 MW" -> "ca. 5-8 MW (Datenqualitaet: mittel, +-30%)"
 - Status: TEILWEISE UMGESETZT
 - Stand 2026-05-16: Engine liefert Kostenbandbreiten; Frontend zeigt Bandbreite in Invest-Sicht und allgemeiner Kosten-Sektion (Fallback „ca.“ bei Einzelwert).
+- Stand 2026-06-11: Eingabe-Quellen-Markierung je Feld (`transparenz.eingabe_quellen`: nutzer/standardwert/modell) macht Standard-/Modellannahmen explizit sichtbar — adressiert Scheingenauigkeit an der Eingabewurzel.
 
 ---
 
@@ -92,7 +93,8 @@
 ### R-09 - Szenarienvergleich im UI fehlt
 - Wirkung: Portfoliofunktion nicht nutzbar.
 - Massnahme: Varianten-Feature als dediziertes UI-Modul.
-- Status: GEPLANT (Phase 3)
+- Status: UMGESETZT
+- Stand 2026-06-11: `ScenarioComparePanel` + Routen `/projects/{id}/szenarien-vergleich` und `/projektierer/szenarien-vergleich`; Standalone-Datenpfad (Snapshot-Schreiben aus GridCheckForm) am 2026-06-11 gefixt.
 
 ### R-10 - Security-/Compliance-Dokumentation fehlt
 - Wirkung: Enterprise-Einkauf blockiert. Procurement-Gate nicht passierbar.
@@ -214,15 +216,15 @@ Zahlungsbereitschaft Netzbetreiber: 6-stellig/Jahr moeglich bei Enterprise-Lizen
 - [ ] Deployment stabil (Railway + Vercel)
 - [x] PDF-Report produktionsreif exportierbar (API + UI-Export)
 - [x] Disclaimer sichtbar im Frontend + PDF + API
-- [ ] Confidence-Level prominent angezeigt
-- [ ] Jede Eingabe mit Quelle markiert (User / Default / Modell)
-- [ ] 3 Beispiel-Demo-Cases vorbereitet:
-  - [ ] PV 5 MW, MS, machbar mit Auflagen
-  - [ ] BESS 10 MW, grenzwertig (N-1/Trafo)
-  - [ ] No-Go-Standort (Thermik/Spannungsfall)
-- [ ] Pilotangebot schriftlich definiert
-- [ ] ROI-Onepager erstellt
-- [ ] Security-Onepager erstellt
+- [x] Confidence-Level prominent angezeigt (Ergebnis-Header: Daten-Confidence + KI-%; Sektion "Transparenz / Annahmen" mit Confidence-Hinweisen)
+- [x] Jede Eingabe mit Quelle markiert (User / Default / Modell) — `transparenz.eingabe_quellen` (Engine `baue_eingabe_quellen`), UI-Quellen-Tabelle im Ergebnis (Stand 2026-06-11)
+- [x] 3 Beispiel-Demo-Cases vorbereitet (`DemoCaseLoader.tsx`, als [DEMO] markiert):
+  - [x] PV 5 MW, MS, machbar mit Auflagen
+  - [x] BESS 10 MW, grenzwertig (N-1/Trafo)
+  - [x] No-Go-Standort (Thermik/Spannungsfall)
+- [ ] Pilotangebot schriftlich definiert (Template `docs/sales/PILOTANGEBOT.md` vorhanden; Parameter/Preise = Nutzer-Entscheidung)
+- [x] ROI-Onepager erstellt (`docs/sales/ROI_ONEPAGER.md`)
+- [ ] Security-Onepager erstellt (Entwurf `docs/SECURITY_ONEPAGER.md`, juristische Pruefung offen)
 
 ---
 
@@ -279,4 +281,6 @@ Die Demo muss in unter 5 Minuten zeigen:
 | 2026-05-16 | Initiale Erstellung aus Testergebnis-Review         | System |
 | 2026-05-16 | Abschnitte 4-7 + 14-15 ergaenzt (vollstaendige Fassung) | System |
 | 2026-05-16 | Status-Update nach Code-Audit: Auth-Guard, API-Bearer, Disclaimer, PLZ-VNB, THD-Transparenz | Agent |
+| 2026-06-11 | Statisches Code-Audit + 6 Bugfixes (Stripe-Addon-Mode, Blank-Screen Rollen-Routen, projectId-Bind, 401-Redirect, Szenarien-Standalone, Query-Key); R-09 umgesetzt; MVP-Checkliste aktualisiert | Agent |
+| 2026-06-11 | Eingabe-Quellen-Markierung je Feld (`transparenz.eingabe_quellen`, Engine+API+UI); GIS-Pipeline als BL-GIS-001…005 sequenziert (Plan, kein Blind-Code) | Agent |
 

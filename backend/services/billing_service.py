@@ -684,6 +684,91 @@ def has_paid_access(user: User) -> bool:
     return user.plan_tier != "free" and user.billing_status in SUBSCRIPTION_ANALYSIS_ACCESS_STATUSES
 
 
+# --- Admin bypass --------------------------------------------------------------
+#
+# Interne Admin-Konten (User.role == "admin") sind ein operativer Zugang fuer
+# Betreiber, QA und Support. Sie umgehen die "3 Free Checks"-Schranke und sehen
+# alle Premium-Features mit dem hoechsten Paket-Scope ("professional").
+#
+# Verbindlich:
+#   - Die Rollenpruefung erfolgt ausschliesslich serverseitig anhand der DB-Spalte
+#     users.role (kommt ueber das JWT 'sub' -> get_current_user -> DB-Lookup).
+#     Es wird KEIN Wert aus dem Request, Header oder Frontend vertraut.
+#   - Es werden KEINE Credits/Counter (free_quota_consumed, entitlement.used_credits)
+#     fuer Admin-Runs hochgezaehlt. Admin-Runs landen mit billing_category="admin"
+#     und usage_bucket="admin" in der Analyse-History, bleiben dort vollstaendig
+#     auditierbar und sind klar von echten Free/Pro/Pay-per-Use-Runs unterscheidbar.
+#   - Normale Basic-User sind nicht betroffen. Das 3-Frei-Checks-Limit bleibt
+#     fuer alle Nicht-Admin-Rollen unveraendert (test_freemium_paywall_and_billing_catalog).
+
+
+def _is_unlimited_admin(user: User) -> bool:
+    """Server-side truth: only DB role 'admin' grants the unlimited-access bypass."""
+    return str(getattr(user, "role", "") or "").strip().lower() == "admin"
+
+
+_ADMIN_OFFER_SCOPE = "professional"
+_ADMIN_OFFER_REPORT_SCOPE = "professional"
+_ADMIN_OFFER_USAGE_BUCKET = "admin"
+_ADMIN_OFFER_ID = "admin"
+
+
+def _admin_feature_flags() -> dict[str, bool]:
+    """Mirrors the professional package feature set so admins see every premium UI path."""
+    return {
+        "hybrid": True,
+        "storage": True,
+        "environment": True,
+        "stakeholder_compare": True,
+        "variants": True,
+        "visualization": True,
+        "express_eligible": True,
+    }
+
+
+def _admin_access_context(requested_offer_id: str | None = None) -> dict[str, Any]:
+    """Synthetic access context for admin users; no entitlement, no quota consumed."""
+    return {
+        "billing_category": "admin",
+        "free_quota_consumed": False,
+        "offer_id": _ADMIN_OFFER_ID,
+        "package_scope": _ADMIN_OFFER_SCOPE,
+        "usage_bucket": _ADMIN_OFFER_USAGE_BUCKET,
+        "entitlement": None,
+        "report_scope": _ADMIN_OFFER_REPORT_SCOPE,
+        "feature_flags": _admin_feature_flags(),
+        "ops_followup_required": False,
+    }
+
+
+def _apply_admin_overview_overrides(overview: dict[str, Any], user: User) -> dict[str, Any]:
+    """Rewrite a billing overview so admins see unlimited access and the premium option set."""
+    overview["plan_tier"] = "admin"
+    overview["billing_state_label"] = "admin"
+    overview["can_run_analysis"] = True
+    overview["upgrade_required"] = False
+    overview["billing_attention"] = None
+    overview["has_active_subscription"] = False
+    overview["subscription_state"] = overview.get("subscription_state") or "none"
+
+    admin_option = {
+        "offer_id": _ADMIN_OFFER_ID,
+        "label": "Admin (unlimited)",
+        "package_scope": _ADMIN_OFFER_SCOPE,
+        "remaining_credits": None,
+        "usage_bucket": _ADMIN_OFFER_USAGE_BUCKET,
+        "report_scope": _ADMIN_OFFER_REPORT_SCOPE,
+        "feature_flags": _admin_feature_flags(),
+        "default": True,
+        "ops_followup_required": False,
+    }
+    options = list(overview.get("analysis_options") or [])
+    for option in options:
+        option["default"] = False
+    overview["analysis_options"] = [admin_option, *options]
+    return overview
+
+
 def count_consumed_free_checks(db: Session, user: User) -> int:
     count = (
         db.query(func.count(AnalysisRun.id))
@@ -1056,7 +1141,7 @@ def build_billing_overview(db: Session, user: User) -> dict[str, Any]:
     else:
         billing_state_label = "paywall"
 
-    return {
+    overview = {
         "plan_tier": user.plan_tier,
         "billing_status": user.billing_status,
         "has_active_subscription": paid_access,
@@ -1124,6 +1209,13 @@ def build_billing_overview(db: Session, user: User) -> dict[str, Any]:
         },
     }
 
+    # Admin-Bypass: ueberschreibt nur die paket-/limit-relevanten Felder am Ende.
+    # plan_tier=="admin" schaltet Frontend-Banner (isPaidBillingStatus) automatisch aus,
+    # can_run_analysis=True und upgrade_required=False loesen Paywall-UI in GridCheckForm/BillingUpgradePrompt.
+    if _is_unlimited_admin(user):
+        return _apply_admin_overview_overrides(overview, user)
+    return overview
+
 
 def ensure_analysis_allowed(db: Session, user: User) -> dict[str, Any]:
     overview = build_billing_overview(db, user)
@@ -1138,6 +1230,13 @@ def package_access_context(
     *,
     requested_offer_id: str | None = None,
 ) -> dict[str, Any]:
+    # Admin-Bypass: keine Paywall, kein Quota-Verbrauch, voller Professional-Scope.
+    # Greift VOR jeder Entitlement-/Free-Tier-Pruefung, damit Admin nie an einer
+    # 402-Paywall haengenbleibt. Counter werden nicht hochgezaehlt, weil
+    # entitlement=None und free_quota_consumed=False (siehe persist_completed_analysis_run).
+    if _is_unlimited_admin(user):
+        return _admin_access_context(requested_offer_id)
+
     _ensure_subscription_entitlement(db, user)
 
     if requested_offer_id and requested_offer_id not in PAYMENT_OFFER_IDS | SUBSCRIPTION_OFFER_IDS | {"free"}:
@@ -1632,8 +1731,11 @@ def create_checkout_session(db: Session, user: User, offer_id: str = "pro_lizenz
         "report_scope": str(offer["report_scope"]),
         "source": "gridcheck",
     }
+    # Stripe Checkout kennt nur "payment" | "subscription" | "setup".
+    # Interne Addon-Angebote (z. B. express_upgrade) sind Einmalzahlungen.
+    stripe_checkout_mode = "payment" if offer["billing_mode"] == "addon" else offer["billing_mode"]
     create_kwargs: dict[str, Any] = {
-        "mode": offer["billing_mode"],
+        "mode": stripe_checkout_mode,
         "customer": customer_id,
         "client_reference_id": str(user.id),
         "allow_promotion_codes": True,

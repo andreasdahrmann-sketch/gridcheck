@@ -1509,6 +1509,80 @@ def bewerte_stakeholder_konflikt(eingabe, projektprofil, speicher, umwelt, koste
     }
 
 
+def baue_eingabe_quellen(
+    *,
+    spannungsebene,
+    u_kv,
+    p_mw,
+    leitungstyp,
+    anschlussart,
+    entfernung_km,
+    cable_info,
+    cos_phi,
+    cos_phi_info,
+    sk_user,
+    sk_mva,
+    rx_ratio,
+    rx_user,
+    trafo_s_mva,
+    trafo_s_user,
+    trafo_uk,
+    trafo_uk_user,
+):
+    """Provenienz je Eingabefeld: 'nutzer' | 'standardwert' | 'modell'.
+
+    Rein dokumentierend/additiv. Beeinflusst weder Berechnung noch Revisionshash.
+    """
+    def eintrag(feld, label, wert, einheit, quelle, begruendung):
+        return {
+            'feld': feld,
+            'label': label,
+            'wert': wert,
+            'einheit': einheit,
+            'quelle': quelle,
+            'begruendung': begruendung,
+        }
+
+    cos_phi_user = cos_phi_info.get('quelle') == 'nutzer'
+    entfernung_modelliert = bool(cable_info.get('heuristisch'))
+
+    return [
+        eintrag('nennspannung', 'Nennspannung', round(float(u_kv), 3), 'kV', 'nutzer',
+                'Pflichteingabe aus dem Anschlussprofil.'),
+        eintrag('leistung_mw', 'Anschlussleistung', round(float(p_mw), 4), 'MW', 'nutzer',
+                'Pflichteingabe aus dem Projektprofil.'),
+        eintrag('leitungstyp', 'Leitungstyp', leitungstyp, None, 'nutzer',
+                'Pflichteingabe; bestimmt Strombelastbarkeit und R/X-Belag.'),
+        eintrag('anschlussart', 'Anschlussart', anschlussart, None, 'nutzer',
+                'Pflichteingabe (Einspeisung/Entnahme/Speicher).'),
+        eintrag('entfernung_km', 'Leitungslaenge', round(float(entfernung_km), 3), 'km',
+                'modell' if entfernung_modelliert else 'nutzer',
+                cable_info.get('annahme') or 'Aus Eingabe uebernommen.'),
+        eintrag('cos_phi', 'Leistungsfaktor cos phi', round(float(cos_phi), 4), None,
+                'nutzer' if cos_phi_user else 'standardwert',
+                cos_phi_info.get('annahme') or f"Quelle: {cos_phi_info.get('quelle', 'unbekannt')}."),
+        eintrag('sk_mva', 'Netzkurzschlussleistung Sk', round(float(sk_mva), 2), 'MVA',
+                'nutzer' if sk_user is not None else 'standardwert',
+                'Eingabe verwendet.' if sk_user is not None
+                else (
+                    f"Konservativer Standardwert fuer {spannungsebene} "
+                    f"({SK_DEFAULT[spannungsebene]} MVA); keine verifizierten Netzbetreiberdaten."
+                )),
+        eintrag('rx_ratio', 'R/X-Verhaeltnis vorgelagertes Netz', round(float(rx_ratio), 3), None,
+                'nutzer' if rx_user else 'standardwert',
+                'Eingabe verwendet.' if rx_user
+                else f"Typischer Standardwert fuer {spannungsebene}."),
+        eintrag('trafo_s_mva', 'Transformator-Bemessungsleistung', round(float(trafo_s_mva), 3), 'MVA',
+                'nutzer' if trafo_s_user else 'standardwert',
+                'Eingabe verwendet.' if trafo_s_user
+                else f"Standard-Transformator fuer {spannungsebene}."),
+        eintrag('trafo_uk_prozent', 'Transformator-Kurzschlussspannung uk', round(float(trafo_uk), 2), '%',
+                'nutzer' if trafo_uk_user else 'standardwert',
+                'Eingabe verwendet.' if trafo_uk_user
+                else f"Typischer Standardwert fuer {spannungsebene}."),
+    ]
+
+
 def erzeuge_transparenzblock(eingabe, dq, speicher, umwelt, stakeholder, n1):
     assumptions = [
         'Vorpruefung auf Basis des eingegebenen Projekt- und Anschlussprofils; keine verbindliche Netzanschlusszusage.',
@@ -1664,6 +1738,29 @@ def berechne_netzanschluss(eingabe, dry_run=False, revision_context=None):
         0,
     )
 
+    # Eingabe-Quellen-Markierung (additiv, ohne Einfluss auf Berechnung oder Revisionshash):
+    # macht je Feld transparent, ob der Wert vom Nutzer stammt, ein konservativer
+    # Standardwert oder ein Modell-/Heuristik-Wert ist (Regel: Datenquellen/Annahmen getrennt halten).
+    eingabe_quellen = baue_eingabe_quellen(
+        spannungsebene=spannungsebene,
+        u_kv=u_kv,
+        p_mw=p_mw,
+        leitungstyp=leitungstyp,
+        anschlussart=anschlussart,
+        entfernung_km=entfernung_km,
+        cable_info=cable_info,
+        cos_phi=cos_phi,
+        cos_phi_info=cos_phi_info,
+        sk_user=sk_user,
+        sk_mva=sk_mva,
+        rx_ratio=rx_ratio,
+        rx_user=eingabe.get('rx_ratio') is not None,
+        trafo_s_mva=trafo_s_mva,
+        trafo_s_user=eingabe.get('trafo_s_mva') is not None,
+        trafo_uk=trafo_uk,
+        trafo_uk_user=(eingabe.get('trafo_uk_prozent') is not None) or (eingabe.get('uk_prozent') is not None),
+    )
+
     r_q, x_q = berechne_quellenimpedanz(u_kv, sk_mva, rx_ratio)
     r_t, x_t = berechne_trafoimpedanz(u_kv, trafo_s_mva, trafo_uk)
     r_l, x_l = berechne_leitungsimpedanz(leitungstyp, entfernung_km, parallele_systeme, temperatur_c)
@@ -1723,6 +1820,7 @@ def berechne_netzanschluss(eingabe, dry_run=False, revision_context=None):
     transparenz = erzeuge_transparenzblock(
         eingabe, datenqualitaet, speicher_bewertung, route_environment, stakeholder_bewertung, n1
     )
+    transparenz['eingabe_quellen'] = eingabe_quellen
     erweiterte_scores = erzeuge_erweiterte_scores(
         speicher_bewertung, route_environment, stakeholder_bewertung
     )

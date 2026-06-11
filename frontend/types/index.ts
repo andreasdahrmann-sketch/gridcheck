@@ -274,10 +274,22 @@ export interface StakeholderBewertungResult {
   recommended_focus: string;
 }
 
+export type EingabeQuellenTyp = "nutzer" | "standardwert" | "modell";
+
+export interface EingabeQuelle {
+  feld: string;
+  label: string;
+  wert: string | number | null;
+  einheit?: string | null;
+  quelle: EingabeQuellenTyp;
+  begruendung?: string;
+}
+
 export interface TransparenzResult {
   assumptions: string[];
   disclaimers: string[];
   confidence_notes: string[];
+  eingabe_quellen?: EingabeQuelle[];
 }
 
 export type N1Bewertung = "GRUEN" | "GELB" | "ROT" | "NICHT_GEPRUEFT";

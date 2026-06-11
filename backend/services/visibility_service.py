@@ -260,6 +260,7 @@ _COMMON_RESULT_SPEC: FieldSpec = {
         "assumptions": True,
         "disclaimers": True,
         "confidence_notes": True,
+        "eingabe_quellen": True,
     },
     "billing_access": True,
     "billing": True,

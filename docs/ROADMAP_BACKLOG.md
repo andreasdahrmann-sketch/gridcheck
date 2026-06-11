@@ -7,7 +7,7 @@ Dokumentierte Folgeaufgaben ohne aktuelle Implementierungspflicht.
 | Engine-Tests | Erweiterung Rechenkern-Coverage (N-1-Grenzfaelle, Spannungsfall-Matrix) | Mittel |
 | Sentry | `SENTRY_DSN` Backend + Frontend, Release-Tracking mit `APP_VERSION` | Mittel |
 | Onboarding | Gefuehrter Erst-Check (Tour), Beispielprojekt | Niedrig |
-| Passwort-Reset UI | Login-Seite: Formular fuer `/api/v1/auth/forgot-password` + Token-Eingabe (Backend fertig) | Hoch |
+| Passwort-Reset UI | ERLEDIGT (verifiziert 2026-06-11): `/login/forgot-password` + `/reset-password` vorhanden, Login verlinkt | Erledigt |
 | Impressum | Rechtlich gepruefte Firmendaten (Nutzer pflegt separat) | Hoch (Recht) |
 
 **Hinweis:** Keine Scheinsicherheit bei Netzkapazitaet; DSO-Daten bleiben separater Integrationspfad.
@@ -194,6 +194,117 @@ ADR-013 angenommen
 ```
 
 **Out-of-scope dieser Iteration:** BL-NB-006 (MaStR-Bestandsdaten als zusätzliche Cluster-Schicht — eigene ADR und eigene Story).
+
+---
+
+## GIS-/Netzdatenpipeline (Meilenstein, R-08)
+
+Bezug: `docs/DATA_SOURCE_PIPELINE.md`, `docs/OSM_FETCH_STUB.md`, `Ideen.md` (Kern-Datenmodell), `RISIKO_STATUS.md` R-08.
+
+> **Stand 2026-06-11:** Interaktive OSM-Umkreissuche ist **live** (`backend/geo/osm_nearby.py`, `GET /api/v1/geo/osm/nearby`, `test_v1_geo_osm_nearby.py`). Snapshot-/Hash-Framework existiert (`services/data_source_pipeline.py`, MaStR/SMARD/DWD). **Offen** ist die **persistente GIS-ETL** in `asset_candidates` + Confidence + Ops-Sicht. Reihenfolge bindend (Rule 06).
+>
+> **Voraussetzung vor Story-Start:** laufende PostgreSQL+PostGIS (Docker :5433) und grüne Testsuite. Ohne lauffähige DB/Shell wird **nicht** begonnen (Rule: Tests müssen grün sein).
+
+### BL-GIS-001 — Schema `asset_candidates` + Alembic-Migration
+
+**Ziel:** Persistente, append-only Asset-Kandidaten-Schicht (OSM/abgeleitet), Datenklasse B/C.
+
+**Scope:**
+- Alembic-Revision `2026MMDD_xx_asset_candidates` (Tabelle existiert teils aus früherer `20260510_01`; **erst Drift-Inventur** wie DECISIONS 2026-05-13, dann ergänzen statt neu anlegen).
+- Felder: `id`, `source` (`osm`|`derived`), `asset_type` (`substation`|`transformer`|`line`|`cable`), `geom` (PostGIS `GEOMETRY`, SRID 4326), `tags_json`, `voltage_hint_kv`, `operator_hint`, `raw_hash`, `normalized_hash`, `parser_version`, `confidence_geometrisch`, `confidence_technisch`, `confidence_score`, `validierungsstatus`, `datenklasse`, `imported_at`, `source_snapshot_id`.
+- **Hartes Verbot (Test):** keine Spalte `freie_kapazitaet*` / `verfuegbar*` (Rule: keine Kapazität aus OSM).
+- PostGIS-Index `GIST(geom)`, B-Tree auf `(asset_type, validierungsstatus)`, `source_snapshot_id`.
+- SQLAlchemy-Modell in `backend/db/models.py`, **keine** API in dieser Story.
+
+**Akzeptanzkriterien:** `alembic upgrade head` + `downgrade -1` ohne Drift auf leerer DB; Indizes vorhanden; kein Kapazitätsfeld; reversibel.
+
+**Tests:** `pytest backend/tests/test_asset_candidates_schema.py` (Insert + Geom-Roundtrip, Hash-Pflichtfelder, kein Kapazitätsfeld).
+
+**Aufwand:** M.
+
+---
+
+### BL-GIS-002 — OSM-ETL-Worker (Overpass → `asset_candidates`)
+
+**Ziel:** Wiederholbarer Worker, der OSM-Assets für eine BBox normalisiert und revisionssicher persistiert (nicht der interaktive Endpoint).
+
+**Scope:**
+- Modul `backend/services/osm_etl.py`: nutzt bestehende Overpass-/Normalisierungslogik aus `geo/osm_nearby.py` (refaktorieren in gemeinsamen Parser, **kein** Duplikat).
+- `raw_hash` (kanonisches JSON) + `normalized_hash`, append-only Snapshot in `data_source_pipeline`.
+- Confidence: geometrisch 55–70, technisch 40–55, Gesamt abgeleitet; `validierungsstatus=PARTIAL` bis manuelle Stichprobe; `hinweis="OSM — keine Kapazitätsaussage"`.
+- Idempotenz: gleicher `normalized_hash` ⇒ kein Duplikat, nur `imported_at`/Snapshot-Referenz aktualisiert.
+- Rate-Limit/Timeout/Fehler ⇒ `validierungsstatus=ERROR`, Gesamt-ETL bricht **nicht** ab.
+
+**Akzeptanzkriterien:** Mock-Overpass-JSON ⇒ ≥1 Kandidat ohne Kapazitätsfeld; Re-Run idempotent; Fehlerfall isoliert.
+
+**Tests:** `pytest backend/tests/test_osm_etl.py` (Mock-Fetch, Idempotenz, Fehlerklassen, kein Kapazitäts-Claim).
+
+**Abhängigkeiten:** BL-GIS-001. **Aufwand:** L.
+
+---
+
+### BL-GIS-003 — MaStR-Bestandsdaten als `generation_assets`
+
+**Ziel:** Einspeisedruck-Indikator aus offiziellen MaStR-Daten (Datenklasse A) — **kein** Kapazitäts-Claim.
+
+**Scope:**
+- Erweiterung `data_source_pipeline` (`mastr`-Pfad) auf Persistenz in `generation_assets` (Tabelle teils vorhanden, Drift-Inventur zuerst).
+- Felder gem. `Ideen.md`: Leistung, Energieträger, Status, Standort, Netzebene, Quelle/Stand/Hash/Confidence.
+- Aggregation für Einspeisedruck pro PLZ/Umkreis (read-only Service, **keine** Aussage über freie Netzkapazität).
+
+**Akzeptanzkriterien:** Import nur mit `MASTR_EXPORT_URL`, sonst `NOT_CONFIGURED`; Hash-/Confidence-Pflichtfelder; Aggregat ohne Kapazitäts-Behauptung.
+
+**Tests:** `pytest backend/tests/test_mastr_etl.py` (Fixture-Export, Aggregation, Confidence).
+
+**Abhängigkeiten:** BL-GIS-001. **Aufwand:** L.
+
+---
+
+### BL-GIS-004 — Engine-Verknüpfung: NAP-Kandidaten + Provenienz
+
+**Ziel:** Engine nutzt persistierte `asset_candidates` als **indikative** NAP-Kandidaten und markiert sie über die neue Eingabe-Quellen-Logik (`transparenz.eingabe_quellen`, Quelle `modell`/Datenklasse B).
+
+**Scope:**
+- Service liefert nächstgelegene Substation/Transformer (PostGIS `ST_Distance`) zum Projektstandort.
+- Ergebnis fließt als **Annahme mit Confidence** in `transparenz`/`eingabe_quellen` ein — niemals als verbindlicher NAP.
+- UI: NAP-Kandidat klar als „indikativ, OSM/Community" kennzeichnen (bestehende Quellen-Tabelle wiederverwenden).
+
+**Akzeptanzkriterien:** Kandidat erscheint mit Distanz + Confidence + Disclaimer; ohne Treffer sauberer Fallback; kein Kapazitäts-Claim; BOLA-frei (nur eigener Projektkontext).
+
+**Tests:** `pytest backend/tests/test_nap_candidates.py` (Distanz, Fallback, Provenienz-Markierung).
+
+**Abhängigkeiten:** BL-GIS-001/002. **Aufwand:** M.
+
+---
+
+### BL-GIS-005 — Ops-Endpoint `GET /api/v1/ops/data-sources` (Admin)
+
+**Ziel:** Betriebssicht über letzte Importläufe, Snapshot-Stände, Validierungsstatus.
+
+**Scope:**
+- Admin-gegateter Read-Endpoint: pro Quelle letzter `validierungsstatus`, `record_count`, Hash-Prefix, `imported_at`.
+- Frontend-Admin-Kachel (read-only) — analog `app/admin/users`.
+
+**Akzeptanzkriterien:** Nicht-Admin ⇒ 403; nur Metadaten, keine Rohdaten/PII; deckt `docs/DATA_SOURCE_PIPELINE.md` §„Geplant" ab.
+
+**Tests:** `pytest backend/tests/test_ops_data_sources.py` (Auth-Matrix, Felder).
+
+**Abhängigkeiten:** BL-GIS-001…003. **Aufwand:** S/M.
+
+---
+
+### Reihenfolge & Abhängigkeitsgraph (GIS)
+
+```
+PostgreSQL+PostGIS lauffähig + Tests grün
+   └─ BL-GIS-001 (Schema asset_candidates)
+        ├─ BL-GIS-002 (OSM-ETL)
+        │     └─ BL-GIS-004 (NAP-Kandidaten + Provenienz)
+        ├─ BL-GIS-003 (MaStR generation_assets)
+        └─ BL-GIS-005 (Ops-Endpoint)
+```
+
+**Out-of-scope:** SMARD-Engpass-Layer als Score-Eingang (eigene Story), Community/Grid-Scout (Ideen.md „Später").
 
 ---
 

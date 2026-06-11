@@ -690,6 +690,24 @@ function mapResponseToUi(res: any, input: GridCheckInput): GridCheckResult {
       confidence_notes: Array.isArray(transparenz?.confidence_notes)
         ? transparenz.confidence_notes.map((item: unknown) => String(item))
         : [],
+      eingabe_quellen: Array.isArray(transparenz?.eingabe_quellen)
+        ? transparenz.eingabe_quellen.map((item: any) => ({
+            feld: String(item?.feld ?? ""),
+            label: String(item?.label ?? item?.feld ?? ""),
+            wert:
+              item?.wert === null || item?.wert === undefined
+                ? null
+                : typeof item.wert === "number"
+                  ? item.wert
+                  : String(item.wert),
+            einheit: item?.einheit == null ? null : String(item.einheit),
+            quelle:
+              item?.quelle === "nutzer" || item?.quelle === "modell"
+                ? item.quelle
+                : "standardwert",
+            begruendung: item?.begruendung == null ? undefined : String(item.begruendung),
+          }))
+        : undefined,
     },
     ki: {
       konfidenz: Number(ki?.konfidenz ?? Number(ki?.konfidenz_prozent ?? 0) / 100),

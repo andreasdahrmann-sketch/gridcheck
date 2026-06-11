@@ -1,6 +1,6 @@
 ﻿# GridCheck – Project Status
 
-> Zuletzt aktualisiert: **2026-05-17**
+> Zuletzt aktualisiert: **2026-06-11**
 
 ## Stack
 
@@ -22,6 +22,9 @@
 - [x] Disclaimer UI + PDF
 - [x] KI-Feedback-Hash-Chain (`docs/KI_TRAINING.md`)
 - [x] Go-Live-Doku: `GO_LIVE_OHNE_DNS.md`, `DEPLOY_AUTH_FIX.md`, `RAILWAY_ENV_SETUP.md`
+- [x] Passwort-Reset UI (`/login/forgot-password`, `/reset-password`)
+- [x] Szenarienvergleich UI (Projekt + Standalone) inkl. Datenpfad-Fix 2026-06-11
+- [x] Bugfix-Runde 2026-06-11 (statisches Audit): Stripe-Addon-Checkout-Mode, Blank-Screen auf Rollen-Routen, projectId-Bindung der Projektanalyse, 401-Redirect, Query-Key — Testlauf (`pytest` + `next build`) noch ausstehend
 
 ## Offen (priorisiert)
 
