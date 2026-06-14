@@ -41,6 +41,19 @@ Pruefe diese Liste vor jedem Prod-Deploy. „Pflicht" = `backend/core/config.py`
 | `RESEND_API_KEY` / `EMAIL_FROM` | bei Versand | `re_...` / `noreply@gridcheck.de` | **ja** | Ohne Key: keine Mails (kein Crash). |
 | `CONTACT_SMTP_HOST` / `_PORT` / `_USER` / `_PASSWORD` / `CONTACT_TO_EMAIL` | bei Kontaktformular | echte SMTP-Werte | **ja** | Platzhalter `smtp.example.com` = deaktiviert. |
 
+### Billing-Schalter (Hide-Switch)
+
+`BILLING_ENABLED` schaltet den gesamten Billing-Pfad an/aus. Default = `false`, damit die App auch ohne Stripe live gehen kann. Der Admin-Bypass (`User.role == "admin"`) ist davon nicht betroffen.
+
+| Variable | Beispielwert | Wirkung |
+|---|---|---|
+| `BILLING_ENABLED` | `false` (Default) | `/api/v1/billing/*` antwortet 503 `BILLING_DISABLED` fuer Nicht-Admins. Stripe-Webhook bleibt erreichbar (200) und ignoriert Events mit Audit-Log `webhook_received_while_disabled`. Frontend versteckt Pricing-/Settings-Billing-UI. |
+| `BILLING_ENABLED` | `true` | Stripe-Pfad aktiv (vorausgesetzt die `STRIPE_*`-Pflichtgruppe ist vollstaendig). |
+
+Frontend-Spiegel (Vercel): `NEXT_PUBLIC_BILLING_ENABLED=false|true` als Build-Variable in **Production** und **Preview** setzen. Der Wert wird zur Build-Zeit eingebettet — nach Aenderung **Redeploy** ausloesen.
+
+> Fuer ein „echtes Live" mit Stripe muessen **beide** Schalter (`BILLING_ENABLED` Backend + `NEXT_PUBLIC_BILLING_ENABLED` Frontend) auf `true` stehen UND die Stripe-Pflichtgruppe (siehe unten) komplett gesetzt sein.
+
 ### Stripe (optional, aber „alles oder nichts")
 
 Sobald **eine** Stripe-Variable gesetzt ist, validiert `config.py` die komplette Gruppe — fehlende Werte fuehren zum Boot-Abbruch.

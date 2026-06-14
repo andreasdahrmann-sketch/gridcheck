@@ -23,6 +23,7 @@ import BillingAndHistoryPanel from "@/components/settings/BillingAndHistoryPanel
 import { logout } from "@/lib/api/auth";
 import { getCsrfTokenFromCookie } from "@/lib/api/csrf";
 import { bearerAuthHeaders } from "@/lib/api/session";
+import { isBillingEnabled } from "@/lib/billing-flag";
 import {
   DEFAULT_USER_PREFERENCES,
   readUserPreferences,
@@ -275,9 +276,11 @@ export default function SettingsPage() {
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.9fr)]">
           <div className="space-y-6">
-            <Suspense fallback={<div className={`${cardClass} p-6 text-sm text-text-muted`}>Lade Abrechnung...</div>}>
-              <BillingAndHistoryPanel cardClass={cardClass} isAdmin={meQuery.data?.role === "admin"} />
-            </Suspense>
+            {isBillingEnabled() || meQuery.data?.role === "admin" ? (
+              <Suspense fallback={<div className={`${cardClass} p-6 text-sm text-text-muted`}>Lade Abrechnung...</div>}>
+                <BillingAndHistoryPanel cardClass={cardClass} isAdmin={meQuery.data?.role === "admin"} />
+              </Suspense>
+            ) : null}
 
             {meQuery.data?.role === "admin" ? (
               <Card className={cardClass}>
@@ -696,6 +699,12 @@ export default function SettingsPage() {
                 >
                   {isLoggingOut ? "Meldet ab..." : "Abmelden"}
                 </Button>
+                <Link
+                  href="/settings/privacy"
+                  className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-border/70 bg-transparent px-4 text-sm text-text-muted hover:bg-white/5"
+                >
+                  Datenschutz &amp; DSGVO-Self-Service
+                </Link>
               </CardContent>
             </Card>
           </div>

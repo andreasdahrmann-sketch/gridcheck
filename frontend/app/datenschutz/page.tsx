@@ -245,6 +245,14 @@ export default function DatenschutzPage() {
           </a>
           .
         </p>
+        <p>
+          Auskunft (Art. 15 / 20 DSGVO) und Konto-Loeschung (Art. 17 DSGVO) koennen
+          eingeloggte Nutzer direkt im{" "}
+          <a href="/settings/privacy" className="text-brand-cyan hover:underline">
+            DSGVO-Self-Service
+          </a>{" "}
+          ausloesen.
+        </p>
       </LegalSection>
 
       <LegalSection title="9. Cookies, lokale Speicherung und Tracking (TTDSG § 25)">
