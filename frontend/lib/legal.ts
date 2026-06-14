@@ -58,9 +58,19 @@ export const LEGAL_DATA: Record<LegalDataKey, string> = {
  * Ersetzt {{TOKEN}}-Platzhalter in Templates.
  * Tokens, fuer die kein Wert in LEGAL_DATA gesetzt wurde, bleiben unveraendert
  * stehen — bewusst, damit fehlende Pflichtangaben sichtbar sind.
+ *
+ * Sonderfall AUFSICHTSBEHOERDE:
+ *   - Falls AUFSICHTSBEHOERDE noch das Token-Default ist (nicht explizit gesetzt)
+ *     UND HOST_BUNDESLAND auf ein bekanntes Bundesland zeigt,
+ *     wird die Aufsichtsbehoerde automatisch aus AUFSICHTSBEHOERDEN_BY_BUNDESLAND
+ *     aufgeloest. Ein explizit gesetzter AUFSICHTSBEHOERDE-Wert (z. B. ueber ENV)
+ *     hat Vorrang und ueberschreibt die automatische Aufloesung.
  */
 export function renderLegalText(template: string): string {
   return template.replace(/\{\{([A-Z_]+)\}\}/g, (match, key: string) => {
+    if (key === "AUFSICHTSBEHOERDE") {
+      return resolveAufsichtsbehoerdeForLegalData();
+    }
     const value = LEGAL_DATA[key as LegalDataKey];
     return value ?? match;
   });
@@ -69,6 +79,219 @@ export function renderLegalText(template: string): string {
 /** Liefert true, wenn der Wert noch das Token-Default ist (also nicht ausgefuellt). */
 export function isLegalTokenUnset(key: LegalDataKey): boolean {
   return LEGAL_DATA[key] === `{{${key}}}`;
+}
+
+// ---------------------------------------------------------------------------
+// Aufsichtsbehoerden-Mapping (Datenschutz-Aufsicht je Bundesland)
+// ---------------------------------------------------------------------------
+//
+// Stand: Recherche 2026 anhand offizieller DSB-Webseiten (BlnBDI, BayLDA,
+// LfDI BW, LDI NRW, HBDI, LfD Niedersachsen, SDB, LfD ST, TLfDI, LDA BB,
+// LfDI MV, ULD, HmbBfDI, LfDI HB, UDS Saarland, LfDI RLP).
+//
+// HINWEIS: Diese Daten dienen ausschliesslich als technischer Default fuer
+// die Datenschutzerklaerung. Aktualitaet (Anschriften, Kontaktdaten, Wechsel
+// der Behoerdenleitung) ist NICHT garantiert. Vor Live-Schaltung muss der
+// User die zustaendige Behoerde bestaetigen oder per ENV/LEGAL_DATA ueber-
+// schreiben (Override siehe renderLegalText-Doc).
+//
+// Telefonnummern bewusst optional — im Zweifel weggelassen statt erfunden.
+// E-Mails bewusst weggelassen, da Adressformate sich aendern; bei Bedarf
+// per Override-Pfad ergaenzen.
+
+export type AufsichtsbehoerdeRecord = {
+  /** Anzeigename der Behoerde (Lang- oder Kurzform). */
+  name: string;
+  /** Strasse + Hausnummer. */
+  anschrift: string;
+  /** PLZ + Ort. */
+  ort: string;
+  /** Optionale Webseite. */
+  webseite?: string;
+  /** Optionales Telefon. */
+  telefon?: string;
+  /** Optionale Kontakt-E-Mail. */
+  email?: string;
+};
+
+export const AUFSICHTSBEHOERDEN_BY_BUNDESLAND: Record<string, AufsichtsbehoerdeRecord> = {
+  "baden-wuerttemberg": {
+    name: "Der Landesbeauftragte fuer den Datenschutz und die Informationsfreiheit Baden-Wuerttemberg (LfDI BW)",
+    anschrift: "Lautenschlagerstrasse 20",
+    ort: "70173 Stuttgart",
+    webseite: "https://www.baden-wuerttemberg.datenschutz.de/",
+  },
+  bayern: {
+    name: "Bayerisches Landesamt fuer Datenschutzaufsicht (BayLDA)",
+    anschrift: "Promenade 18",
+    ort: "91522 Ansbach",
+    webseite: "https://www.lda.bayern.de/",
+  },
+  berlin: {
+    name: "Berliner Beauftragte fuer Datenschutz und Informationsfreiheit (BlnBDI)",
+    anschrift: "Friedrichstrasse 219",
+    ort: "10969 Berlin",
+    webseite: "https://www.datenschutz-berlin.de/",
+  },
+  brandenburg: {
+    name: "Die Landesbeauftragte fuer den Datenschutz und fuer das Recht auf Akteneinsicht Brandenburg (LDA BB)",
+    anschrift: "Stahnsdorfer Damm 77",
+    ort: "14532 Kleinmachnow",
+    webseite: "https://www.lda.brandenburg.de/",
+  },
+  bremen: {
+    name: "Die Landesbeauftragte fuer Datenschutz und Informationsfreiheit der Freien Hansestadt Bremen (LfDI HB)",
+    anschrift: "Arndtstrasse 1",
+    ort: "27570 Bremerhaven",
+    webseite: "https://www.datenschutz.bremen.de/",
+  },
+  hamburg: {
+    name: "Der Hamburgische Beauftragte fuer Datenschutz und Informationsfreiheit (HmbBfDI)",
+    anschrift: "Ludwig-Erhard-Strasse 22",
+    ort: "20459 Hamburg",
+    webseite: "https://datenschutz-hamburg.de/",
+  },
+  hessen: {
+    name: "Der Hessische Beauftragte fuer Datenschutz und Informationsfreiheit (HBDI)",
+    anschrift: "Gustav-Stresemann-Ring 1",
+    ort: "65189 Wiesbaden",
+    webseite: "https://datenschutz.hessen.de/",
+  },
+  "mecklenburg-vorpommern": {
+    name: "Der Landesbeauftragte fuer Datenschutz und Informationsfreiheit Mecklenburg-Vorpommern (LfDI MV)",
+    anschrift: "Lennestrasse 1",
+    ort: "19053 Schwerin",
+    webseite: "https://www.datenschutz-mv.de/",
+  },
+  niedersachsen: {
+    name: "Die Landesbeauftragte fuer den Datenschutz Niedersachsen (LfD Niedersachsen)",
+    anschrift: "Prinzenstrasse 5",
+    ort: "30159 Hannover",
+    webseite: "https://lfd.niedersachsen.de/",
+  },
+  "nordrhein-westfalen": {
+    name: "Landesbeauftragte fuer Datenschutz und Informationsfreiheit Nordrhein-Westfalen (LDI NRW)",
+    anschrift: "Kavalleriestrasse 2-4",
+    ort: "40213 Duesseldorf",
+    webseite: "https://www.ldi.nrw.de/",
+  },
+  "rheinland-pfalz": {
+    name: "Der Landesbeauftragte fuer den Datenschutz und die Informationsfreiheit Rheinland-Pfalz (LfDI RLP)",
+    anschrift: "Hintere Bleiche 34",
+    ort: "55116 Mainz",
+    webseite: "https://www.datenschutz.rlp.de/",
+  },
+  saarland: {
+    name: "Unabhaengiges Datenschutzzentrum Saarland (UDS Saarland)",
+    anschrift: "Fritz-Dobisch-Strasse 12",
+    ort: "66111 Saarbruecken",
+    webseite: "https://www.datenschutz.saarland.de/",
+  },
+  sachsen: {
+    name: "Die Saechsische Datenschutz- und Transparenzbeauftragte (SDB)",
+    anschrift: "Devrientstrasse 1",
+    ort: "01067 Dresden",
+    webseite: "https://www.saechsdsb.de/",
+  },
+  "sachsen-anhalt": {
+    name: "Landesbeauftragter fuer den Datenschutz Sachsen-Anhalt (LfD ST)",
+    anschrift: "Leiterstrasse 9",
+    ort: "39104 Magdeburg",
+    webseite: "https://datenschutz.sachsen-anhalt.de/",
+  },
+  "schleswig-holstein": {
+    name: "Unabhaengiges Landeszentrum fuer Datenschutz Schleswig-Holstein (ULD)",
+    anschrift: "Holstenstrasse 98",
+    ort: "24103 Kiel",
+    webseite: "https://www.datenschutzzentrum.de/",
+  },
+  thueringen: {
+    name: "Thueringer Landesbeauftragter fuer den Datenschutz und die Informationsfreiheit (TLfDI)",
+    anschrift: "Haesslerstrasse 8",
+    ort: "99096 Erfurt",
+    webseite: "https://www.tlfdi.de/",
+  },
+};
+
+/**
+ * Normalisiert einen Bundesland-String fuer Lookup-Zwecke:
+ *  - trim
+ *  - lowercase
+ *  - Umlaute -> ae/oe/ue/ss
+ *  - Whitespace und " / "/"_" -> "-"
+ *  - haeufige Synonyme (NRW, BW, M-V, S-H, RLP) auf kanonische Keys
+ */
+function normalizeBundeslandKey(input: string): string {
+  if (!input) return "";
+  const lowered = input
+    .trim()
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[\s_/]+/g, "-");
+  const synonyms: Record<string, string> = {
+    bw: "baden-wuerttemberg",
+    by: "bayern",
+    be: "berlin",
+    bb: "brandenburg",
+    hb: "bremen",
+    hh: "hamburg",
+    he: "hessen",
+    mv: "mecklenburg-vorpommern",
+    "m-v": "mecklenburg-vorpommern",
+    ni: "niedersachsen",
+    nrw: "nordrhein-westfalen",
+    "nordrhein-westf.": "nordrhein-westfalen",
+    rlp: "rheinland-pfalz",
+    sl: "saarland",
+    sn: "sachsen",
+    st: "sachsen-anhalt",
+    sh: "schleswig-holstein",
+    "s-h": "schleswig-holstein",
+    th: "thueringen",
+  };
+  if (synonyms[lowered]) return synonyms[lowered];
+  return lowered;
+}
+
+/**
+ * Liefert die Aufsichtsbehoerde formatiert als "Name, Anschrift, Ort".
+ * Robust gegen Gross-/Kleinschreibung, Umlaute und uebliche Abkuerzungen.
+ *
+ * Bei unbekanntem Bundesland wird ein leerer String zurueckgegeben — die
+ * aufrufende Stelle (renderLegalText) entscheidet, wie sie damit umgeht
+ * (Fallback auf das Token-Literal, damit fehlende Daten sichtbar bleiben).
+ */
+export function resolveAufsichtsbehoerde(bundesland: string): string {
+  const key = normalizeBundeslandKey(bundesland);
+  const rec = AUFSICHTSBEHOERDEN_BY_BUNDESLAND[key];
+  if (!rec) return "";
+  return `${rec.name}, ${rec.anschrift}, ${rec.ort}`;
+}
+
+/**
+ * Interne Hilfe fuer renderLegalText:
+ *  - explizit gesetzter AUFSICHTSBEHOERDE-Wert (nicht das Token-Literal) wird
+ *    unveraendert zurueckgegeben (Override-Moeglichkeit)
+ *  - sonst: Aufloesung ueber HOST_BUNDESLAND
+ *  - falls weder Override noch bekanntes Bundesland: Token-Literal beibehalten
+ */
+function resolveAufsichtsbehoerdeForLegalData(): string {
+  const explicit = LEGAL_DATA.AUFSICHTSBEHOERDE;
+  if (explicit && explicit !== "{{AUFSICHTSBEHOERDE}}") {
+    return explicit;
+  }
+  const bundesland = LEGAL_DATA.HOST_BUNDESLAND;
+  if (!bundesland || bundesland === "{{HOST_BUNDESLAND}}") {
+    return "{{AUFSICHTSBEHOERDE}}";
+  }
+  const resolved = resolveAufsichtsbehoerde(bundesland);
+  if (!resolved) {
+    return "{{AUFSICHTSBEHOERDE}}";
+  }
+  return resolved;
 }
 
 // ---------------------------------------------------------------------------
