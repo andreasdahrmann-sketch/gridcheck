@@ -24,11 +24,19 @@ const cardClass = "rounded-[24px] border border-border/70 bg-bg-card/80 shadow-[
 const fieldClass =
   "h-11 rounded-xl border-border/70 bg-white/5 px-3 text-white placeholder:text-text-dim focus-visible:border-brand-cyan/70 focus-visible:ring-brand-cyan/20";
 
+type LocationMode = "address" | "coordinates";
+
 export default function ProjectsPage() {
   const [name, setName] = useState("");
   const [plz, setPlz] = useState("");
   const [typ, setTyp] = useState("pv");
   const [leistungKw, setLeistungKw] = useState("1000");
+  const [locationMode, setLocationMode] = useState<LocationMode>("address");
+  const [street, setStreet] = useState("");
+  const [houseNumber, setHouseNumber] = useState("");
+  const [city, setCity] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [uiMessage, setUiMessage] = useState<string | null>(null);
   const [compactCards, setCompactCards] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState<number | null>(null);
@@ -45,10 +53,22 @@ export default function ProjectsPage() {
 
   const createMutation = useMutation({
     mutationFn: createProject,
-    onSuccess: () => {
+    onSuccess: (project) => {
       setName("");
       setPlz("");
-      setUiMessage("Projekt erstellt.");
+      setStreet("");
+      setHouseNumber("");
+      setCity("");
+      setLatitude("");
+      setLongitude("");
+      const warningMessages: Record<string, string> = {
+        geocoding_failed:
+          "Adresse konnte aktuell nicht in Koordinaten umgewandelt werden (Nominatim nicht erreichbar oder unbekannt) — Projekt wurde trotzdem gespeichert.",
+        reverse_geocoding_failed:
+          "Adresse konnte aus den Koordinaten nicht ermittelt werden — Projekt wurde trotzdem gespeichert.",
+      };
+      const warnings = (project.warnings ?? []).map((code) => warningMessages[code] ?? code);
+      setUiMessage(warnings.length ? `Projekt erstellt. ${warnings.join(" ")}` : "Projekt erstellt.");
       queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
@@ -65,13 +85,46 @@ export default function ProjectsPage() {
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
+    const trimmedPlz = plz.trim() || null;
+    const trimmedStreet = locationMode === "address" ? street.trim() || null : null;
+    const trimmedHouseNumber = locationMode === "address" ? houseNumber.trim() || null : null;
+    const trimmedCity = locationMode === "address" ? city.trim() || null : null;
+    const parsedLatitude =
+      locationMode === "coordinates" && latitude.trim() ? Number(latitude.replace(",", ".")) : null;
+    const parsedLongitude =
+      locationMode === "coordinates" && longitude.trim() ? Number(longitude.replace(",", ".")) : null;
+
+    if (locationMode === "coordinates") {
+      if (parsedLatitude === null || parsedLongitude === null || Number.isNaN(parsedLatitude) || Number.isNaN(parsedLongitude)) {
+        setUiMessage("Bitte gueltige Breiten- und Laengengrade eingeben.");
+        return;
+      }
+      if (parsedLatitude < -90 || parsedLatitude > 90) {
+        setUiMessage("Breitengrad muss zwischen -90 und 90 liegen.");
+        return;
+      }
+      if (parsedLongitude < -180 || parsedLongitude > 180) {
+        setUiMessage("Laengengrad muss zwischen -180 und 180 liegen.");
+        return;
+      }
+    } else if (!trimmedPlz) {
+      setUiMessage("Bitte PLZ angeben oder zum Modus Koordinaten wechseln.");
+      return;
+    }
+    setUiMessage(null);
+
     await createMutation.mutateAsync({
       name,
-      plz,
+      plz: trimmedPlz,
+      street: trimmedStreet,
+      house_number: trimmedHouseNumber,
+      city: trimmedCity,
+      latitude: parsedLatitude,
+      longitude: parsedLongitude,
       typ,
       leistung_kw: Number(leistungKw),
       role_inputs: {
-        plz,
+        plz: trimmedPlz ?? undefined,
         antragsteller: name,
         anlagentyp:
           typ === "pv" ? "solar" :
@@ -173,50 +226,137 @@ export default function ProjectsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={onCreate} className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_120px_160px_150px_auto]">
-                <Input
-                  className={fieldClass}
-                  placeholder="Projektname"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-                <Input
-                  className={fieldClass}
-                  placeholder="PLZ"
-                  value={plz}
-                  onChange={(e) => setPlz(e.target.value)}
-                  required
-                  maxLength={5}
-                  inputMode="numeric"
-                />
-                <select
-                  className="form-select h-11 w-full cursor-pointer rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70"
-                  value={typ}
-                  onChange={(e) => setTyp(e.target.value)}
-                  required
-                >
-                  {PROJECT_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-bg text-white">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <Input
-                  className={fieldClass}
-                  placeholder="Leistung kW"
-                  value={leistungKw}
-                  onChange={(e) => setLeistungKw(e.target.value)}
-                  required
-                  inputMode="decimal"
-                />
-                <Button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="h-11 rounded-xl bg-brand-orange px-5 text-white hover:bg-brand-orangeHover"
-                >
-                  {createMutation.isPending ? "Erstellt..." : "Projekt erstellen"}
-                </Button>
+              <form onSubmit={onCreate} className="space-y-4">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_160px_150px]">
+                  <Input
+                    className={fieldClass}
+                    placeholder="Projektname"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                  <select
+                    className="form-select h-11 w-full cursor-pointer rounded-xl border border-border/70 bg-white/5 px-3 text-sm text-white outline-none transition focus:border-brand-cyan/70"
+                    value={typ}
+                    onChange={(e) => setTyp(e.target.value)}
+                    required
+                  >
+                    {PROJECT_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value} className="bg-bg text-white">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <Input
+                    className={fieldClass}
+                    placeholder="Leistung kW"
+                    value={leistungKw}
+                    onChange={(e) => setLeistungKw(e.target.value)}
+                    required
+                    inputMode="decimal"
+                  />
+                </div>
+
+                <div className="rounded-xl border border-border/70 bg-black/10 p-3">
+                  <div role="tablist" aria-label="Standort-Modus" className="mb-3 inline-flex rounded-lg border border-white/10 bg-white/5 p-1">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={locationMode === "address"}
+                      onClick={() => setLocationMode("address")}
+                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                        locationMode === "address"
+                          ? "bg-brand-cyan/20 text-brand-cyan"
+                          : "text-text-muted hover:text-white"
+                      }`}
+                    >
+                      Adresse
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={locationMode === "coordinates"}
+                      onClick={() => setLocationMode("coordinates")}
+                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                        locationMode === "coordinates"
+                          ? "bg-brand-cyan/20 text-brand-cyan"
+                          : "text-text-muted hover:text-white"
+                      }`}
+                    >
+                      Koordinaten
+                    </button>
+                  </div>
+
+                  {locationMode === "address" ? (
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_120px_120px_minmax(0,1fr)]">
+                      <Input
+                        className={fieldClass}
+                        placeholder="Strasse"
+                        value={street}
+                        onChange={(e) => setStreet(e.target.value)}
+                      />
+                      <Input
+                        className={fieldClass}
+                        placeholder="Hausnr."
+                        value={houseNumber}
+                        onChange={(e) => setHouseNumber(e.target.value)}
+                      />
+                      <Input
+                        className={fieldClass}
+                        placeholder="PLZ"
+                        value={plz}
+                        onChange={(e) => setPlz(e.target.value)}
+                        maxLength={5}
+                        inputMode="numeric"
+                      />
+                      <Input
+                        className={fieldClass}
+                        placeholder="Ort"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px]">
+                      <Input
+                        className={fieldClass}
+                        placeholder="Latitude (-90..90)"
+                        value={latitude}
+                        onChange={(e) => setLatitude(e.target.value)}
+                        inputMode="decimal"
+                      />
+                      <Input
+                        className={fieldClass}
+                        placeholder="Longitude (-180..180)"
+                        value={longitude}
+                        onChange={(e) => setLongitude(e.target.value)}
+                        inputMode="decimal"
+                      />
+                      <Input
+                        className={fieldClass}
+                        placeholder="PLZ (optional)"
+                        value={plz}
+                        onChange={(e) => setPlz(e.target.value)}
+                        maxLength={5}
+                        inputMode="numeric"
+                      />
+                    </div>
+                  )}
+                  <p className="mt-2 text-xs leading-5 text-text-dim">
+                    Geocoding via OpenStreetMap (Nominatim). Datenklasse B, keine Kapazitaetsaussage.
+                    Adresseingaben werden zur Standortbestimmung an die Nominatim-API geleitet.
+                  </p>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    type="submit"
+                    disabled={createMutation.isPending}
+                    className="h-11 rounded-xl bg-brand-orange px-5 text-white hover:bg-brand-orangeHover"
+                  >
+                    {createMutation.isPending ? "Erstellt..." : "Projekt erstellen"}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>

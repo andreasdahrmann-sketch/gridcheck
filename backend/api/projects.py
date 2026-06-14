@@ -5,13 +5,13 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from core.auth import get_current_user, require_csrf
 from db.database import get_db
 from db.models import User
-from services import project_service
+from services import geocoding_service, project_service
 from services.visibility_service import (
     derive_stakeholder_path,
     get_project_access_level,
@@ -25,19 +25,55 @@ router = APIRouter(prefix="/api/v1/projects", tags=["projects"])
 UPLOAD_DIR = os.getenv("PROJECT_UPLOAD_DIR", "./uploads")
 
 
+def _has_address(values: dict[str, Any]) -> bool:
+    street = (values.get("street") or "").strip()
+    house_number = (values.get("house_number") or "").strip()
+    plz = (values.get("plz") or "").strip()
+    return bool(street and house_number and plz)
+
+
+def _has_coordinates(values: dict[str, Any]) -> bool:
+    return values.get("latitude") is not None and values.get("longitude") is not None
+
+
+def _has_plz_only(values: dict[str, Any]) -> bool:
+    return bool((values.get("plz") or "").strip())
+
+
 class ProjectCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
-    plz: str = Field(..., min_length=4, max_length=5)
+    plz: str | None = Field(default=None, min_length=4, max_length=5)
+    ort: str | None = Field(default=None, max_length=120)
+    street: str | None = Field(default=None, max_length=120)
+    house_number: str | None = Field(default=None, max_length=20)
+    city: str | None = Field(default=None, max_length=120)
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
     typ: str = Field(..., min_length=1, max_length=50)
     leistung_kw: float = Field(..., gt=0)
     description: str | None = None
     role_inputs: dict[str, Any] | None = None
     role_results: dict[str, Any] | None = None
 
+    @model_validator(mode="after")
+    def _at_least_one_location(self) -> "ProjectCreateRequest":
+        data = self.model_dump()
+        if _has_address(data) or _has_coordinates(data) or _has_plz_only(data):
+            return self
+        raise ValueError(
+            "Mindestens PLZ oder vollstaendige Koordinaten (latitude+longitude) erforderlich.",
+        )
+
 
 class ProjectUpdateRequest(BaseModel):
     name: str | None = None
     plz: str | None = Field(default=None, min_length=4, max_length=5)
+    ort: str | None = Field(default=None, max_length=120)
+    street: str | None = Field(default=None, max_length=120)
+    house_number: str | None = Field(default=None, max_length=20)
+    city: str | None = Field(default=None, max_length=120)
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
     typ: str | None = None
     leistung_kw: float | None = Field(default=None, gt=0)
     description: str | None = None
@@ -53,7 +89,13 @@ class ShareRequest(BaseModel):
 class ProjectResponse(BaseModel):
     id: int
     name: str
-    plz: str
+    plz: str | None
+    ort: str | None = None
+    street: str | None = None
+    house_number: str | None = None
+    city: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     typ: str
     leistung_kw: float
     description: str | None
@@ -62,8 +104,15 @@ class ProjectResponse(BaseModel):
     owner_user_id: int | None
     created_at: datetime
     updated_at: datetime | None
+    warnings: list[str] = Field(default_factory=list)
 
-def _to_response(project, db: Session, current_user: User) -> ProjectResponse:
+def _to_response(
+    project,
+    db: Session,
+    current_user: User,
+    *,
+    warnings: list[str] | None = None,
+) -> ProjectResponse:
     role_inputs = parse_project_role_inputs(project.role_inputs)
     access_level = get_project_access_level(db, current_user, project)
     stakeholder_path = derive_stakeholder_path(role_inputs, fallback_user_role=current_user.role)
@@ -71,6 +120,12 @@ def _to_response(project, db: Session, current_user: User) -> ProjectResponse:
         id=project.id,
         name=project.name,
         plz=project.plz,
+        ort=project.ort,
+        street=getattr(project, "street", None),
+        house_number=getattr(project, "house_number", None),
+        city=getattr(project, "city", None),
+        latitude=getattr(project, "latitude", None),
+        longitude=getattr(project, "longitude", None),
         typ=project.typ,
         leistung_kw=project.leistung_kw,
         description=project.description,
@@ -83,7 +138,81 @@ def _to_response(project, db: Session, current_user: User) -> ProjectResponse:
         owner_user_id=project.owner_user_id if access_level in {"admin", "owner", "editor"} else None,
         created_at=project.created_at,
         updated_at=project.updated_at,
+        warnings=list(warnings or []),
     )
+
+
+def _enrich_location_with_geocoding(payload: dict[str, Any]) -> list[str]:
+    """Erzeugt lat/lon aus Adresse oder Adresse aus lat/lon. Fail-soft, mutiert payload.
+
+    Liefert eine Liste mit Warnungen (z. B. "geocoding_failed"), die der Client anzeigen kann.
+    Geocoding-Metadaten landen in payload["role_inputs"]["_geocoding"], damit das Projekt sie
+    revisionssicher mitschreibt (Datenquelle, Confidence) — ohne dass das Project-Modell neue
+    Felder fuer Confidence/Source braucht.
+    """
+    warnings: list[str] = []
+    role_inputs = payload.get("role_inputs")
+    if not isinstance(role_inputs, dict):
+        role_inputs = {}
+    geocoding_meta = role_inputs.get("_geocoding") if isinstance(role_inputs.get("_geocoding"), dict) else {}
+
+    has_address = bool(
+        (payload.get("street") or "").strip()
+        and (payload.get("house_number") or "").strip()
+        and (payload.get("plz") or "").strip(),
+    )
+    has_coordinates = payload.get("latitude") is not None and payload.get("longitude") is not None
+
+    if has_address and not has_coordinates:
+        result = geocoding_service.geocode_address(
+            street=payload.get("street"),
+            house_number=payload.get("house_number"),
+            plz=payload.get("plz"),
+            city=payload.get("city"),
+        )
+        if result:
+            payload["latitude"] = result["latitude"]
+            payload["longitude"] = result["longitude"]
+            geocoding_meta = {
+                "mode": "forward",
+                "source": result["source"],
+                "data_class": result["data_class"],
+                "confidence": result["confidence"],
+                "raw_label": result.get("raw_label"),
+                "has_house_number": result.get("has_house_number", False),
+            }
+        else:
+            warnings.append("geocoding_failed")
+
+    elif has_coordinates and not has_address:
+        result = geocoding_service.reverse_geocode(
+            lat=payload.get("latitude"),
+            lon=payload.get("longitude"),
+        )
+        if result:
+            if not (payload.get("street") or "").strip() and result.get("street"):
+                payload["street"] = result["street"]
+            if not (payload.get("house_number") or "").strip() and result.get("house_number"):
+                payload["house_number"] = result["house_number"]
+            if not (payload.get("plz") or "").strip() and result.get("plz"):
+                payload["plz"] = result["plz"]
+            if not (payload.get("city") or "").strip() and result.get("city"):
+                payload["city"] = result["city"]
+            geocoding_meta = {
+                "mode": "reverse",
+                "source": result["source"],
+                "data_class": result["data_class"],
+                "confidence": result["confidence"],
+                "raw_label": result.get("raw_label"),
+            }
+        else:
+            warnings.append("reverse_geocoding_failed")
+
+    if geocoding_meta:
+        role_inputs["_geocoding"] = geocoding_meta
+        payload["role_inputs"] = role_inputs
+
+    return warnings
 
 
 @router.post("", response_model=ProjectResponse)
@@ -93,8 +222,10 @@ def create_project(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_csrf),
 ) -> ProjectResponse:
-    project = project_service.create_project(db, current_user, **req.model_dump())
-    return _to_response(project, db, current_user)
+    payload = req.model_dump()
+    warnings = _enrich_location_with_geocoding(payload)
+    project = project_service.create_project(db, current_user, **payload)
+    return _to_response(project, db, current_user, warnings=warnings)
 
 
 @router.get("", response_model=list[ProjectResponse])

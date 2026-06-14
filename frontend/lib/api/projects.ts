@@ -11,7 +11,13 @@ export type ProjectRoleInputs = Partial<GridCheckInput> & {
 export type Project = {
   id: number;
   name: string;
-  plz: string;
+  plz: string | null;
+  ort?: string | null;
+  street?: string | null;
+  house_number?: string | null;
+  city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   typ: string;
   leistung_kw: number;
   description?: string | null;
@@ -20,6 +26,7 @@ export type Project = {
   owner_user_id?: number | null;
   created_at?: string;
   updated_at?: string | null;
+  warnings?: string[];
 };
 
 const BASE = "/api/backend/api/v1/projects";
@@ -63,7 +70,13 @@ export async function getProject(projectId: number) {
 export async function createProject(
   payload: {
     name: string;
-    plz: string;
+    plz?: string | null;
+    ort?: string | null;
+    street?: string | null;
+    house_number?: string | null;
+    city?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
     typ: string;
     leistung_kw: number;
     description?: string;

@@ -95,16 +95,28 @@ def create_project(
     user: User,
     *,
     name: str,
-    plz: str,
+    plz: str | None = None,
     typ: str,
     leistung_kw: float,
-    description: str | None,
+    description: str | None = None,
     role_inputs: dict | None = None,
     role_results: dict | None = None,
+    street: str | None = None,
+    house_number: str | None = None,
+    city: str | None = None,
+    ort: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> Project:
     project = Project(
         name=name,
         plz=plz,
+        ort=ort,
+        street=street,
+        house_number=house_number,
+        city=city,
+        latitude=latitude,
+        longitude=longitude,
         typ=typ,
         leistung_kw=leistung_kw,
         description=description or "",
@@ -125,6 +137,12 @@ def create_project(
             "typ": typ,
             "leistung_kw": leistung_kw,
             "plz": plz,
+            "ort": ort,
+            "street": street,
+            "house_number": house_number,
+            "city": city,
+            "latitude": latitude,
+            "longitude": longitude,
             "role_inputs": role_inputs or {},
             "role_results": role_results or {},
         },
@@ -176,7 +194,19 @@ def update_project(db: Session, user: User, project_id: int, payload: dict) -> P
     project = get_project(db, user, project_id)
     if not _can_write(user, project, db):
         raise _forbidden()
-    for key in ("name", "plz", "typ", "leistung_kw", "description"):
+    for key in (
+        "name",
+        "plz",
+        "typ",
+        "leistung_kw",
+        "description",
+        "street",
+        "house_number",
+        "city",
+        "ort",
+        "latitude",
+        "longitude",
+    ):
         if key in payload and payload[key] is not None:
             setattr(project, key, payload[key])
     if "role_inputs" in payload and payload["role_inputs"] is not None:
