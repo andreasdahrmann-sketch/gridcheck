@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Column, Integer, Float, String, DateTime, Boolean, Text, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import BigInteger, Column, Date, Integer, Float, Numeric, String, DateTime, Boolean, Text, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from .database import Base
@@ -97,6 +97,13 @@ class User(Base):
     billing_current_period_end = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # DSGVO Art. 17 Soft-Delete: harte Loeschung verbietet Revisionssicherheit (Rule 05),
+    # daher anonymisiert + deaktiviert; Datensatz bleibt fuer Audit-Trail / Hash-Chain bestehen.
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    # SHA256(lower(original_email)) zur Re-Registrierungs-Sperre nach Anonymisierung.
+    # Klartext-E-Mail wird beim Soft-Delete entfernt; der Hash bleibt fuer Account-Enum-Schutz
+    # und zur Erfuellung der Konto-Sperre nach Loeschung (siehe DSGVO-Self-Service-Bericht).
+    deleted_email_hash = Column(String(64), nullable=True, index=True)
 
     owned_projects = relationship("Project", back_populates="owner")
     memberships = relationship("ProjectMember", back_populates="user", cascade="all, delete-orphan")
@@ -589,4 +596,64 @@ class ReportRevisionRecord(Base):
     engine_revision_hash = Column(String, nullable=True)
     report_json = Column(Text, nullable=False)
     html_content = Column(Text, nullable=False)
+
+
+class MastrUnit(Base):
+    """Marktstammdatenregister-Anlagenstamm (Datenklasse A laut Rule 06).
+
+    Skeleton fuer BL-GIS-003. Liefert Einspeisedruck-Indikatoren, KEIN Kapazitaetsclaim.
+    raw_hash/normalized_hash/parser_version sind Pflicht (Provenienz, Rule 06).
+    """
+
+    __tablename__ = "mastr_units"
+    __table_args__ = (
+        Index("ix_mastr_units_plz", "plz"),
+        Index("ix_mastr_units_bundesland", "bundesland"),
+        Index("ix_mastr_units_latitude", "latitude"),
+        Index("ix_mastr_units_longitude", "longitude"),
+        Index("ix_mastr_units_unit_type", "unit_type"),
+    )
+
+    mastr_id = Column(String(64), primary_key=True)
+    unit_type = Column(String(20), nullable=False)
+    installed_capacity_kw = Column(Numeric(14, 3), nullable=False)
+    commissioning_date = Column(Date, nullable=True)
+    decommissioning_date = Column(Date, nullable=True)
+    plz = Column(String(10), nullable=True)
+    bundesland = Column(String(50), nullable=True)
+    latitude = Column(Numeric(9, 6), nullable=True)
+    longitude = Column(Numeric(9, 6), nullable=True)
+    dso_name = Column(String(200), nullable=True)
+    voltage_level = Column(String(50), nullable=True)
+    data_source = Column(String(20), nullable=False, default="mastr")
+    data_class = Column(String(1), nullable=False, default="A")
+    confidence = Column(Numeric(4, 3), nullable=False, default=0.95)
+    raw_hash = Column(String(64), nullable=False)
+    normalized_hash = Column(String(64), nullable=False)
+    parser_version = Column(String(20), nullable=False)
+    imported_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    source_updated_at = Column(DateTime, nullable=True)
+
+
+class MastrImport(Base):
+    """Audit-Tabelle pro MaStR-Importlauf (running/success/failed)."""
+
+    __tablename__ = "mastr_imports"
+    __table_args__ = (
+        Index("ix_mastr_imports_started_at", "started_at"),
+        Index("ix_mastr_imports_status", "status"),
+    )
+
+    id = Column(String(36), primary_key=True)
+    started_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    finished_at = Column(DateTime, nullable=True)
+    parser_version = Column(String(20), nullable=False)
+    source_file = Column(String(500), nullable=False)
+    rows_total = Column(Integer, nullable=False, default=0)
+    rows_inserted = Column(Integer, nullable=False, default=0)
+    rows_updated = Column(Integer, nullable=False, default=0)
+    rows_skipped = Column(Integer, nullable=False, default=0)
+    rows_failed = Column(Integer, nullable=False, default=0)
+    status = Column(String(20), nullable=False, default="running")
+    error_summary = Column(Text, nullable=True)
 

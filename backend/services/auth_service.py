@@ -70,6 +70,25 @@ def register_user(db: Session, *, email: str, password: str, role: str, full_nam
             status_code=409,
             detail={"code": "EMAIL_EXISTS", "message": "E-Mail bereits vorhanden", "hint": "Bitte andere E-Mail nutzen."},
         )
+    # DSGVO Art. 17: Re-Registrierung mit einer zuvor geloeschten E-Mail ist gesperrt.
+    # Der Klartext der E-Mail ist beim Soft-Delete entfernt worden; verglichen wird
+    # gegen den dabei gespeicherten SHA256-Hash (deleted_email_hash).
+    email_hash = hashlib.sha256(normalized_email.encode("utf-8")).hexdigest()
+    deleted_match = (
+        db.query(User)
+        .filter(User.deleted_email_hash == email_hash, User.deleted_at.isnot(None))
+        .first()
+    )
+    if deleted_match:
+        log_security_event("auth_register_blocked_deleted", email=normalized_email)
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "EMAIL_DELETED_BLOCKED",
+                "message": "Konto mit dieser E-Mail wurde geloescht und ist gesperrt.",
+                "hint": "Bitte eine andere E-Mail-Adresse verwenden oder Support kontaktieren.",
+            },
+        )
     vnb_status = VNB_STATUS_PENDING if normalized_role == "netzbetreiber" else VNB_STATUS_NONE
     user = User(
         email=normalized_email,
@@ -94,7 +113,9 @@ def register_user(db: Session, *, email: str, password: str, role: str, full_nam
 def login_user(db: Session, *, email: str, password: str) -> User:
     normalized_email = email.strip().lower()
     user = db.query(User).filter(User.email == normalized_email).first()
-    if not user or not verify_password(password, user.password_hash):
+    # DSGVO-geloeschte Konten antworten identisch zu nicht-existenten Konten,
+    # um Account-Enumeration zu vermeiden (Soft-Delete: deleted_at gesetzt).
+    if not user or user.deleted_at is not None or not verify_password(password, user.password_hash):
         log_security_event("auth_login_failed", email=normalized_email)
         raise HTTPException(
             status_code=401,
