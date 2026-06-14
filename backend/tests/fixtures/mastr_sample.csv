@@ -1,0 +1,11 @@
+MaStR-Nr;Anlagentyp;Bruttoleistung_kW;Inbetriebnahme;PLZ;Bundesland;Laengengrad;Breitengrad;Netzbetreiber;Spannungsebene
+SEE900000000001;Solar;9.85;2021-04-15;10115;Berlin;13.388860;52.517037;Stromnetz Berlin GmbH;Niederspannung
+SEE900000000002;Solar;125.500;2022-07-01;80331;Bayern;11.575380;48.137079;SWM Infrastruktur GmbH;Niederspannung
+SEE900000000003;Wind;3450.000;2019-11-20;25761;Schleswig-Holstein;9.083000;54.080000;Schleswig-Holstein Netz AG;Mittelspannung
+SEE900000000004;Biomasse;500.000;2018-03-10;39576;Sachsen-Anhalt;11.726000;52.585000;Avacon Netz GmbH;Mittelspannung
+SEE900000000005;Wasser;75.000;2015-09-01;79100;Baden-Wuerttemberg;7.842000;48.000000;Netze BW GmbH;Niederspannung
+SEE900000000006;Stromspeicher;250.000;2024-01-15;04109;Sachsen;12.373075;51.339695;MITNETZ STROM mbH;Niederspannung
+SEE900000000007;Solar;15.200;2023-06-30;;;;;EWE Netz GmbH;Niederspannung
+SEE900000000008;Wind;4200.000;2020-05-22;26789;Niedersachsen;7.473000;53.142000;EWE Netz GmbH;Mittelspannung
+SEE900000000009;Solar;42.000;2024-03-01;70173;Baden-Wuerttemberg;9.179000;48.776000;Netze BW GmbH;Niederspannung
+SEE900000000010;Solar;18.500;NICHT_DATUM;90402;Bayern;11.077000;49.452000;N-ERGIE Netz GmbH;Niederspannung

@@ -23,6 +23,7 @@ from api.analyze_v2 import router_analysis_compat, router_v2
 from api.v1_projektierer import router as v1_projektierer_router
 from api.v1_geo import router as v1_geo_router
 from api.v1_ki_feedback import router as v1_ki_router
+from api.v1_mastr import router as v1_mastr_router
 from api.revisions import router as revisions_router
 from api.auth import router as auth_router
 from api.billing import router as billing_router
@@ -122,6 +123,7 @@ app.include_router(stakeholder_router, prefix="/api/v1")
 app.include_router(v1_projektierer_router)
 app.include_router(v1_geo_router)
 app.include_router(v1_ki_router)
+app.include_router(v1_mastr_router)
 app.include_router(revisions_router, prefix="/api/v1")
 app.include_router(auth_router)
 app.include_router(billing_router)
