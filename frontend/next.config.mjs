@@ -39,6 +39,95 @@ if (rawBackendUrl && /\/api(\/v\d+)?\/?$/i.test(rawBackendUrl)) {
   );
 }
 
+/**
+ * Security-Header — siehe `.cursor/rules/02-frontend.mdc` und `04-deployment.mdc`.
+ *
+ * CSP ist bewusst konservativ. Externe Hosts:
+ *  - Mapbox (Karten / Geocoding):       https://api.mapbox.com, https://*.mapbox.com,
+ *                                       https://events.mapbox.com
+ *  - OpenStreetMap-Tiles (Leaflet):     https://*.tile.openstreetmap.org,
+ *                                       https://tile.openstreetmap.org
+ *  - Nominatim (PLZ-/Adresssuche):      https://nominatim.openstreetmap.org
+ *  - Sentry (optional, falls aktiviert):https://*.sentry.io
+ *  - Google Fonts (Inter @import in
+ *    globals.css):                      https://fonts.googleapis.com (style),
+ *                                       https://fonts.gstatic.com (font-src)
+ *
+ * BACKEND_URL wird, falls gesetzt, additiv in `connect-src` aufgenommen
+ * (für Browser-Calls zu /api/backend/*; im Vercel-Setup laufen diese Calls
+ *  same-origin via rewrites, in lokalen Setups ggf. cross-origin).
+ *
+ * Stripe ist aktuell nicht aktiv. Wenn Stripe später integriert wird,
+ *   - script-src:  https://js.stripe.com
+ *   - frame-src:   https://js.stripe.com, https://hooks.stripe.com
+ *   - connect-src: https://api.stripe.com
+ * ergänzen.
+ *
+ * 'unsafe-inline' für script-src ist für Next.js-Hydration/Inline-Scripts
+ * notwendig. 'unsafe-eval' nur in Development (next dev) zugelassen.
+ */
+const isDev = process.env.NODE_ENV !== "production";
+
+const cspBackendOrigin = rawBackendUrl ? backendOrigin : "";
+
+const cspDirectives = {
+  "default-src": ["'self'"],
+  "script-src": [
+    "'self'",
+    "'unsafe-inline'",
+    ...(isDev ? ["'unsafe-eval'"] : []),
+  ],
+  "style-src": [
+    "'self'",
+    "'unsafe-inline'",
+    "https://fonts.googleapis.com",
+  ],
+  "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
+  "img-src": [
+    "'self'",
+    "data:",
+    "blob:",
+    "https://*.tile.openstreetmap.org",
+    "https://tile.openstreetmap.org",
+    "https://api.mapbox.com",
+    "https://*.mapbox.com",
+  ],
+  "connect-src": [
+    "'self'",
+    "https://nominatim.openstreetmap.org",
+    "https://api.mapbox.com",
+    "https://*.mapbox.com",
+    "https://events.mapbox.com",
+    "https://*.sentry.io",
+    ...(cspBackendOrigin ? [cspBackendOrigin] : []),
+    ...(isDev ? ["ws://localhost:*", "http://localhost:*"] : []),
+  ],
+  "worker-src": ["'self'", "blob:"],
+  "frame-ancestors": ["'none'"],
+  "frame-src": ["'self'"],
+  "base-uri": ["'self'"],
+  "form-action": ["'self'"],
+  "object-src": ["'none'"],
+};
+
+const cspString = Object.entries(cspDirectives)
+  .map(([directive, values]) => `${directive} ${values.join(" ")}`)
+  .concat(["upgrade-insecure-requests"])
+  .join("; ");
+
+const securityHeaders = [
+  // HSTS: zwei Jahre + Preload. Wirkt nur über https; auf http (lokal) ignoriert der Browser den Header.
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(self), interest-cohort=()",
+  },
+  { key: "Content-Security-Policy", value: cspString },
+];
+
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -47,6 +136,14 @@ const nextConfig = {
   // erzwingt Per-Icon-Auflösung (Next 14.2+).
   experimental: {
     optimizePackageImports: ["lucide-react"],
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+    ];
   },
   async rewrites() {
     if (!rawBackendUrl || isLocalBackendUrl) return [];
