@@ -1208,8 +1208,31 @@ def _build_vnb_story(
     report_id: str,
     full_hash: str,
 ) -> list[Any]:
+    """VNB-Story (P3 — Score-Hero, Standort/Netzumfeld, Anschlusskandidaten,
+    Risiko-Block, Datenquellen analog Projektierer-Schema)."""
     story: list[Any] = []
     body = body_style(palette)
+
+    # P3 1. Score-Hero (kompakt) — visualisiert Gesamtbewertung. Funktion ist
+    # rolle-agnostisch (liest gridcheck_score/scores aus dem Report).
+    story.append(_projektierer_score_hero(palette, report, doc_width=doc_width))
+    story.append(Spacer(1, 4 * mm))
+
+    # P3 2. Standort / Netzumfeld. Helper liest location_meta + persp.
+    story.extend(
+        section(
+            palette,
+            "Standort & Netzumfeld",
+            [
+                kv_table(
+                    palette,
+                    _projektierer_location_rows(report),
+                    doc_width=doc_width,
+                    boxed=True,
+                )
+            ],
+        )
+    )
 
     headline, severity, msg = _decision_summary(report)
     story.append(
@@ -1247,6 +1270,42 @@ def _build_vnb_story(
     )
     story.append(Spacer(1, 2 * mm))
 
+    # P3 3. Sk''-Annahme + Konformitaets-Hinweis (NUR Hinweis, keine
+    # verbindliche Konformitaetsaussage — 06-arbeitsweise-gridcheck.mdc).
+    sk_note = _safe(report.get("sk_assumption_note"), default="")
+    conformity = _safe(report.get("conformity_hint"), default="")
+    if sk_note != "—" or conformity != "—":
+        story.extend(
+            section(
+                palette,
+                "Sk''-/N-1-Annahme und Konformitaets-Hinweis",
+                [
+                    p(sk_note, body) if sk_note != "—" else Spacer(1, 0),
+                    p(conformity, body) if conformity != "—" else Spacer(1, 0),
+                ],
+            )
+        )
+
+    # P3 4. Anschlusskandidaten — gleicher Helper wie beim Projektierer.
+    story.extend(
+        section(
+            palette,
+            "Anschlusspunkt-Kandidaten",
+            [_projektierer_connection_variants_table(palette, report, doc_width=doc_width)],
+        )
+    )
+    story.append(Spacer(1, 2 * mm))
+
+    # P3 5. Risiko-Block (Gesamt/Netz/Trasse/Kosten/Termin/Datenqualitaet).
+    story.extend(
+        section(
+            palette,
+            "Risiko-Block (Gesamt / Netz / Trasse / Kosten / Termin / Datenqualitaet)",
+            [_projektierer_risk_table(palette, report, doc_width=doc_width)],
+        )
+    )
+    story.append(Spacer(1, 2 * mm))
+
     story.extend(
         section(
             palette,
@@ -1268,6 +1327,29 @@ def _build_vnb_story(
     )
 
     story.append(PageBreak())
+
+    # P3 6. Datenanforderung an Projektierer / Antragsteller — explizite
+    # Liste der erforderlichen Nachreichungen (aus technical_requirements).
+    story.extend(
+        section(
+            palette,
+            "Datenanforderung an Projektierer",
+            bulleted_block(
+                palette,
+                list(report.get("technical_requirements") or []),
+                empty_label="Keine zusaetzlichen Nachweise erkannt.",
+            ),
+        )
+    )
+
+    # P3 7. Datenquellen-Block (gleicher Standard wie Projektierer).
+    story.extend(
+        section(
+            palette,
+            "Datenquellen",
+            [_projektierer_sources_table(palette, report, doc_width=doc_width)],
+        )
+    )
 
     story.extend(
         section(
@@ -1613,6 +1695,32 @@ def _invest_eckdaten(report: dict[str, Any]) -> list[tuple[str, Any]]:
     ]
 
 
+def _invest_scenarios_table(
+    palette: StakeholderPalette, report: dict[str, Any], *, doc_width: float
+) -> Table | None:
+    """Worst / Hoch / Basis / Niedrig / Best CAPEX-Szenarien (Invest-Block).
+
+    Reine Visualisierung der vom DTO bereitgestellten `scenarios`. Wenn keine
+    Bandbreite vorliegt, wird die Sektion nicht erzeugt.
+    """
+    sc = report.get("scenarios") if isinstance(report.get("scenarios"), dict) else None
+    if not sc or not sc.get("base_eur"):
+        return None
+    rows: list[list[Any]] = [
+        ["Best (gestresst, -10%)", _fmt_eur(sc.get("best_eur")), _confidence_label(sc.get("confidence"))],
+        ["Niedrig", _fmt_eur(sc.get("low_eur")), _confidence_label(sc.get("confidence"))],
+        ["Basis", _fmt_eur(sc.get("base_eur")), _confidence_label(sc.get("confidence"))],
+        ["Hoch", _fmt_eur(sc.get("high_eur")), _confidence_label(sc.get("confidence"))],
+        ["Worst (gestresst, +20%)", _fmt_eur(sc.get("worst_eur")), _confidence_label(sc.get("confidence"))],
+    ]
+    return alt_table(
+        palette,
+        ["Szenario", "CAPEX (EUR)", "Confidence"],
+        rows,
+        col_widths=[doc_width * 0.45, doc_width * 0.35, doc_width * 0.20],
+    )
+
+
 def _build_invest_story(
     palette: StakeholderPalette,
     report: dict[str, Any],
@@ -1621,6 +1729,8 @@ def _build_invest_story(
     report_id: str,
     full_hash: str,
 ) -> list[Any]:
+    """Invest-Story (P3 — Hero + KPI + Standort + Risiko-Block + Worst/Base/Best
+    + Kostenbandbreite + Datenquellen)."""
     story: list[Any] = []
     body = body_style(palette)
 
@@ -1636,11 +1746,37 @@ def _build_invest_story(
     )
     story.append(Spacer(1, 3 * mm))
 
+    # P3 — Standort & Netzumfeld. Wird vor dem Chancen/Risiken-Block gezeigt,
+    # damit Investor den Lagekontext vor der qualitativen Bewertung sieht.
+    story.extend(
+        section(
+            palette,
+            "Standort & Netzumfeld",
+            [
+                kv_table(
+                    palette,
+                    _projektierer_location_rows(report),
+                    doc_width=doc_width,
+                    boxed=True,
+                )
+            ],
+        )
+    )
+
     story.extend(
         section(
             palette,
             "Chancen & Risiken (kuratiert)",
             [_invest_chancen_risiken(palette, report, doc_width=doc_width)],
+        )
+    )
+
+    # P3 — strukturierter Risiko-Block (gleiche 6-Dimensionen wie Projektierer).
+    story.extend(
+        section(
+            palette,
+            "Risiko-Treiber (Gesamt / Netz / Trasse / Kosten / Termin / Datenqualitaet)",
+            [_projektierer_risk_table(palette, report, doc_width=doc_width)],
         )
     )
 
@@ -1651,6 +1787,37 @@ def _build_invest_story(
             [kv_table(palette, _invest_eckdaten(report), doc_width=doc_width, boxed=True)],
         )
     )
+
+    # P3 — Worst / Base / Best Szenarien (nur wenn cost_band Daten geliefert hat).
+    scenarios_tbl = _invest_scenarios_table(palette, report, doc_width=doc_width)
+    if scenarios_tbl is not None:
+        story.extend(
+            section(
+                palette,
+                "Worst / Base / Best Szenarien (CAPEX)",
+                [
+                    scenarios_tbl,
+                    Spacer(1, 1 * mm),
+                    p(
+                        _safe(
+                            (report.get("scenarios") or {}).get("note"),
+                            default="Worst/Best als transparenter Stress-Spread.",
+                        ),
+                        muted_style(palette),
+                    ),
+                ],
+            )
+        )
+
+    sensitivities = list(report.get("sensitivities") or [])
+    if sensitivities:
+        story.extend(
+            section(
+                palette,
+                "Sensitivitaeten / Kostentreiber",
+                bulleted_block(palette, sensitivities),
+            )
+        )
 
     cost_band = report.get("cost_band") if isinstance(report.get("cost_band"), dict) else None
     if cost_band:
@@ -1695,6 +1862,15 @@ def _build_invest_story(
             palette,
             "Nächste Schritte",
             bulleted_block(palette, next_steps, empty_label="—"),
+        )
+    )
+
+    # P3 — Datenquellen-Block (gleicher Standard wie Projektierer/VNB).
+    story.extend(
+        section(
+            palette,
+            "Datenquellen",
+            [_projektierer_sources_table(palette, report, doc_width=doc_width)],
         )
     )
 

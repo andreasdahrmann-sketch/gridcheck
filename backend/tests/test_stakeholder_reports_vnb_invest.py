@@ -589,6 +589,136 @@ def test_report_route_rejects_client_supplied_engine_result():
     assert "analysis_run_id" in r.text.lower()
 
 
+# ---------------------------------------------------------------------------
+# P3 — neue Sektionen (Score-Hero, Standort/Netzumfeld, Anschlusskandidaten,
+# Risiko-Block, Datenquellen) fuer VNB- und Invest-Profil.
+# ---------------------------------------------------------------------------
+
+
+def _engine_result_with_kosten_and_variants() -> dict:
+    er = _engine_result_base()
+    er["scores"] = {"gesamt": 72, "voltage_match": 80, "distance": 60}
+    er["kosten"] = {
+        "band_niedrig_eur": 350_000,
+        "band_basis_eur": 480_000,
+        "band_hoch_eur": 720_000,
+        "kosten_trasse_eur": 220_000,
+        "kosten_station_eur": 180_000,
+        "konfidenz_prozent": 55,
+        "quelle": "BNetzA-Heuristik (oeffentlich)",
+        "hauptrisikotreiber": ["Trassenlaenge", "Schutzgebietsnaehe"],
+    }
+    er["connection_variants"] = [
+        {
+            "label": "Variante A",
+            "voltage_label": "MS (20 kV)",
+            "distance_km": 3.2,
+            "confidence": "medium",
+            "cost_risk": "medium",
+            "route_risk": "medium",
+            "comment": "Direktanschluss heuristisch.",
+        }
+    ]
+    er["eingabe"]["project_location"] = {"latitude": 52.5, "longitude": 13.4}
+    er["eingabe"]["bundesland"] = "Berlin"
+    return er
+
+
+def test_vnb_dto_has_score_hero_risk_and_sources_fields():
+    """VNB-DTO muss P3-Felder (gridcheck_score, risks, sources,
+    connection_variants, location_meta, sk_assumption_note, conformity_hint)
+    sauber befuellt liefern."""
+    report = build_vnb_report(_engine_result_with_kosten_and_variants())
+    assert report["gridcheck_score"] == 72
+    assert isinstance(report["scores"], dict) and report["scores"].get("gesamt") == 72
+    assert isinstance(report["risks"], dict)
+    for key in ("overall", "grid", "route", "cost", "timeline", "data_quality"):
+        assert key in report["risks"], f"risks fehlt {key}"
+    assert isinstance(report["sources"], list) and len(report["sources"]) >= 2
+    assert any(src.get("sourceName") for src in report["sources"])
+    assert isinstance(report["connection_variants"], list) and report["connection_variants"]
+    assert report["connection_variants"][0]["label"] == "Variante A"
+    assert isinstance(report["location_meta"], dict)
+    assert report["location_meta"]["bundesland"] == "Berlin"
+    assert report["location_meta"]["latitude"] == 52.5
+    assert "Sk''" in report["sk_assumption_note"]
+    assert "VDE-AR-N" in report["conformity_hint"]
+    # Cost band: bei voller kosten-Eingabe sollte ein Band mit items+drivers entstehen.
+    assert isinstance(report["cost_band"], dict)
+    assert report["cost_band"]["basis_eur"] == 480_000
+    assert report["cost_band"]["main_drivers"]
+
+
+def test_vnb_pdf_contains_score_hero_risk_and_sources_sections():
+    """VNB-PDF muss neue Sektionen (Score-Hero, Standort/Netzumfeld,
+    Anschlusspunkt-Kandidaten, Risiko-Block, Datenquellen) als Text enthalten."""
+    from io import BytesIO
+
+    from pypdf import PdfReader
+
+    report = build_vnb_report(_engine_result_with_kosten_and_variants())
+    pdf_bytes = build_stakeholder_report_pdf(report)
+    reader = PdfReader(BytesIO(pdf_bytes))
+    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    assert "GridCheck-Score" in text
+    assert "Standort" in text
+    assert "Netzumfeld" in text
+    assert "Anschlusspunkt-Kandidaten" in text or "Variante A" in text
+    assert "Risiko-Block" in text or "Datenqualit" in text
+    assert "Datenquellen" in text
+    assert "Sk''" in text or "VDE-AR-N" in text
+    assert "Datenanforderung" in text
+
+
+def test_invest_dto_has_scenarios_risks_sources_fields():
+    """Invest-DTO muss P3-Felder (gridcheck_score, risks, sources,
+    location_meta, scenarios, sensitivities) sauber befuellt liefern,
+    wenn cost_band Daten enthaelt."""
+    er = _engine_result_with_kosten_and_variants()
+    report = build_invest_report(er)
+    assert report["gridcheck_score"] == 72
+    assert isinstance(report["risks"], dict)
+    for key in ("overall", "grid", "route", "cost", "timeline", "data_quality"):
+        assert key in report["risks"]
+    assert isinstance(report["sources"], list) and len(report["sources"]) >= 2
+    assert isinstance(report["location_meta"], dict)
+    assert isinstance(report["scenarios"], dict)
+    assert report["scenarios"]["base_eur"] == 480_000
+    assert report["scenarios"]["worst_eur"] > report["scenarios"]["high_eur"]
+    assert report["scenarios"]["best_eur"] < report["scenarios"]["low_eur"]
+    assert isinstance(report["sensitivities"], list)
+    assert any("Trassen" in s for s in report["sensitivities"])
+
+
+def test_invest_pdf_contains_scenarios_and_sources_sections():
+    """Invest-PDF muss Standort/Netzumfeld, Risiko-Block, Worst/Base/Best und
+    Datenquellen als Text enthalten."""
+    from io import BytesIO
+
+    from pypdf import PdfReader
+
+    er = _engine_result_with_kosten_and_variants()
+    report = build_invest_report(er)
+    pdf_bytes = build_stakeholder_report_pdf(report)
+    reader = PdfReader(BytesIO(pdf_bytes))
+    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    assert "Standort" in text and "Netzumfeld" in text
+    assert "Risiko-Treiber" in text or "Datenqualit" in text
+    assert "Worst" in text or "Szenarien" in text
+    assert "Sensitivit" in text or "Trassen" in text
+    assert "Datenquellen" in text
+
+
+def test_invest_dto_without_kosten_has_empty_scenarios():
+    """Ohne kosten darf scenarios leer bleiben — keine erfundenen Werte."""
+    report = build_invest_report(_engine_result_base())
+    assert report["scenarios"] == {}
+    assert report["sensitivities"] == []
+    # Risiko-Block ist trotzdem da (auch ohne Kosten).
+    assert isinstance(report["risks"], dict)
+    assert "overall" in report["risks"]
+
+
 def test_vnb_report_route_is_rate_limited(
     isolierte_revisionen,
     isolierte_report_revisionen,

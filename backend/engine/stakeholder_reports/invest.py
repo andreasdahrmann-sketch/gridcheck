@@ -1,12 +1,20 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from compliance import APP_VERSION_NORMSTAND, get_normen_fuer_spannungsebene
+from engine.gridcheck_report_mapper import _sources_from_engine
 from engine.stakeholder_reports.content_blocks import (
     build_invest_kpi_summary,
     build_process_timeline_lines,
+)
+from engine.stakeholder_reports.projektierer import (
+    _build_connection_variants,
+    _build_cost_band,
+    _build_location_meta,
+    _build_risks,
 )
 from engine.stakeholder_reports.scope_meta import resolve_report_scope_meta
 
@@ -60,6 +68,16 @@ class InvestReportDTO:
     operational_boundary_note: str | None
     kpi_summary: list[str]
     process_timeline: list[str]
+    # P3: Score-Hero, Standort/Netzumfeld, Risiko-Block, Worst/Base/Best-Szenario,
+    # Datenquellen — analog Projektierer-DTO; defaults wahren Abwaertskompatibilitaet.
+    gridcheck_score: int | None = None
+    scores: dict[str, Any] = field(default_factory=dict)
+    connection_variants: list[dict[str, Any]] = field(default_factory=list)
+    risks: dict[str, Any] = field(default_factory=dict)
+    sources: list[dict[str, Any]] = field(default_factory=list)
+    location_meta: dict[str, Any] = field(default_factory=dict)
+    scenarios: dict[str, Any] = field(default_factory=dict)
+    sensitivities: list[str] = field(default_factory=list)
 
 
 def _spannungsebene_from_kv(u_kv: float) -> str:
@@ -250,6 +268,67 @@ def _data_basis(engine_result: dict[str, Any]) -> list[str]:
     ]
 
 
+def _invest_scenarios(cost_band: dict[str, Any] | None) -> dict[str, Any]:
+    """Worst/Base/Best CAPEX-Szenarien fuer die Investsicht.
+
+    Reine Ableitung aus cost_band. Wenn keine Bandbreite vorhanden ist, wird
+    ein leeres Dict zurueckgegeben — keine erfundenen Werte. Worst/Best wird
+    bewusst um +20%/-10% gegenueber high/low erweitert (Stress-Spread,
+    transparente Annahme), damit die Sensitivitaet nicht versteckt bleibt.
+    """
+    if not isinstance(cost_band, dict):
+        return {}
+    base = int(cost_band.get("basis_eur") or 0)
+    low = int(cost_band.get("niedrig_eur") or 0)
+    high = int(cost_band.get("hoch_eur") or 0)
+    if base <= 0 and low <= 0 and high <= 0:
+        return {}
+    if base <= 0:
+        base = max(low, high, 1)
+    if low <= 0:
+        low = int(base * 0.85)
+    if high <= 0:
+        high = int(base * 1.15)
+    worst = int(high * 1.20)
+    best = max(0, int(low * 0.90))
+    conf = str(cost_band.get("confidence") or "medium")
+    conf_pct = cost_band.get("confidence_pct")
+    return {
+        "best_eur": best,
+        "low_eur": low,
+        "base_eur": base,
+        "high_eur": high,
+        "worst_eur": worst,
+        "confidence": conf,
+        "confidence_pct": conf_pct,
+        "note": (
+            "Worst/Best erweitern Hoch/Niedrig um +20%/-10% als transparenter "
+            "Stress-Spread. Keine Kapazitaetsgarantie."
+        ),
+    }
+
+
+def _invest_sensitivities(cost_band: dict[str, Any] | None, engine_result: dict[str, Any]) -> list[str]:
+    """Sensitivitaeten / Annahmen, die das Kostenband am staerksten treiben.
+
+    Quellen: cost_band.annahmen, kosten.hauptrisikotreiber, route_environment.
+    Keine Erfindung — wenn nichts da ist, kommt ein leerer Block zurueck.
+    """
+    out: list[str] = []
+    if isinstance(cost_band, dict):
+        for item in cost_band.get("annahmen") or []:
+            if str(item).strip():
+                out.append(str(item))
+        for item in cost_band.get("main_drivers") or []:
+            if str(item).strip():
+                out.append(str(item))
+    kosten = engine_result.get("kosten") if isinstance(engine_result.get("kosten"), dict) else {}
+    for item in kosten.get("hauptrisikotreiber") or []:
+        if str(item).strip() and str(item) not in out:
+            out.append(str(item))
+    return out[:8]
+
+
 def build_invest_report(engine_result: dict[str, Any]) -> dict[str, Any]:
     eingabe = engine_result.get("eingabe", {})
     fazit = engine_result.get("fazit", {})
@@ -263,6 +342,16 @@ def build_invest_report(engine_result: dict[str, Any]) -> dict[str, Any]:
     stakeholder = engine_result.get("stakeholder_bewertung", {})
     transparenz = engine_result.get("transparenz", {})
     scope_meta = resolve_report_scope_meta(engine_result)
+    scores = engine_result.get("scores", {})
+    if not isinstance(scores, dict):
+        scores = {}
+    kosten = engine_result.get("kosten", {})
+    if not isinstance(kosten, dict):
+        kosten = {}
+    v2 = engine_result.get("grid_calculation_v2") or {}
+    if not isinstance(v2, dict):
+        v2 = {}
+    persp = v2.get("projektierer_perspective") if isinstance(v2.get("projektierer_perspective"), dict) else None
 
     nennspannung = float(eingabe.get("nennspannung", 20.0))
     normen = get_normen_fuer_spannungsebene(nennspannung)
@@ -270,6 +359,34 @@ def build_invest_report(engine_result: dict[str, Any]) -> dict[str, Any]:
         {"norm_id": n.norm_id, "titel": n.titel, "stand": n.stand, "kategorie": n.kategorie}
         for n in normen
     ]
+
+    generated_at_iso = (
+        str(revision.get("timestamp"))
+        if isinstance(revision, dict) and revision.get("timestamp")
+        else datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    )
+    # Projektierer-Style Kostenbandbreite (mit items + main_drivers) parallel zum
+    # bestehenden _cost_band(): wird intern fuer scenarios/sensitivities genutzt,
+    # nicht ueber das DTO-Feld exportiert (HTML-Template erwartet die schlanke
+    # Form).
+    pj_cost_band = _build_cost_band(kosten)
+    connection_variants = _build_connection_variants(engine_result, eingabe, nennspannung)
+    risks_block = _build_risks(
+        engine_result,
+        fazit,
+        scores,
+        pj_cost_band,
+        route_environment if isinstance(route_environment, dict) else {},
+    )
+    sources_block = _sources_from_engine(engine_result, retrieved_at=generated_at_iso)
+    location_meta = _build_location_meta(eingabe, persp)
+    score_int: int | None
+    try:
+        score_int = int(float(scores.get("gesamt"))) if scores.get("gesamt") is not None else None
+    except (TypeError, ValueError):
+        score_int = None
+    scenarios_block = _invest_scenarios(pj_cost_band)
+    sensitivities_block = _invest_sensitivities(pj_cost_band, engine_result)
 
     dto = InvestReportDTO(
         report_type="invest",
@@ -326,5 +443,13 @@ def build_invest_report(engine_result: dict[str, Any]) -> dict[str, Any]:
         ),
         kpi_summary=build_invest_kpi_summary(engine_result),
         process_timeline=build_process_timeline_lines(engine_result),
+        gridcheck_score=score_int,
+        scores=dict(scores),
+        connection_variants=connection_variants,
+        risks=risks_block,
+        sources=sources_block,
+        location_meta=location_meta,
+        scenarios=scenarios_block,
+        sensitivities=sensitivities_block,
     )
     return asdict(dto)

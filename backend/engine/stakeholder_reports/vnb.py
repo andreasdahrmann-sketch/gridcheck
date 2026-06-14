@@ -1,13 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from compliance import APP_VERSION_NORMSTAND, get_normen_fuer_spannungsebene
+from engine.gridcheck_report_mapper import _sources_from_engine
 from engine.stakeholder_reports.content_blocks import (
     build_process_timeline_lines,
     build_vnb_signature_section,
     build_vnb_technical_review_table,
+)
+from engine.stakeholder_reports.projektierer import (
+    _build_connection_variants,
+    _build_cost_band,
+    _build_location_meta,
+    _build_risks,
 )
 from engine.stakeholder_reports.scope_meta import resolve_report_scope_meta
 
@@ -62,6 +70,20 @@ class VnbReportDTO:
     technical_review_table: list[dict[str, str]]
     signature_section: dict[str, Any]
     process_timeline: list[str]
+    # P3: Score-Hero, Standort/Netzumfeld, Anschlussvarianten, Risiko-Block,
+    # Kostenbandbreite (rolle-spezifisch dezent) und Datenquellen-Block —
+    # gleiche Felder wie ProjektiererReportDTO, damit pdf_builder.py
+    # rolle-agnostische Sektionen wiederverwenden kann. Defaults
+    # halten bestehende Aufrufer abwärtskompatibel.
+    gridcheck_score: int | None = None
+    scores: dict[str, Any] = field(default_factory=dict)
+    cost_band: dict[str, Any] | None = None
+    connection_variants: list[dict[str, Any]] = field(default_factory=list)
+    risks: dict[str, Any] = field(default_factory=dict)
+    sources: list[dict[str, Any]] = field(default_factory=list)
+    location_meta: dict[str, Any] = field(default_factory=dict)
+    sk_assumption_note: str = ""
+    conformity_hint: str = ""
 
 
 VNB_NB_CHECKLISTE_HINWEIS = (
@@ -226,6 +248,48 @@ def _data_role_summary(engine_result: dict[str, Any]) -> str:
     ).strip()
 
 
+def _vnb_sk_assumption_note(eingabe: dict[str, Any], n1: dict[str, Any]) -> str:
+    """Sk''-/N-1-Annahme-Hinweis fuer die VNB-Sicht.
+
+    Keine Behauptung freier Netzkapazitaet. Wenn keine DSO-verifizierten
+    Daten vorhanden sind, wird das explizit als Annahme markiert.
+    """
+    grundlage = str(eingabe.get("n1_datengrundlage") or "unknown")
+    klasse = str(n1.get("n1_klasse") or "N1-0")
+    sk_mva = eingabe.get("sk_mva")
+    if grundlage == "dso_verified":
+        return (
+            f"Sk''-/N-1-Basis: DSO-verifiziert (Klasse {klasse}). "
+            "Vorpruefwerte mit Realnetzdaten abgeglichen."
+        )
+    base = (
+        f"Sk''-/N-1-Annahme: heuristisch ({grundlage}, Klasse {klasse}). "
+        "Belastbare Netzaussage erst nach Nachreichung verifizierter Sk''-/Trafo-Daten."
+    )
+    if sk_mva is not None:
+        base = f"Modellierte Sk''-Annahme ~{sk_mva} MVA — " + base
+    return base
+
+
+def _vnb_conformity_hint(u_kv: float) -> str:
+    """Kurzer Konformitaets-Hinweis fuer den relevanten VDE-AR-N-Anwendungsbereich.
+
+    Bewusst HINWEIS, keine verbindliche Konformitaetsaussage — die finale
+    Beurteilung obliegt dem zustaendigen VNB.
+    """
+    if u_kv < 1:
+        norm = "VDE-AR-N 4105 (Niederspannung, Erzeugungsanlagen)"
+    elif u_kv <= 35:
+        norm = "VDE-AR-N 4110 (Mittelspannung, Erzeugungsanlagen)"
+    else:
+        norm = "VDE-AR-N 4120 (Hochspannung, Erzeugungsanlagen)"
+    return (
+        f"Anwendungsbereich Screening: {norm}. "
+        "Hinweis, keine verbindliche Konformitaetsaussage. "
+        "Bindende Pruefung erfolgt durch den zustaendigen Netzbetreiber."
+    )
+
+
 def build_vnb_report(engine_result: dict[str, Any]) -> dict[str, Any]:
     eingabe = engine_result.get("eingabe", {})
     fazit = engine_result.get("fazit", {})
@@ -239,6 +303,16 @@ def build_vnb_report(engine_result: dict[str, Any]) -> dict[str, Any]:
     route_environment = engine_result.get("route_environment", {})
     stakeholder = engine_result.get("stakeholder_bewertung", {})
     transparenz = engine_result.get("transparenz", {})
+    scores = engine_result.get("scores", {})
+    if not isinstance(scores, dict):
+        scores = {}
+    kosten = engine_result.get("kosten", {})
+    if not isinstance(kosten, dict):
+        kosten = {}
+    v2 = engine_result.get("grid_calculation_v2") or {}
+    if not isinstance(v2, dict):
+        v2 = {}
+    persp = v2.get("projektierer_perspective") if isinstance(v2.get("projektierer_perspective"), dict) else None
     scope_meta = resolve_report_scope_meta(engine_result)
 
     nennspannung = float(eingabe.get("nennspannung", 20.0))
@@ -247,6 +321,28 @@ def build_vnb_report(engine_result: dict[str, Any]) -> dict[str, Any]:
         {"norm_id": n.norm_id, "titel": n.titel, "stand": n.stand, "kategorie": n.kategorie}
         for n in normen
     ]
+
+    generated_at_iso = (
+        str(revision.get("timestamp"))
+        if isinstance(revision, dict) and revision.get("timestamp")
+        else datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    )
+    cost_band = _build_cost_band(kosten)
+    connection_variants = _build_connection_variants(engine_result, eingabe, nennspannung)
+    risks_block = _build_risks(
+        engine_result,
+        fazit,
+        scores,
+        cost_band,
+        route_environment if isinstance(route_environment, dict) else {},
+    )
+    sources_block = _sources_from_engine(engine_result, retrieved_at=generated_at_iso)
+    location_meta = _build_location_meta(eingabe, persp)
+    score_int: int | None
+    try:
+        score_int = int(float(scores.get("gesamt"))) if scores.get("gesamt") is not None else None
+    except (TypeError, ValueError):
+        score_int = None
 
     dto = VnbReportDTO(
         report_type="vnb",
@@ -304,5 +400,17 @@ def build_vnb_report(engine_result: dict[str, Any]) -> dict[str, Any]:
         technical_review_table=build_vnb_technical_review_table(engine_result),
         signature_section=build_vnb_signature_section(),
         process_timeline=build_process_timeline_lines(engine_result),
+        gridcheck_score=score_int,
+        scores=dict(scores),
+        cost_band=cost_band,
+        connection_variants=connection_variants,
+        risks=risks_block,
+        sources=sources_block,
+        location_meta=location_meta,
+        sk_assumption_note=_vnb_sk_assumption_note(eingabe, n1),
+        conformity_hint=_vnb_conformity_hint(nennspannung),
     )
-    return asdict(dto)
+    report_dict = asdict(dto)
+    if generated_at_iso and not report_dict.get("report_generated_at"):
+        report_dict["report_generated_at"] = generated_at_iso
+    return report_dict
