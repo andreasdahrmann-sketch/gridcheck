@@ -12,6 +12,7 @@ from db.database import Base, get_db
 from db.models import AnalysisRun, AuditLog, Project, ProjectMember, ReportRevisionRecord, User, make_checksum
 from engine.revision import speichere_revision
 from main import app
+from services.auth_service import approve_netzbetreiber
 from tests.postgres_test_utils import build_isolated_postgres_session_factory
 
 
@@ -399,6 +400,8 @@ def test_legacy_stakeholder_route_requires_auth_role_and_persists_owner_guardrai
         )
         assert nb_register.status_code == 200, nb_register.text
         user_id = nb_register.json()["id"]
+        with _db_session(client) as db:
+            approve_netzbetreiber(db, user_id=user_id)
         nb_login = client.post(
             "/api/v1/auth/login",
             json={"email": "stakeholder-vnb@example.com", "password": "Passwort123!"},
@@ -834,7 +837,7 @@ def test_analyze_v2_investor_path_is_sanitized_server_side(monkeypatch):
 
         from api import analyze_v2 as analyze_v2_api
 
-        monkeypatch.setattr(analyze_v2_api, "run_v1_analysis", lambda payload: _rich_analysis_result())
+        monkeypatch.setattr(analyze_v2_api, "run_v1_analysis", lambda payload, **kwargs: _rich_analysis_result())
 
         response = client.post(
             "/api/v1/analyze",
@@ -942,7 +945,7 @@ def test_freemium_paywall_and_billing_catalog(monkeypatch):
             "empfehlungen": ["Weiter abstimmen"],
             "revision": {"hash": "a" * 64},
         }
-        monkeypatch.setattr(analyze_v2_api, "run_v1_analysis", lambda payload: fake_result)
+        monkeypatch.setattr(analyze_v2_api, "run_v1_analysis", lambda payload, **kwargs: fake_result)
 
         payload = {
             "nennspannung": 20,
@@ -1007,7 +1010,7 @@ def test_analyze_v2_is_rate_limited(monkeypatch):
         monkeypatch.setattr(
             analyze_v2_api,
             "run_v1_analysis",
-            lambda payload: {
+            lambda payload, **kwargs: {
                 "status": "OK",
                 "scores": {"gesamt": 81},
                 "fazit": {"entscheidung": "A"},

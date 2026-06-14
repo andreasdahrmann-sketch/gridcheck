@@ -1,6 +1,6 @@
 {
   "smard_dayahead_avg_30d": {
-    "value": "{\"price_eur_mwh\": 113.93, \"source\": \"SMARD.de (Bundesnetzagentur)\", \"timestamp\": 1781178445.722307}",
-    "ts": 1781178445.722307
+    "value": "{\"price_eur_mwh\": 110.63, \"source\": \"SMARD.de (Bundesnetzagentur)\", \"timestamp\": 1781183716.3449287}",
+    "ts": 1781183716.3449287
   }
 }

@@ -30,8 +30,11 @@ BASE_KEYS = [
 
 
 def _reset_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    # setenv("") statt delenv: verhindert, dass python-dotenv backend/.env
+    # nach delenv erneut injiziert. Empty-string ist im Codebase aequivalent
+    # zu absent (os.getenv("X", "").strip() or None).
     for key in BASE_KEYS:
-        monkeypatch.delenv(key, raising=False)
+        monkeypatch.setenv(key, "")
 
 
 def _set_base_env(monkeypatch: pytest.MonkeyPatch, *, app_env: str) -> None:

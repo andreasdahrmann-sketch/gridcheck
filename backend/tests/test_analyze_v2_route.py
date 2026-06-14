@@ -188,7 +188,7 @@ def test_analysis_run_compat_alias_matches_v1_analyze(monkeypatch: pytest.Monkey
     monkeypatch.setattr(
         analyze_v2_api,
         "run_v1_analysis",
-        lambda payload: {"status": "OK", "revision": {"hash": "a" * 64}},
+        lambda payload, **kwargs: {"status": "OK", "revision": {"hash": "a" * 64}},
     )
     monkeypatch.setattr(
         analyze_v2_api,

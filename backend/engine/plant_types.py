@@ -1,4 +1,4 @@
-"""
+﻿"""
 Plant-type configuration for Projektierer screening (authoritative, Pydantic v2).
 
 Frontend mirrors: frontend/lib/schemas/plant-types.ts
@@ -121,7 +121,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
         power_factor_range=PowerFactorRange(min=0.85, max=1.0),
         default_simultaneity_factor=0.85,
         simultaneity_note=(
-            "PV-Einspeiseprofil tagsüber — volle AC-Nennleistung nicht dauerhaft gleichzeitig am NVP."
+            "PV-Einspeiseprofil tagsÃ¼ber â€” volle AC-Nennleistung nicht dauerhaft gleichzeitig am NVP."
         ),
         reactive_power_capable=True,
         default_reactive_power_mode="fixed_cos_phi",
@@ -131,7 +131,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
             "VDE-AR-N 4110:2018-11",
             "VDE-AR-N 4120:2018-11",
         ),
-        feed_in_profile_note="Tagesgang / Sonneneinstrahlung — Einspeise nicht 24/7 auf Nennleistung.",
+        feed_in_profile_note="Tagesgang / Sonneneinstrahlung â€” Einspeise nicht 24/7 auf Nennleistung.",
         project_type="generation",
     ),
     PlantType.WIND: PlantTypeConfig(
@@ -141,7 +141,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
         power_factor_range=PowerFactorRange(min=0.85, max=1.0),
         default_simultaneity_factor=0.35,
         simultaneity_note=(
-            "Wind volatil — Gleichzeitigkeitsfaktor 0,35 für konservatives Lastfluss-Screening "
+            "Wind volatil â€” Gleichzeitigkeitsfaktor 0,35 fÃ¼r konservatives Lastfluss-Screening "
             "(kein Erzeugungsgarantie-Nachweis)."
         ),
         reactive_power_capable=True,
@@ -152,7 +152,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
             "VDE-AR-N 4110:2018-11",
             "VDE-AR-N 4120:2018-11",
         ),
-        feed_in_profile_note="Volatile Einspeise — volle Nennleistung selten gleichzeitig.",
+        feed_in_profile_note="Volatile Einspeise â€” volle Nennleistung selten gleichzeitig.",
         project_type="generation",
     ),
     PlantType.BESS: PlantTypeConfig(
@@ -162,7 +162,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
         power_factor_range=PowerFactorRange(min=0.9, max=1.0),
         default_simultaneity_factor=0.9,
         simultaneity_note=(
-            "Speicher betrieblich begrenzt — Gleichzeitigkeit hoch, aber nicht 1,0 ohne Fahrplan."
+            "Speicher betrieblich begrenzt â€” Gleichzeitigkeit hoch, aber nicht 1,0 ohne Fahrplan."
         ),
         reactive_power_capable=True,
         default_reactive_power_mode="bidirectional",
@@ -172,7 +172,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
             "VDE-AR-N 4110:2018-11",
             "VDE-AR-N 4120:2018-11",
         ),
-        feed_in_profile_note="Steuerbar / netzdienlich möglich — Q-Fähigkeit projektspezifisch.",
+        feed_in_profile_note="Steuerbar / netzdienlich mÃ¶glich â€” Q-FÃ¤higkeit projektspezifisch.",
         project_type="storage",
     ),
     PlantType.HYBRID_PV_BESS: PlantTypeConfig(
@@ -181,7 +181,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
         default_power_factor=0.98,
         power_factor_range=PowerFactorRange(min=0.9, max=1.0),
         default_simultaneity_factor=0.88,
-        simultaneity_note="Kombination Erzeugung und Speicher — konservativer Mittelwert für Screening.",
+        simultaneity_note="Kombination Erzeugung und Speicher â€” konservativer Mittelwert fÃ¼r Screening.",
         reactive_power_capable=True,
         default_reactive_power_mode="bidirectional",
         has_dc_side=True,
@@ -190,16 +190,16 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
             "VDE-AR-N 4110:2018-11",
             "VDE-AR-N 4120:2018-11",
         ),
-        feed_in_profile_note="PV-Tagesgang plus steuerbarer Speicher — VNB-Abstimmung zentral.",
+        feed_in_profile_note="PV-Tagesgang plus steuerbarer Speicher â€” VNB-Abstimmung zentral.",
         project_type="mixed",
     ),
     PlantType.CHP: PlantTypeConfig(
-        label="Kraft-Wärme-Kopplung",
+        label="Kraft-WÃ¤rme-Kopplung",
         label_en="Combined heat and power",
         default_power_factor=0.95,
         power_factor_range=PowerFactorRange(min=0.9, max=1.0),
         default_simultaneity_factor=0.9,
-        simultaneity_note="BHKW oft grundlastnah — Gleichzeitigkeit hoch, Wärmegeführter Betrieb beachten.",
+        simultaneity_note="BHKW oft grundlastnah â€” Gleichzeitigkeit hoch, WÃ¤rmegefÃ¼hrter Betrieb beachten.",
         reactive_power_capable=True,
         default_reactive_power_mode="fixed_cos_phi",
         has_dc_side=False,
@@ -208,7 +208,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
             "VDE-AR-N 4110:2018-11",
             "VDE-AR-N 4120:2018-11",
         ),
-        feed_in_profile_note="Grundlast-/Regelbetrieb — Einspeiseplan mit Wärmenutzung abstimmen.",
+        feed_in_profile_note="Grundlast-/Regelbetrieb â€” Einspeiseplan mit WÃ¤rmenutzung abstimmen.",
         project_type="generation",
     ),
     PlantType.HYDRO: PlantTypeConfig(
@@ -218,7 +218,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
         power_factor_range=PowerFactorRange(min=0.85, max=1.0),
         default_simultaneity_factor=0.8,
         simultaneity_note=(
-            "Laufwasser/reguliert unterschiedlich — Faktor 0,8 als konservatives Screening ohne Pegeldaten."
+            "Laufwasser/reguliert unterschiedlich â€” Faktor 0,8 als konservatives Screening ohne Pegeldaten."
         ),
         reactive_power_capable=True,
         default_reactive_power_mode="q_setpoint",
@@ -228,7 +228,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
             "VDE-AR-N 4110:2018-11",
             "VDE-AR-N 4120:2018-11",
         ),
-        feed_in_profile_note="Regelbar je nach Anlagentyp — Wasserrecht und VNB-Vorgaben maßgeblich.",
+        feed_in_profile_note="Regelbar je nach Anlagentyp â€” Wasserrecht und VNB-Vorgaben maÃŸgeblich.",
         project_type="generation",
     ),
     PlantType.CONSUMPTION: PlantTypeConfig(
@@ -237,7 +237,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
         default_power_factor=0.95,
         power_factor_range=PowerFactorRange(min=0.85, max=1.0),
         default_simultaneity_factor=1.0,
-        simultaneity_note="Verbraucheranschluss — Gleichzeitigkeit 1,0 für Einzelanschluss-Screening.",
+        simultaneity_note="Verbraucheranschluss â€” Gleichzeitigkeit 1,0 fÃ¼r Einzelanschluss-Screening.",
         reactive_power_capable=False,
         default_reactive_power_mode="fixed_cos_phi",
         has_dc_side=False,
@@ -246,7 +246,7 @@ PLANT_TYPE_CONFIG: dict[PlantType, PlantTypeConfig] = {
             "VDE-AR-N 4110:2018-11",
             "VDE-AR-N 4120:2018-11",
         ),
-        feed_in_profile_note="Bezugslast — kein EEG-Einspeisemanagement.",
+        feed_in_profile_note="Bezugslast â€” kein EEG-Einspeisemanagement.",
         project_type="consumption",
     ),
 }
@@ -405,14 +405,16 @@ def resolve_plant_context(
 
     cos_known = eingabe.get("cos_phi_known")
     if (
-        cos_known is True
-        and explicit_pf is not None
+        explicit_pf is not None
         and pf_range.min <= explicit_pf <= pf_range.max
+        and cos_known is not False
     ):
         power_factor = explicit_pf
         pf_source: PowerFactorSource = "nutzer"
     else:
         power_factor = config.default_power_factor
+        if plant_type == PlantType.PV and str(eingabe.get("anschlussart") or "").strip().lower() == "einspeisung":
+            power_factor = 1.0
         pf_source = "plant_default"
 
     simultaneity = config.default_simultaneity_factor

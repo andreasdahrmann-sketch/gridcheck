@@ -1,4 +1,4 @@
-﻿"""
+"""
 Gemeinsame Test-Fixtures fuer GridCheck Engine.
 """
 import os
@@ -69,6 +69,18 @@ def _reset_fastapi_dependency_overrides():
     app.dependency_overrides.pop(get_db, None)
     yield
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit_state_per_test():
+    """In-Memory Rate-Limit-Buckets (User- und IP-Bucket) vor jedem Test leeren.
+    setup_function greift nur modul-intern; ohne diesen Reset leakt der
+    IP-Counter (TestClient hat eine stabile Client-IP) ueber Modulgrenzen.
+    """
+    from core import rate_limit as rate_limit_mod
+    rate_limit_mod._MEM_BUCKETS.clear()
+    rate_limit_mod._REDIS_CLIENT = None
+    yield
 
 
 @pytest.fixture(autouse=True)

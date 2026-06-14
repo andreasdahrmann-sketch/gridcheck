@@ -1,4 +1,4 @@
-﻿# C:\Users\andre\gridcheck\backend\api\stakeholders.py
+# C:\Users\andre\gridcheck\backend\api\stakeholders.py
 # Stakeholder-spezifische Endpoints (Endkunde / Projektierer / Netzbetreiber)
 # Nutzt intern berechne_netzcheck wie /api/analyze, liefert aber zielgruppen-
 # gerechte Inputs und Outputs.

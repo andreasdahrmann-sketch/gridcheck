@@ -9,6 +9,9 @@ export type AuthUser = {
   vnb_verification_status?: "none" | "pending" | "approved";
   netzbetreiber_verified?: boolean;
   vnb_dashboard_access?: boolean;
+  // Backend liefert is_admin als read-only Spiegel von role==='admin'.
+  // Enforcement bleibt strikt serverseitig; Frontend nutzt das Flag nur fuer Sichtbarkeit.
+  is_admin?: boolean;
 };
 
 type TokenResponse = {

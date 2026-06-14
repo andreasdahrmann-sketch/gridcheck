@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
@@ -100,7 +100,7 @@ def test_basic_package_strips_premium_only_inputs(monkeypatch):
 
         from api import analyze_v2 as analyze_v2_api
 
-        def fake_run(payload: dict) -> dict:
+        def fake_run(payload: dict, **kwargs) -> dict:
             seen_payload.clear()
             seen_payload.update(payload)
             return {
@@ -474,7 +474,7 @@ def test_past_due_keeps_oneoff_credits_usable(monkeypatch):
         fake_settings = replace(billing_service.settings, stripe_secret_key="sk_test", free_checks_limit=0)
         monkeypatch.setattr(billing_service, "settings", fake_settings)
 
-        def fake_run(payload: dict) -> dict:
+        def fake_run(payload: dict, **kwargs) -> dict:
             seen_payload.clear()
             seen_payload.update(payload)
             return {
@@ -931,7 +931,7 @@ def test_report_scope_differs_between_basic_and_premium(monkeypatch):
         from api import v2_reports as reports_api
         from engine.revision import speichere_revision
 
-        def fake_run(payload: dict) -> dict:
+        def fake_run(payload: dict, **kwargs) -> dict:
             result = {
                 "status": "OK",
                 "eingabe": payload,

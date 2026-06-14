@@ -486,6 +486,370 @@ def _build_kpi_status_table(
     )
 
 
+_RISK_LEVEL_LABELS = {
+    "low": ("Niedrig", "GRUEN"),
+    "medium": ("Mittel", "GELB"),
+    "high": ("Hoch", "ROT"),
+    "critical": ("Kritisch", "ROT"),
+    "unknown": ("Unbekannt", "OFFEN"),
+}
+
+
+def _confidence_label(value: Any) -> str:
+    token = str(value or "").strip().lower()
+    return {"low": "niedrig", "medium": "mittel", "high": "hoch"}.get(token, token or "—")
+
+
+def _projektierer_score_hero(
+    palette: StakeholderPalette, report: dict[str, Any], *, doc_width: float
+) -> Table:
+    """Kompakter Hero-Block fuer den Projektierer-Report (Score-Zahl + Verdict-Badge).
+
+    Stilistisch an _invest_hero angelehnt, aber kleinere Schrift / kompakter
+    fuer den technischen Bericht.
+    """
+    score: int | None = None
+    if report.get("gridcheck_score") is not None:
+        try:
+            score = int(report["gridcheck_score"])
+        except (TypeError, ValueError):
+            score = None
+    if score is None:
+        scores = report.get("scores")
+        if isinstance(scores, dict):
+            try:
+                score = int(float(scores.get("gesamt", 0)))
+            except (TypeError, ValueError):
+                score = None
+    score_text = f"{score}/100" if score is not None else "—/100"
+
+    decision = str(report.get("entscheidung") or "C").strip().upper() or "C"
+    label, severity, _msg = _DECISION_BADGES.get(decision, _DECISION_BADGES["C"])
+
+    big = ParagraphStyle(
+        "p_score_big",
+        fontName=FONT_BOLD,
+        fontSize=34,
+        textColor=colors.HexColor(palette.primary),
+        leading=38,
+        alignment=0,
+    )
+    label_style = ParagraphStyle(
+        "p_score_label",
+        fontName=FONT_REGULAR,
+        fontSize=9,
+        textColor=colors.HexColor(palette.text_muted),
+        leading=11,
+    )
+    headline_style = ParagraphStyle(
+        "p_score_head",
+        fontName=FONT_BOLD,
+        fontSize=14,
+        textColor=colors.HexColor(palette.primary_dark),
+        leading=18,
+    )
+    badge_color = (
+        palette.pass_color
+        if severity == "pass"
+        else palette.warn_color
+        if severity == "warn"
+        else palette.fail_color
+    )
+    badge_style = ParagraphStyle(
+        "p_score_badge",
+        fontName=FONT_BOLD,
+        fontSize=10,
+        textColor=colors.HexColor(badge_color),
+        leading=13,
+    )
+    sub_style = ParagraphStyle(
+        "p_score_sub",
+        fontName=FONT_REGULAR,
+        fontSize=9,
+        textColor=colors.HexColor(palette.text),
+        leading=12,
+    )
+
+    left = Table(
+        [
+            [Paragraph("GridCheck-Score (0–100)", label_style)],
+            [Paragraph(score_text, big)],
+            [Paragraph(f"Entscheidung: {decision}", label_style)],
+        ],
+        colWidths=[doc_width * 0.36],
+    )
+    left.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(palette.zebra)),
+                ("LINEAFTER", (-1, 0), (-1, -1), 1.0, colors.HexColor(palette.primary)),
+            ]
+        )
+    )
+
+    headline_text = _safe(report.get("standort"), default="Projektstandort")
+    plz = _safe(report.get("plz"))
+    if plz != "—":
+        headline_text = f"{headline_text} (PLZ {plz})"
+    sub_lines = [_safe(report.get("scope_summary"), default=label)]
+    rec_focus = _safe(report.get("recommended_focus"), default="")
+    if rec_focus and rec_focus != "—":
+        sub_lines.append(rec_focus)
+
+    right_rows: list[list[Any]] = [
+        [Paragraph(headline_text, headline_style)],
+        [Paragraph(label, badge_style)],
+    ]
+    for line in sub_lines:
+        right_rows.append([Paragraph(line, sub_style)])
+
+    right = Table(right_rows, colWidths=[doc_width * 0.64])
+    right.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ]
+        )
+    )
+
+    hero = Table([[left, right]], colWidths=[doc_width * 0.36, doc_width * 0.64])
+    hero.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor(palette.border)),
+            ]
+        )
+    )
+    return hero
+
+
+def _projektierer_location_rows(report: dict[str, Any]) -> list[tuple[str, Any]]:
+    meta = report.get("location_meta") if isinstance(report.get("location_meta"), dict) else {}
+    persp = _persp(report) or {}
+    plz = _safe(report.get("plz") or meta.get("plz"))
+    standort = _safe(report.get("standort") or meta.get("ort"))
+    bundesland = _safe(meta.get("bundesland"))
+    lat = meta.get("latitude")
+    lon = meta.get("longitude")
+    if lat is not None and lon is not None:
+        try:
+            koord = f"{float(lat):.4f}, {float(lon):.4f}"
+        except (TypeError, ValueError):
+            koord = "—"
+    else:
+        koord = "—"
+    rec_v = meta.get("recommended_voltage_level")
+    if not rec_v:
+        nvp = persp.get("nvp_recommendation") if isinstance(persp.get("nvp_recommendation"), dict) else {}
+        rec_v = nvp.get("suggested_voltage_level") if isinstance(nvp, dict) else None
+    return [
+        ("Standort", standort),
+        ("PLZ", plz),
+        ("Bundesland", bundesland if bundesland != "—" else "—"),
+        ("Koordinaten (lat, lon)", koord),
+        ("Empfohlene Spannungsebene", _voltage_label(rec_v) if rec_v else "—"),
+        ("VNB-Gebiet", _safe(meta.get("vnb_gebiet"))),
+        ("Naehester Knoten", _safe(meta.get("nearest_node_hint"))),
+    ]
+
+
+def _projektierer_connection_variants_table(
+    palette: StakeholderPalette, report: dict[str, Any], *, doc_width: float
+) -> Table:
+    raw = report.get("connection_variants")
+    rows: list[list[Any]] = []
+    if isinstance(raw, list):
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            label = _safe(entry.get("label"))
+            voltage = _safe(entry.get("voltage_label"))
+            distance = _fmt_num(entry.get("distance_km"), digits=2, suffix=" km")
+            confidence = _confidence_label(entry.get("confidence"))
+            cost_label, cost_status = _RISK_LEVEL_LABELS.get(
+                str(entry.get("cost_risk") or "unknown").lower(),
+                _RISK_LEVEL_LABELS["unknown"],
+            )
+            route_label, route_status = _RISK_LEVEL_LABELS.get(
+                str(entry.get("route_risk") or "unknown").lower(),
+                _RISK_LEVEL_LABELS["unknown"],
+            )
+            comment = _safe(entry.get("comment"))
+            rows.append(
+                [
+                    label,
+                    voltage,
+                    distance,
+                    confidence,
+                    status_badge_paragraph(palette, cost_status) if cost_status else cost_label,
+                    status_badge_paragraph(palette, route_status) if route_status else route_label,
+                    comment,
+                ]
+            )
+    if not rows:
+        rows.append(
+            [
+                "—",
+                "—",
+                "—",
+                "—",
+                status_badge_paragraph(palette, "OFFEN"),
+                status_badge_paragraph(palette, "OFFEN"),
+                "1 Kandidat verfuegbar — OSM-/Asset-Pipeline liefert spaeter weitere Varianten.",
+            ]
+        )
+    return alt_table(
+        palette,
+        ["Variante", "Spannung", "Distanz", "Confidence", "Kostenrisiko", "Trassenrisiko", "Bemerkung"],
+        rows,
+        col_widths=[
+            doc_width * 0.18,
+            doc_width * 0.12,
+            doc_width * 0.10,
+            doc_width * 0.10,
+            doc_width * 0.13,
+            doc_width * 0.13,
+            doc_width * 0.24,
+        ],
+    )
+
+
+def _projektierer_risk_table(
+    palette: StakeholderPalette, report: dict[str, Any], *, doc_width: float
+) -> Table:
+    risks = report.get("risks") if isinstance(report.get("risks"), dict) else {}
+    rows: list[list[Any]] = []
+    keys: list[tuple[str, str]] = [
+        ("overall", "Gesamtrisiko"),
+        ("grid", "Netzanschluss-Risiko"),
+        ("route", "Trassenrisiko"),
+        ("cost", "Kostenrisiko"),
+        ("timeline", "Terminrisiko"),
+        ("data_quality", "Datenqualitaet"),
+    ]
+    for key, label in keys:
+        level = str(risks.get(key) or "unknown").lower()
+        de_label, status = _RISK_LEVEL_LABELS.get(level, _RISK_LEVEL_LABELS["unknown"])
+        rows.append([label, de_label, status_badge_paragraph(palette, status)])
+    return alt_table(
+        palette,
+        ["Risiko-Dimension", "Stufe", "Status"],
+        rows,
+        col_widths=[doc_width * 0.45, doc_width * 0.25, doc_width * 0.30],
+    )
+
+
+def _projektierer_cost_band_blocks(
+    palette: StakeholderPalette, report: dict[str, Any], *, doc_width: float
+) -> list[Any]:
+    band = report.get("cost_band") if isinstance(report.get("cost_band"), dict) else None
+    if not band:
+        return [p(
+            "Keine belastbare Kostenbandbreite aus der Engine — bitte Detail-Pruefung anstossen.",
+            body_style(palette),
+        )]
+    blocks: list[Any] = []
+    rows: list[list[Any]] = [
+        ["Niedrig", _fmt_eur(band.get("niedrig_eur"))],
+        ["Basis", _fmt_eur(band.get("basis_eur"))],
+        ["Hoch", _fmt_eur(band.get("hoch_eur"))],
+    ]
+    blocks.append(
+        alt_table(
+            palette,
+            ["Bandbreite", "Wert (EUR)"],
+            rows,
+            col_widths=[doc_width * 0.40, doc_width * 0.60],
+        )
+    )
+    blocks.append(Spacer(1, 2 * mm))
+    items = band.get("items") if isinstance(band.get("items"), list) else []
+    if items:
+        item_rows: list[list[Any]] = []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            item_rows.append(
+                [
+                    _safe(it.get("label")),
+                    _fmt_eur(it.get("low")),
+                    _fmt_eur(it.get("base")),
+                    _fmt_eur(it.get("high")),
+                    _confidence_label(it.get("confidence")),
+                ]
+            )
+        if item_rows:
+            blocks.append(p_html("<b>Kostenpositionen</b>", body_bold_style(palette)))
+            blocks.append(
+                alt_table(
+                    palette,
+                    ["Position", "Niedrig", "Basis", "Hoch", "Confidence"],
+                    item_rows,
+                    col_widths=[
+                        doc_width * 0.34,
+                        doc_width * 0.16,
+                        doc_width * 0.16,
+                        doc_width * 0.16,
+                        doc_width * 0.18,
+                    ],
+                )
+            )
+            blocks.append(Spacer(1, 2 * mm))
+    drivers = band.get("main_drivers") if isinstance(band.get("main_drivers"), list) else []
+    if drivers:
+        blocks.append(p_html("<b>Hauptkostentreiber</b>", body_bold_style(palette)))
+        blocks.extend(bulleted_block(palette, [str(d) for d in drivers]))
+    return blocks
+
+
+def _projektierer_sources_table(
+    palette: StakeholderPalette, report: dict[str, Any], *, doc_width: float
+) -> Table:
+    sources = report.get("sources") if isinstance(report.get("sources"), list) else []
+    rows: list[list[Any]] = []
+    for entry in sources:
+        if not isinstance(entry, dict):
+            continue
+        retrieved = str(entry.get("retrievedAt") or "").split("T", 1)[0]
+        rows.append(
+            [
+                _safe(entry.get("sourceName")),
+                _safe(entry.get("sourceType")),
+                retrieved or "—",
+                _safe(entry.get("license"), default="—"),
+                _confidence_label(entry.get("confidence")),
+            ]
+        )
+    if not rows:
+        rows.append(["—", "—", "—", "—", "—"])
+    return alt_table(
+        palette,
+        ["Quelle", "Typ", "Stand", "Lizenz", "Confidence"],
+        rows,
+        col_widths=[
+            doc_width * 0.30,
+            doc_width * 0.20,
+            doc_width * 0.16,
+            doc_width * 0.16,
+            doc_width * 0.18,
+        ],
+    )
+
+
 def _projektierer_assumptions(report: dict[str, Any]) -> list[tuple[str, str]]:
     persp = _persp(report) or {}
     cos_phi = persp.get("cos_phi") or persp.get("power_factor")
@@ -517,9 +881,29 @@ def _build_projektierer_story(
     report_id: str,
     full_hash: str,
 ) -> list[Any]:
+    """Projektierer-Story (P1/P2/P3-Sektionen).
+
+    Reihenfolge: Score-Hero → Standort/Netzumfeld → Kurz-Cover/Decision →
+    Technische KPI → Anschlussvarianten → Risiko-Block → Kostenbandbreite →
+    Annahmen/Empfehlungen/Auflagen → Datenquellen → Disclaimer.
+    """
     story: list[Any] = []
     body = body_style(palette)
 
+    # 1. Score-Hero (P1) — kompakt analog zu _invest_hero.
+    story.append(_projektierer_score_hero(palette, report, doc_width=doc_width))
+    story.append(Spacer(1, 4 * mm))
+
+    # 2. Standort / Netzumfeld (P2). Fehlende Felder werden sichtbar als "—" markiert.
+    story.extend(
+        section(
+            palette,
+            "Standort & Netzumfeld",
+            [kv_table(palette, _projektierer_location_rows(report), doc_width=doc_width, boxed=True)],
+        )
+    )
+
+    # Cover-Block (Projekt-Eckdaten) bleibt, ist aber jetzt nach Hero+Standort.
     story.extend(_projektierer_cover(palette, report, report_id=report_id, doc_width=doc_width))
 
     headline, severity, msg = _decision_summary(report)
@@ -532,8 +916,9 @@ def _build_projektierer_story(
             doc_width=doc_width,
         )
     )
-    story.append(Spacer(1, 4 * mm))
+    story.append(Spacer(1, 3 * mm))
 
+    # 4. Technische KPI-Tabelle (bleibt).
     story.extend(
         section(
             palette,
@@ -543,6 +928,37 @@ def _build_projektierer_story(
     )
     story.append(Spacer(1, 3 * mm))
 
+    # 5. Anschlussvarianten (P2) — Pflicht-Sektion, Layout fuer N>=2 Kandidaten.
+    story.extend(
+        section(
+            palette,
+            "Anschlussvarianten",
+            [_projektierer_connection_variants_table(palette, report, doc_width=doc_width)],
+        )
+    )
+    story.append(Spacer(1, 3 * mm))
+
+    # 6. Risiko-Block (P1) — kompakte Status-Tabelle.
+    story.extend(
+        section(
+            palette,
+            "Risiko-Block (Gesamt / Netz / Trasse / Kosten / Termin / Datenqualitaet)",
+            [_projektierer_risk_table(palette, report, doc_width=doc_width)],
+        )
+    )
+    story.append(Spacer(1, 3 * mm))
+
+    # 7. Kostenbandbreite (P1) — Niedrig/Basis/Hoch + costItems + Hauptkostentreiber.
+    story.extend(
+        section(
+            palette,
+            "Kostenbandbreite (Niedrig / Basis / Hoch)",
+            _projektierer_cost_band_blocks(palette, report, doc_width=doc_width),
+        )
+    )
+    story.append(Spacer(1, 3 * mm))
+
+    # Annahmen + Anlagenkontext + EEG + Zeitplan + NVP (bleibt strukturell, aber spaeter).
     story.extend(
         section(
             palette,
@@ -615,6 +1031,7 @@ def _build_projektierer_story(
         )
     )
 
+    # 8. Empfehlungen + Auflagen (bleibt).
     story.extend(
         section(
             palette,
@@ -672,6 +1089,16 @@ def _build_projektierer_story(
             )
         )
 
+    # 9. Datenquellen-Block (P2). Tabelle mit Quelle/Typ/Stand/Lizenz/Confidence.
+    story.extend(
+        section(
+            palette,
+            "Datenquellen",
+            [_projektierer_sources_table(palette, report, doc_width=doc_width)],
+        )
+    )
+
+    # 10. Disclaimer + Audit-Footer (bleibt).
     story.append(Spacer(1, 3 * mm))
     story.append(_disclaimer_paragraph(palette))
     return story

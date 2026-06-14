@@ -391,9 +391,63 @@ def _grid_pressure_indicators(engine_result: dict[str, Any]) -> list[dict[str, A
     return out
 
 
+_RISK_LITERALS = {"low", "medium", "high", "critical", "unknown"}
+_CONFIDENCE_LITERALS = {"low", "medium", "high"}
+
+
+def _norm_risk(value: Any, *, default: str = "unknown") -> str:
+    token = str(value or "").strip().lower()
+    if token in _RISK_LITERALS:
+        return token
+    return _de_risk_to_en(token) if token else default
+
+
+def _norm_confidence(value: Any, *, default: str = "medium") -> str:
+    token = str(value or "").strip().lower()
+    if token in _CONFIDENCE_LITERALS:
+        return token
+    return default
+
+
 def _connection_candidates(
-    eingabe: dict[str, Any], u_kv: float
+    engine_result: dict[str, Any], eingabe: dict[str, Any], u_kv: float
 ) -> list[dict[str, Any]]:
+    """Liefert Anschlusskandidaten fuer das kanonische Report-JSON.
+
+    Bevorzugt explizite Liste aus engine_result['connection_variants']
+    (ETL/OSM-Pipeline). Fallback: ein heuristischer Modell-Kandidat aus den
+    Eingaben. Layout muss N>=2 Kandidaten sauber rendern.
+    """
+    raw = engine_result.get("connection_variants")
+    out: list[dict[str, Any]] = []
+    if isinstance(raw, list):
+        for idx, entry in enumerate(raw, start=1):
+            if not isinstance(entry, dict):
+                continue
+            vl = entry.get("voltageLevel") or entry.get("voltage_level")
+            if not vl:
+                vl_kv = _f(entry.get("voltage_kv"), u_kv)
+                vl = _voltage_level_from_kv(vl_kv)
+            asset_type = str(entry.get("assetType") or entry.get("asset_type") or "line")
+            if asset_type not in ("line", "substation", "switchgear", "transformer", "unknown"):
+                asset_type = "unknown"
+            out.append(
+                {
+                    "candidateId": str(entry.get("candidateId") or entry.get("id") or f"variant-{idx}"),
+                    "label": str(entry.get("label") or f"Variante {idx}"),
+                    "assetType": asset_type,
+                    "voltageLevel": str(vl),
+                    "distanceKm": round(_f(entry.get("distanceKm") or entry.get("distance_km"), 0.0), 3),
+                    "confidence": _norm_confidence(entry.get("confidence")),
+                    "technicalFitScore": int(_f(entry.get("technicalFitScore") or entry.get("technical_fit_score"), 50)),
+                    "costRisk": _norm_risk(entry.get("costRisk") or entry.get("cost_risk")),
+                    "routeRisk": _norm_risk(entry.get("routeRisk") or entry.get("route_risk")),
+                    "comment": str(entry.get("comment") or ""),
+                }
+            )
+    if out:
+        return out
+
     dist = _f(eingabe.get("entfernung_km"), 1.0)
     vl = _voltage_level_from_kv(u_kv)
     return [
@@ -682,7 +736,7 @@ def build_gridcheck_report_data_from_engine_result(
         "grid": {
             "recommendedVoltageLevel": _voltage_level_from_kv(u_kv),
             "recommendedConnectionType": _s(eingabe.get("anschlussart"), "Einspeisung"),
-            "candidateConnectionPoints": _connection_candidates(eingabe, u_kv),
+            "candidateConnectionPoints": _connection_candidates(engine_result, eingabe, u_kv),
             "n1Screening": _n1_screening(n1),
             "gridPressureIndicators": _grid_pressure_indicators(engine_result),
         },

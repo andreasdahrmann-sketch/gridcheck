@@ -97,8 +97,19 @@ export function Header() {
     }
   }
 
+  const isAdmin = user?.role === "admin"
+
   return (
     <header className="safe-area-top sticky top-0 z-40 border-b border-border bg-bg/80 backdrop-blur">
+      {isAdmin ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="border-b border-amber-500/30 bg-amber-500/15 px-4 py-1.5 text-center text-xs font-medium text-amber-100"
+        >
+          Admin-Modus aktiv &mdash; Aktionen werden nicht abgerechnet (interne Tests).
+        </div>
+      ) : null}
       <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <Link href="/" className="shrink-0">
           <Logo />

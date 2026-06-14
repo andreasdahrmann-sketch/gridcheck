@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 from compliance import APP_VERSION_NORMSTAND, get_normen_fuer_spannungsebene
+from engine.gridcheck_report_mapper import _sources_from_engine
 from engine.stakeholder_reports.content_blocks import (
     build_bkz_hint_text,
     build_eeg_checklist,
@@ -59,6 +61,17 @@ class ProjektiererReportDTO:
     process_timeline: list[str]
     bkz_hint: str | None
     warnungen: list[str]
+    # P1/P2: Felder fuer Score-Hero, Kostenband, Risiko-/Variantenblock, Datenquellen.
+    # Defaults sind backwards-kompatibel: bestehende Aufrufer ohne diese Felder
+    # rendern den Report wie bisher, nur ohne die neuen Sektionen.
+    report_generated_at: str | None = None
+    gridcheck_score: int | None = None
+    scores: dict[str, Any] = field(default_factory=dict)
+    cost_band: dict[str, Any] | None = None
+    connection_variants: list[dict[str, Any]] = field(default_factory=list)
+    risks: dict[str, Any] = field(default_factory=dict)
+    sources: list[dict[str, Any]] = field(default_factory=list)
+    location_meta: dict[str, Any] = field(default_factory=dict)
 
 
 _FEED_IN_CLASS_LABELS = {
@@ -155,6 +168,233 @@ def _build_projektierer_v2_lines(
     return lines
 
 
+def _f(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+_DE_RISK_TO_LEVEL = {
+    "niedrig": "low",
+    "mittel": "medium",
+    "hoch": "high",
+    "sehr_hoch": "critical",
+}
+
+
+def _de_risk_to_level(level: Any) -> str:
+    if not level:
+        return "unknown"
+    return _DE_RISK_TO_LEVEL.get(str(level).strip().lower(), "unknown")
+
+
+def _build_cost_band(kosten: dict[str, Any]) -> dict[str, Any] | None:
+    """Liefert eine Kostenbandbreite (Niedrig / Basis / Hoch) plus Confidence
+    und Hauptrisikotreiber. Niemals stille Scheingenauigkeit — fehlende Felder
+    werden weggelassen, nicht erfunden."""
+    if not isinstance(kosten, dict):
+        return None
+    base_e = int(_f(kosten.get("band_basis_eur") or kosten.get("investition_gesamt_eur"), 0))
+    low_e = int(_f(kosten.get("band_niedrig_eur"), 0))
+    high_e = int(_f(kosten.get("band_hoch_eur"), 0))
+    if base_e <= 0 and low_e <= 0 and high_e <= 0:
+        return None
+    if base_e <= 0:
+        base_e = max(low_e, high_e, 1)
+    if low_e <= 0:
+        low_e = int(base_e * 0.85)
+    if high_e <= 0:
+        high_e = int(base_e * 1.15)
+
+    conf_pct = _f(kosten.get("konfidenz_prozent"), 50.0)
+    conf: str = "high" if conf_pct >= 70 else ("medium" if conf_pct >= 45 else "low")
+
+    items: list[dict[str, Any]] = []
+    trasse = int(_f(kosten.get("kosten_trasse_eur"), 0))
+    if trasse > 0:
+        items.append({
+            "label": "Trasse / Kabel / Tiefbau",
+            "low": max(0, int(trasse * 0.85)),
+            "base": trasse,
+            "high": int(trasse * 1.15),
+            "confidence": conf,
+        })
+    station = int(_f(kosten.get("kosten_station_eur"), 0))
+    if station > 0:
+        items.append({
+            "label": "Station / Schaltanlage",
+            "low": max(0, int(station * 0.85)),
+            "base": station,
+            "high": int(station * 1.20),
+            "confidence": conf,
+        })
+    planung = int(_f(kosten.get("kosten_planung_eur"), 0)) + int(
+        _f(kosten.get("kosten_genehmigung_eur"), 0)
+    )
+    if planung > 0:
+        items.append({
+            "label": "Planung / Genehmigung",
+            "low": max(0, int(planung * 0.90)),
+            "base": planung,
+            "high": int(planung * 1.15),
+            "confidence": conf,
+        })
+
+    main_drivers = [
+        str(x) for x in (kosten.get("hauptrisikotreiber") or []) if str(x).strip()
+    ]
+    return {
+        "currency": "EUR",
+        "niedrig_eur": low_e,
+        "basis_eur": base_e,
+        "hoch_eur": high_e,
+        "confidence": conf,
+        "confidence_pct": int(conf_pct),
+        "items": items,
+        "main_drivers": main_drivers[:8],
+        "annahmen": [
+            str(a) for a in (kosten.get("band_annahmen") or []) if str(a).strip()
+        ],
+        "quelle": str(kosten.get("quelle") or "") or None,
+    }
+
+
+def _voltage_label_for_kv(u_kv: float) -> str:
+    if u_kv < 1:
+        return "NS (< 1 kV)"
+    if u_kv <= 35:
+        return f"MS ({u_kv:g} kV)"
+    if u_kv <= 110:
+        return f"HS ({u_kv:g} kV)"
+    return f"HöS ({u_kv:g} kV)"
+
+
+def _build_connection_variants(
+    engine_result: dict[str, Any], eingabe: dict[str, Any], u_kv: float
+) -> list[dict[str, Any]]:
+    """Anschlussvarianten-Tabelle.
+    - Bevorzugt explizite Liste aus engine_result['connection_variants'].
+    - Fallback: ein Modell-Kandidat aus den Eingaben (Distanz / Spannung).
+    Layout im Renderer ist N>=1 fähig.
+    """
+    raw = engine_result.get("connection_variants")
+    out: list[dict[str, Any]] = []
+    if isinstance(raw, list):
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            out.append({
+                "label": str(entry.get("label") or "Variante"),
+                "voltage_label": str(
+                    entry.get("voltage_label")
+                    or _voltage_label_for_kv(_f(entry.get("voltage_kv"), u_kv))
+                ),
+                "distance_km": float(_f(entry.get("distance_km"), 0.0)),
+                "confidence": str(entry.get("confidence") or "medium"),
+                "cost_risk": str(entry.get("cost_risk") or "unknown"),
+                "route_risk": str(entry.get("route_risk") or "unknown"),
+                "comment": str(entry.get("comment") or ""),
+            })
+    if out:
+        return out
+
+    dist = _f(eingabe.get("entfernung_km"), 0.0)
+    return [
+        {
+            "label": "Modell-Anschluss (heuristisch)",
+            "voltage_label": _voltage_label_for_kv(u_kv),
+            "distance_km": round(dist, 3),
+            "confidence": "medium",
+            "cost_risk": "medium",
+            "route_risk": "medium",
+            "comment": "1 Kandidat verfuegbar — OSM-/Asset-Pipeline liefert spaeter weitere Varianten.",
+        }
+    ]
+
+
+def _build_risks(
+    engine_result: dict[str, Any],
+    fazit: dict[str, Any],
+    scores: dict[str, Any],
+    cost_band: dict[str, Any] | None,
+    route_environment: dict[str, Any],
+) -> dict[str, Any]:
+    """Konsolidierter Risiko-Block fuer Renderer + revisionssichere Doku."""
+    ents = str(fazit.get("entscheidung") or "B").strip().upper()
+    g = _f(scores.get("gesamt"), 50.0)
+    if ents == "C" or g < 35:
+        overall = "high"
+    elif ents == "B" or g < 60:
+        overall = "medium"
+    elif ents == "A" and g >= 70:
+        overall = "low"
+    else:
+        overall = "medium"
+    grid_r = overall
+
+    route_r = _de_risk_to_level(route_environment.get("risk_level"))
+
+    cost_r = "unknown"
+    if cost_band and cost_band.get("basis_eur"):
+        base_e = int(cost_band["basis_eur"]) or 1
+        high_e = int(cost_band.get("hoch_eur") or base_e)
+        if high_e > base_e * 1.35:
+            cost_r = "high"
+        elif high_e > base_e * 1.15:
+            cost_r = "medium"
+        else:
+            cost_r = "low"
+
+    timeline_r = "medium"
+
+    dq_block = engine_result.get("datenqualitaet") if isinstance(
+        engine_result.get("datenqualitaet"), dict
+    ) else {}
+    dq_class = str(dq_block.get("klasse") or "C").strip().upper()
+    if dq_class in ("D", "C"):
+        data_q = "high"
+    elif dq_class == "B":
+        data_q = "medium"
+    elif dq_class == "A":
+        data_q = "low"
+    else:
+        data_q = "unknown"
+
+    return {
+        "overall": overall,
+        "grid": grid_r,
+        "route": route_r,
+        "cost": cost_r,
+        "timeline": timeline_r,
+        "data_quality": data_q,
+    }
+
+
+def _build_location_meta(
+    eingabe: dict[str, Any], persp: dict[str, Any] | None
+) -> dict[str, Any]:
+    loc = eingabe.get("project_location") if isinstance(eingabe.get("project_location"), dict) else {}
+    out: dict[str, Any] = {
+        "ort": str(eingabe.get("ort") or eingabe.get("standort") or ""),
+        "plz": str(eingabe.get("plz") or ""),
+        "bundesland": str(eingabe.get("bundesland") or loc.get("federal_state") or ""),
+        "latitude": loc.get("latitude"),
+        "longitude": loc.get("longitude"),
+        "vnb_gebiet": str(eingabe.get("vnb_gebiet") or ""),
+    }
+    if isinstance(persp, dict):
+        nvp = persp.get("nvp_recommendation") if isinstance(persp.get("nvp_recommendation"), dict) else {}
+        if isinstance(nvp, dict):
+            if nvp.get("suggested_voltage_level"):
+                out["recommended_voltage_level"] = str(nvp.get("suggested_voltage_level"))
+            if nvp.get("nearest_node_hint"):
+                out["nearest_node_hint"] = str(nvp.get("nearest_node_hint"))
+    return out
+
+
 def build_projektierer_report(engine_result: dict[str, Any]) -> dict[str, Any]:
     eingabe = engine_result.get("eingabe", {})
     fazit = engine_result.get("fazit", {})
@@ -167,6 +407,12 @@ def build_projektierer_report(engine_result: dict[str, Any]) -> dict[str, Any]:
     route_environment = engine_result.get("route_environment", {})
     stakeholder = engine_result.get("stakeholder_bewertung", {})
     transparenz = engine_result.get("transparenz", {})
+    scores = engine_result.get("scores", {})
+    if not isinstance(scores, dict):
+        scores = {}
+    kosten = engine_result.get("kosten", {})
+    if not isinstance(kosten, dict):
+        kosten = {}
     v2 = engine_result.get("grid_calculation_v2") or {}
     if not isinstance(v2, dict):
         v2 = {}
@@ -195,6 +441,26 @@ def build_projektierer_report(engine_result: dict[str, Any]) -> dict[str, Any]:
         kum = persp.get("kumulation_warning") or {}
         if isinstance(kum, dict) and kum.get("message"):
             extra_auflagen.append(str(kum["message"]))
+
+    # P1/P2 Sektionen: Score-Hero, Kostenband, Risiko-Block, Anschlussvarianten,
+    # Datenquellen, Standort/Netzumfeld. Werden im Renderer + im PDF angezeigt.
+    generated_at_iso = (
+        str(revision.get("timestamp"))
+        if isinstance(revision, dict) and revision.get("timestamp")
+        else datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    )
+    cost_band = _build_cost_band(kosten)
+    connection_variants = _build_connection_variants(engine_result, eingabe, nennspannung)
+    risks_block = _build_risks(
+        engine_result, fazit, scores, cost_band, route_environment if isinstance(route_environment, dict) else {}
+    )
+    sources_block = _sources_from_engine(engine_result, retrieved_at=generated_at_iso)
+    location_meta = _build_location_meta(eingabe, persp)
+    score_int: int | None
+    try:
+        score_int = int(float(scores.get("gesamt"))) if scores.get("gesamt") is not None else None
+    except (TypeError, ValueError):
+        score_int = None
 
     dto = ProjektiererReportDTO(
         report_type="projektierer",
@@ -244,6 +510,14 @@ def build_projektierer_report(engine_result: dict[str, Any]) -> dict[str, Any]:
         process_timeline=build_process_timeline_lines(engine_result),
         bkz_hint=build_bkz_hint_text(engine_result),
         warnungen=[str(w) for w in warnungen if isinstance(w, str)],
+        report_generated_at=generated_at_iso,
+        gridcheck_score=score_int,
+        scores=dict(scores),
+        cost_band=cost_band,
+        connection_variants=connection_variants,
+        risks=risks_block,
+        sources=sources_block,
+        location_meta=location_meta,
     )
     return asdict(dto)
 

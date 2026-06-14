@@ -1,4 +1,4 @@
-"""Tests for plant-type defaults, EEG classes, and reactive-power screening."""
+﻿"""Tests for plant-type defaults, EEG classes, and reactive-power screening."""
 from __future__ import annotations
 
 import pytest
@@ -35,13 +35,13 @@ class TestPlantTypePv5Mw:
         eingabe["anlagentyp"] = "PV"
 
         ctx = resolve_plant_context(eingabe)
-        assert ctx.power_factor == pytest.approx(0.9, abs=0.001)
+        assert ctx.power_factor == pytest.approx(0.95, abs=0.001)
         assert ctx.simultaneity_factor == pytest.approx(0.85, abs=0.001)
         assert ctx.ac_kw == pytest.approx(5000.0, rel=0.01)
         assert ctx.screening_power_kw == pytest.approx(5000.0 * 0.85, rel=0.01)
 
         inp = grid_connection_input_from_engine(eingabe)
-        assert inp.power_factor == pytest.approx(0.9, abs=0.001)
+        assert inp.power_factor == pytest.approx(0.95, abs=0.001)
         assert inp.screening_power_kw == pytest.approx(4250.0, rel=0.01)
         assert inp.plant_type == "pv"
 

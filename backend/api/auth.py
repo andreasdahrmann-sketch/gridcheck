@@ -54,10 +54,15 @@ class UserResponse(BaseModel):
     vnb_verification_status: str = "none"
     netzbetreiber_verified: bool = False
     vnb_dashboard_access: bool = False
+    # Read-only Admin-Flag fuer das Frontend (Anzeige/Sichtbarkeit). Enforcement bleibt
+    # strikt serverseitig (User.role aus der DB), siehe billing_service._is_unlimited_admin
+    # und core/vnb_access.user_is_admin.
+    is_admin: bool = False
 
 
 def _user_response(user: User) -> UserResponse:
     fields = user_to_vnb_access_fields(user)
+    role_value = str(user.role or "").strip().lower()
     return UserResponse(
         id=user.id,
         email=user.email,
@@ -66,6 +71,7 @@ def _user_response(user: User) -> UserResponse:
         vnb_verification_status=str(fields["vnb_verification_status"]),
         netzbetreiber_verified=bool(fields["netzbetreiber_verified"]),
         vnb_dashboard_access=bool(fields["vnb_dashboard_access"]),
+        is_admin=role_value == "admin",
     )
 
 
