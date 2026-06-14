@@ -9,9 +9,12 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from core.auth import get_current_user, require_csrf
+from core.logging_setup import get_logger
 from db.database import get_db
 from db.models import User
 from services import geocoding_service, project_service
+
+logger = get_logger("gridcheck.api.projects")
 from services.visibility_service import (
     derive_stakeholder_path,
     get_project_access_level,
@@ -225,6 +228,14 @@ def create_project(
     payload = req.model_dump()
     warnings = _enrich_location_with_geocoding(payload)
     project = project_service.create_project(db, current_user, **payload)
+    logger.info(
+        "project_created",
+        project_id=project.id,
+        user_id=current_user.id,
+        typ=project.typ,
+        leistung_kw=project.leistung_kw,
+        warnings=warnings or None,
+    )
     return _to_response(project, db, current_user, warnings=warnings)
 
 
@@ -254,6 +265,12 @@ def update_project(
     _: None = Depends(require_csrf),
 ) -> ProjectResponse:
     project = project_service.update_project(db, current_user, project_id, req.model_dump(exclude_none=True))
+    logger.info(
+        "project_updated",
+        project_id=project.id,
+        user_id=current_user.id,
+        fields=sorted(req.model_dump(exclude_none=True).keys()),
+    )
     return _to_response(project, db, current_user)
 
 

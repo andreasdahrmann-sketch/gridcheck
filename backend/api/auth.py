@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Literal
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from core.auth import get_current_user, issue_csrf_token, require_csrf
 from core.config import settings
+from core.logging_setup import get_logger
 from core.rate_limit import enforce_rate_limit
 from db.database import get_db
 from db.models import User
@@ -21,7 +23,15 @@ from services.auth_service import (
     request_password_reset,
 )
 
+logger = get_logger("gridcheck.api.auth")
+
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+
+
+def _email_hash(email: str) -> str:
+    """SHA-256 Prefix der normalisierten E-Mail (kein Klartext im Log, kein Rainbow-Risk)."""
+    normalized = (email or "").strip().lower().encode("utf-8")
+    return hashlib.sha256(normalized).hexdigest()[:8]
 
 
 class RegisterRequest(BaseModel):
@@ -94,8 +104,25 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)) -> UserRespons
 @router.post("/login", response_model=TokenResponse)
 def login(req: LoginRequest, response: Response, db: Session = Depends(get_db)) -> TokenResponse:
     enforce_rate_limit(f"auth:login:{req.email.strip().lower()}", limit=10, window_seconds=300)
-    user = login_user(db, email=req.email, password=req.password)
+    try:
+        user = login_user(db, email=req.email, password=req.password)
+    except HTTPException as exc:
+        # KEINE Email im Klartext, KEIN Passwort. Hash-Prefix reicht fuer Korrelation
+        # bei Brute-Force-Mustern in Log-Auswertung.
+        detail = exc.detail if isinstance(exc.detail, dict) else {}
+        logger.warning(
+            "login_failed",
+            email_hash=_email_hash(req.email),
+            reason=detail.get("code", "UNKNOWN") if isinstance(detail, dict) else "UNKNOWN",
+            status_code=exc.status_code,
+        )
+        raise
     tokens = issue_token_pair(user)
+    logger.info(
+        "login_success",
+        user_id=user.id,
+        role=str(user.role or "").strip().lower(),
+    )
     secure_cookie = settings.app_env in {"staging", "prod", "production"}
     response.set_cookie(
         key=settings.auth_access_cookie,

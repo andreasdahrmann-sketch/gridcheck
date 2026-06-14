@@ -1,3 +1,5 @@
+import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -7,9 +9,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import Response
 from core.config import settings
+from core.logging_setup import configure_logging, get_logger
 from core.monitoring import init_sentry
 from api.routes import router
 
+# Logging vor Sentry konfigurieren, damit auch das Init-Ergebnis von Sentry
+# (sentry_skip / sentry_initialized) bereits sauber strukturiert geloggt wird.
+configure_logging(app_env=settings.app_env, log_level=settings.log_level)
+logger = get_logger("gridcheck.main")
 init_sentry()
 from api.stakeholders import router as stakeholder_router
 from api.analyze_v2 import router_analysis_compat, router_v2
@@ -29,10 +36,30 @@ from api.contact import router as contact_router
 from api.v1_vnb_comms import router as v1_vnb_comms_router
 from api.v2_reports import router_reports
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    norm_version = os.getenv("NORM_VERSION", "unspecified")
+    logger.info(
+        "app_started",
+        app_env=settings.app_env,
+        app_version=settings.app_version,
+        norm_version=norm_version,
+    )
+    try:
+        yield
+    finally:
+        logger.info(
+            "app_stopped",
+            app_env=settings.app_env,
+            app_version=settings.app_version,
+        )
+
+
 app = FastAPI(
     title="GridCheck Pro API",
     version=settings.app_version,
     description="Pre-Netzanschluss-Check mit N-1 Analyse, Diagnose und KI-Lernmodul",
+    lifespan=lifespan,
 )
 
 
