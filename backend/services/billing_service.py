@@ -681,6 +681,13 @@ def _build_stripe_readiness() -> dict[str, Any]:
 
 
 def has_paid_access(user: User) -> bool:
+    # Billing-Hide-Schalter: ohne aktivierten Schalter (Default) wird jeder
+    # Nicht-Admin-User wie plan_tier=free behandelt, unabhaengig vom DB-Stand.
+    # Admin-Bypass bleibt; Admin-Flows werden ohnehin in
+    # _apply_admin_overview_overrides / package_access_context auf Admin-Pfad
+    # umgeleitet. Hier nur die Konsumenten-Sicht synchron halten.
+    if not settings.billing_enabled and not _is_unlimited_admin(user):
+        return False
     return user.plan_tier != "free" and user.billing_status in SUBSCRIPTION_ANALYSIS_ACCESS_STATUSES
 
 
@@ -2145,6 +2152,26 @@ def get_checkout_session_status(db: Session, user: User, session_id: str) -> dic
 
 
 def handle_stripe_webhook(db: Session, payload: bytes, stripe_signature: str | None) -> dict[str, str]:
+    # Billing-Hide-Schalter: wenn Billing in dieser Umgebung deaktiviert ist,
+    # nehmen wir das Event entgegen, audit-loggen es und antworten mit 200,
+    # damit Stripe nicht in einen Retry-Loop faellt. Es findet KEINE
+    # User-/Subscription-Mutation statt.
+    if not settings.billing_enabled:
+        try:
+            _record_billing_event(
+                db,
+                user_id=None,
+                event_type="webhook_received_while_disabled",
+                status="ignored",
+                payload={
+                    "raw_size": len(payload or b""),
+                    "has_signature": bool(stripe_signature),
+                },
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+        return {"status": "ignored_billing_disabled"}
     if not settings.stripe_webhook_secret:
         raise HTTPException(
             status_code=503,

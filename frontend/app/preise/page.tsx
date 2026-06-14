@@ -3,6 +3,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { Header } from "@/components/Header";
 import PricingOverview from "@/components/billing/PricingOverview";
 import ProductDecisionGuide from "@/components/billing/ProductDecisionGuide";
+import { BillingGate } from "@/components/billing/BillingGate";
 
 export const metadata = {
   title: "Tarife & Preise — GridCheck",
@@ -11,7 +12,8 @@ export const metadata = {
 
 export default function PreisePage() {
   return (
-    <main className="min-h-screen bg-bg text-white">
+    <BillingGate>
+      <main className="min-h-screen bg-bg text-white">
       <Header />
 
       <section className="border-b border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_30%),radial-gradient(circle_at_top_right,rgba(249,115,22,0.12),transparent_24%)]">
@@ -53,6 +55,7 @@ export default function PreisePage() {
           description="Die Entscheidungshilfe ergaenzt die Preisuebersicht um typische Einsatzfaelle, Grenzen und den passenden naechsten Schritt."
         />
       </div>
-    </main>
+      </main>
+    </BillingGate>
   );
 }

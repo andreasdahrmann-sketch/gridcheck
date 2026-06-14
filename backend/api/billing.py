@@ -5,6 +5,10 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from core.auth import get_current_user, require_csrf
+from core.billing_flags import (
+    require_billing_enabled_or_admin,
+    require_billing_enabled_public,
+)
 from db.database import get_db
 from db.models import User
 from services.billing_service import (
@@ -76,6 +80,7 @@ class BillingCheckoutSessionResponse(BaseModel):
 def billing_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _flag: None = Depends(require_billing_enabled_or_admin),
 ) -> dict:
     return build_billing_overview(db, current_user)
 
@@ -86,6 +91,7 @@ def billing_checkout(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_csrf),
+    _flag: None = Depends(require_billing_enabled_or_admin),
 ) -> dict:
     return create_checkout_session(db, current_user, req.offer_id)
 
@@ -95,6 +101,7 @@ def billing_portal(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_csrf),
+    _flag: None = Depends(require_billing_enabled_or_admin),
 ) -> dict:
     return create_portal_session(db, current_user)
 
@@ -104,12 +111,13 @@ def billing_checkout_session(
     session_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _flag: None = Depends(require_billing_enabled_or_admin),
 ) -> dict:
     return get_checkout_session_status(db, current_user, session_id)
 
 
 @router.get("/catalog")
-def billing_catalog() -> dict:
+def billing_catalog(_flag: None = Depends(require_billing_enabled_public)) -> dict:
     return get_public_billing_catalog()
 
 
@@ -119,5 +127,9 @@ async def stripe_webhook(
     stripe_signature: str | None = Header(default=None, alias="Stripe-Signature"),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
+    # Webhook bleibt absichtlich erreichbar (kein 503), damit Stripe nicht in einen
+    # Retry-Loop faellt, falls der Schalter im laufenden Betrieb umgestellt wird.
+    # Der Service entscheidet anhand `settings.billing_enabled`, ob das Event
+    # tatsaechlich verarbeitet oder nur audit-loggend ignoriert wird.
     payload = await request.body()
     return handle_stripe_webhook(db, payload, stripe_signature)

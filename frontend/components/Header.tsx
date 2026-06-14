@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Logo } from "./Logo"
 import { me, logout, type AuthUser } from "@/lib/api/auth"
 import { canAccessVnbDashboard } from "@/lib/vnb-access"
+import { isBillingEnabled } from "@/lib/billing-flag"
 import { Button } from "@/components/ui/button"
 import { PwaInstallPrompt } from "@/components/mobile/PwaInstallPrompt"
 import {
@@ -70,11 +71,15 @@ export function Header() {
 
   const navLinks = useMemo(() => {
     const vnbLink = user && canAccessVnbDashboard(user) ? [{ href: "/vnb", label: "VNB" }] : []
+    // Billing-Hide-Schalter: Tarife-Link nur wenn Billing aktiviert ist ODER User Admin ist.
+    // Backend setzt 503 fuer normale User auf /api/v1/billing/*, hier nur UX-Hide.
+    const showPreise = isBillingEnabled() || user?.role === "admin"
+    const preiseLink = showPreise ? [baseNavLinks[2]] : []
     const core = [
       baseNavLinks[0],
       baseNavLinks[1],
       ...vnbLink,
-      baseNavLinks[2],
+      ...preiseLink,
       baseNavLinks[3],
       baseNavLinks[4],
     ]

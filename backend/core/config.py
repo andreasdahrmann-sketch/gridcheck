@@ -140,6 +140,7 @@ class Settings:
     auth_csrf_cookie: str
     auto_create_schema: bool
     free_checks_limit: int
+    billing_enabled: bool
     stripe_secret_key: str | None
     stripe_publishable_key: str | None
     stripe_webhook_secret: str | None
@@ -171,6 +172,8 @@ def load_settings() -> Settings:
     auth_refresh_cookie = os.getenv("AUTH_REFRESH_COOKIE", "gridcheck_refresh")
     auth_csrf_cookie = os.getenv("AUTH_CSRF_COOKIE", "gridcheck_csrf")
     free_checks_limit_raw = os.getenv("FREE_CHECKS_LIMIT", "3").strip() or "3"
+    billing_enabled_env = os.getenv("BILLING_ENABLED", "").strip().lower()
+    billing_enabled = billing_enabled_env in {"1", "true", "yes", "on"}
     auto_create_schema_env = os.getenv("AUTO_CREATE_SCHEMA")
     stripe_secret_key = os.getenv("STRIPE_SECRET_KEY", "").strip() or None
     stripe_publishable_key = os.getenv("STRIPE_PUBLISHABLE_KEY", "").strip() or None
@@ -263,6 +266,7 @@ def load_settings() -> Settings:
         auth_csrf_cookie=auth_csrf_cookie,
         auto_create_schema=auto_create_schema,
         free_checks_limit=free_checks_limit,
+        billing_enabled=billing_enabled,
         stripe_secret_key=stripe_secret_key,
         stripe_publishable_key=stripe_publishable_key,
         stripe_webhook_secret=stripe_webhook_secret,
