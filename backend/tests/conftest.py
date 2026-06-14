@@ -21,8 +21,17 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("JWT_SECRET", "pytest-gridcheck-access-secret-32-chars")
 os.environ.setdefault("JWT_REFRESH_SECRET", "pytest-gridcheck-refresh-secret-32")
 os.environ.setdefault("AUTO_CREATE_SCHEMA", "false")
+# Tests laufen standardmaessig mit aktiviertem Billing-Pfad, damit die bestehenden
+# Billing-/Stripe-Webhook-/Admin-Bypass-Tests gegen den realen 200-Pfad pruefen
+# koennen. Die spezifischen Hide-Switch-Tests setzen den Schalter dann via
+# monkeypatch lokal auf False.
+os.environ.setdefault("BILLING_ENABLED", "true")
 # Starlette TestClient nutzt Host "testserver"; TrustedHostMiddleware sonst 400.
 os.environ["TRUSTED_HOSTS"] = "localhost,127.0.0.1,testserver"
+# Rate-Limiter zwingend auf In-Memory-Backend stellen. Sonst persistieren
+# Buckets in Redis (sobald die redis-Lib installiert ist und .env eine
+# REDIS_URL setzt) ueber Tests hinweg und brechen die Isolation.
+os.environ["REDIS_URL"] = ""
 
 import pytest  # noqa: E402
 
@@ -71,14 +80,36 @@ def _reset_fastapi_dependency_overrides():
     app.dependency_overrides.clear()
 
 
+_RATE_LIMIT_BUCKET_PREFIXES = (
+    "analysis:",
+    "auth:",
+    "geo:",
+    "contact:",
+    "reports:",
+    "vnb_comms_write:",
+    "unit:",
+)
+
+
 @pytest.fixture(autouse=True)
 def _reset_rate_limit_state_per_test():
     """In-Memory Rate-Limit-Buckets (User- und IP-Bucket) vor jedem Test leeren.
     setup_function greift nur modul-intern; ohne diesen Reset leakt der
     IP-Counter (TestClient hat eine stabile Client-IP) ueber Modulgrenzen.
+    Zusaetzlich belt-and-suspenders: falls trotz REDIS_URL="" ein Redis-Client
+    initialisiert wurde (z.B. via monkeypatch), die Limiter-Buckets dort
+    selektiv per SCAN+DEL entfernen. KEIN FLUSHALL.
     """
     from core import rate_limit as rate_limit_mod
     rate_limit_mod._MEM_BUCKETS.clear()
+    redis_client = rate_limit_mod._REDIS_CLIENT
+    if redis_client is not None:
+        try:
+            for prefix in _RATE_LIMIT_BUCKET_PREFIXES:
+                for key in redis_client.scan_iter(match=f"{prefix}*", count=200):
+                    redis_client.delete(key)
+        except Exception:
+            pass
     rate_limit_mod._REDIS_CLIENT = None
     yield
 
