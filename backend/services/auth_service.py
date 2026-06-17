@@ -148,9 +148,24 @@ def issue_token_pair(user: User) -> dict[str, str]:
     }
 
 
-def refresh_access_token(refresh_token: str) -> dict[str, str]:
+def refresh_access_token(db: Session, refresh_token: str) -> dict[str, str]:
     payload = decode_token(refresh_token, refresh=True)
-    access_payload = {"sub": str(payload["sub"]), "email": payload["email"], "role": payload["role"]}
+    try:
+        user_id = int(payload["sub"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "AUTH_TOKEN_INVALID", "message": "Token ist ungueltig", "hint": "Bitte erneut einloggen."},
+        ) from exc
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_active:
+        log_security_event("auth_refresh_inactive_or_missing_user", user_id=user_id)
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "AUTH_USER_INVALID", "message": "Benutzer ungueltig", "hint": "Bitte erneut anmelden."},
+        )
+    access_payload = {"sub": str(user.id), "email": user.email, "role": user.role}
     return {
         "access_token": create_token(access_payload, ACCESS_TTL_MIN, refresh=False),
         "token_type": "bearer",
@@ -186,7 +201,7 @@ def request_password_reset(db: Session, *, email: str) -> None:
     )
     db.commit()
 
-    reset_url = f"{_password_reset_base_url()}/login?reset_token={raw_token}"
+    reset_url = f"{_password_reset_base_url()}/reset-password#token={raw_token}"
     log_security_event("auth_password_reset_requested", user_id=user.id, email=user.email)
 
     from services.email_service import send_password_reset_email

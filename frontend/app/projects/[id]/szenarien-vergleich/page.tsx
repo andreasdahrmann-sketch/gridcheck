@@ -19,6 +19,7 @@ export default function ScenarioComparePage({ params }: { params: { id: string }
   });
 
   const currentResult = (projectQuery.data?.role_results ?? null) as GridCheckResult | null;
+  const projectIdNumber = Number(projectId);
 
   return (
     <div className="min-h-screen bg-background">
@@ -36,7 +37,21 @@ export default function ScenarioComparePage({ params }: { params: { id: string }
           Vorlaeufiger Vergleich zweier Analyse-Snapshots oder thermischer Szenarien. Ersetzt keine Netzbetreiber-Entscheidung.
         </p>
         <div className="mt-8">
-          <ScenarioComparePanel projectId={projectId} currentResult={currentResult} />
+          {!Number.isFinite(projectIdNumber) ? (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-200">
+              Ungueltige Projekt-ID.
+            </div>
+          ) : projectQuery.isLoading ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-text-muted">
+              Projektzugriff wird geprueft...
+            </div>
+          ) : projectQuery.isError || !projectQuery.data ? (
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-5 text-sm text-amber-100">
+              Szenarienvergleich nicht verfuegbar: Sie haben keinen Zugriff auf dieses Projekt oder es existiert nicht.
+            </div>
+          ) : (
+            <ScenarioComparePanel projectId={projectId} currentResult={currentResult} />
+          )}
         </div>
       </main>
     </div>

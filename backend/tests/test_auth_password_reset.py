@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastapi.testclient import TestClient
@@ -30,6 +31,15 @@ def _register(client: TestClient, email: str, password: str = "SecurePass!99") -
         json={"email": email, "password": password, "role": "endkunde"},
     )
     assert res.status_code == 200, res.text
+
+
+def _extract_reset_token(reset_url: str) -> str:
+    parsed = urlparse(reset_url)
+    assert "reset_token" not in parse_qs(parsed.query)
+    fragment_params = parse_qs(parsed.fragment)
+    token = fragment_params.get("token", [""])[0]
+    assert token
+    return token
 
 
 def test_forgot_password_always_ok_no_enumeration(client: TestClient):
@@ -65,7 +75,7 @@ def test_password_reset_roundtrip(client: TestClient, monkeypatch: pytest.Monkey
     assert res.status_code == 200
     assert sent, "Reset-E-Mail sollte versendet (oder geloggt) werden"
 
-    raw_token = sent[0].split("reset_token=")[-1]
+    raw_token = _extract_reset_token(sent[0])
     new_password = "NewSecurePass!01"
     res = client.post(
         "/api/v1/auth/reset-password",
@@ -91,7 +101,7 @@ def test_reset_token_single_use(client: TestClient, monkeypatch: pytest.MonkeyPa
     email = f"reset-once-{uuid.uuid4().hex}@example.com"
     _register(client, email)
     client.post("/api/v1/auth/forgot-password", json={"email": email})
-    raw_token = sent[0].split("reset_token=")[-1]
+    raw_token = _extract_reset_token(sent[0])
 
     first = client.post(
         "/api/v1/auth/reset-password",

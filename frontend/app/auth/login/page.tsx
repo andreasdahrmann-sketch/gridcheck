@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { sanitizeAppRedirect } from "@/lib/safe-redirect";
 
 type PageProps = {
   searchParams?: Record<string, string | string[] | undefined>;
@@ -14,10 +15,10 @@ export default function AuthLoginRedirectPage({ searchParams }: PageProps) {
   const params = new URLSearchParams();
   const plan = pickParam(searchParams?.plan);
   const intent = pickParam(searchParams?.intent) ?? plan;
-  const next = pickParam(searchParams?.next);
+  const next = sanitizeAppRedirect(pickParam(searchParams?.next), "/projects");
   if (intent) params.set("intent", intent);
   if (plan) params.set("plan", plan);
-  if (next) params.set("next", next);
+  params.set("next", next);
   const qs = params.toString();
   redirect(qs ? `/login?${qs}` : "/login");
 }

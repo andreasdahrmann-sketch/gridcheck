@@ -88,6 +88,16 @@ export function clearCompareSnapshots(projectId: string | number): void {
   window.sessionStorage.removeItem(`${SLOT_STORAGE_PREFIX}${projectId}`);
 }
 
+export function clearAllCompareSnapshots(): void {
+  if (typeof window === "undefined") return;
+  for (let i = window.sessionStorage.length - 1; i >= 0; i -= 1) {
+    const key = window.sessionStorage.key(i);
+    if (key?.startsWith(STORAGE_PREFIX) || key?.startsWith(SLOT_STORAGE_PREFIX)) {
+      window.sessionStorage.removeItem(key);
+    }
+  }
+}
+
 function slotStorageKey(projectId: string | number): string {
   return `${SLOT_STORAGE_PREFIX}${projectId}`;
 }

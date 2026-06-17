@@ -246,6 +246,29 @@ def test_auth_register_login_and_me():
         _close_client(client)
 
 
+def test_refresh_denies_deactivated_user():
+    client = build_client()
+    try:
+        tokens = _register_and_login(client, "refresh-inactive@example.com")
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "refresh-inactive@example.com").first()
+            assert user is not None
+            user.is_active = False
+            db.commit()
+
+        csrf_token = client.cookies.get("gridcheck_csrf")
+        assert csrf_token
+        refreshed = client.post(
+            "/api/v1/auth/refresh",
+            headers={"X-CSRF-Token": csrf_token},
+            json={"refresh_token": tokens["refresh_token"]},
+        )
+        assert refreshed.status_code == 401, refreshed.text
+        assert refreshed.json()["detail"]["code"] == "AUTH_USER_INVALID"
+    finally:
+        _close_client(client)
+
+
 def test_password_policy_is_consistent_for_register_change_and_legacy_upgrade():
     client = build_client()
     try:
@@ -1053,7 +1076,7 @@ def test_analyze_v2_is_rate_limited(monkeypatch):
         _close_client(client)
 
 
-def test_analyze_v2_accepts_planner_n1_context():
+def test_analyze_v2_rejects_unverified_dso_n1_context():
     client = build_client()
     try:
         _reset_rate_limit_state()
@@ -1083,12 +1106,8 @@ def test_analyze_v2_accepts_planner_n1_context():
         }
 
         response = client.post("/api/v1/analyze", headers=headers, json=payload)
-        assert response.status_code == 200, response.text
-        body = response.json()
-        assert body["status"] == "OK"
-        assert body["n1"]["n1_klasse"] == "N1-4"
-        assert body["n1"]["dso_daten_vorhanden"] is True
-        assert "Abgangsreserve / Betriebsmittelpfad" in body["n1"]["nachweise_vorhanden"]
+        assert response.status_code == 403, response.text
+        assert response.json()["detail"]["code"] == "N1_DSO_VERIFICATION_FORBIDDEN"
     finally:
         _close_client(client)
 

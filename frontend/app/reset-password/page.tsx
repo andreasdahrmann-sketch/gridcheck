@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
@@ -18,7 +18,8 @@ const fieldClass =
 function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? searchParams.get("reset_token") ?? "";
+  const queryToken = searchParams.get("token") ?? searchParams.get("reset_token") ?? "";
+  const [token, setToken] = useState(queryToken);
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -27,6 +28,19 @@ function ResetPasswordContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const passwordChecks = useMemo(() => getPasswordPolicyChecks(password), [password]);
+
+  useEffect(() => {
+    let nextToken = queryToken;
+    if (!nextToken && typeof window !== "undefined") {
+      const fragment = window.location.hash.replace(/^#/, "");
+      const fragmentParams = new URLSearchParams(fragment);
+      nextToken = fragmentParams.get("token") ?? fragmentParams.get("reset_token") ?? "";
+    }
+    if (nextToken) {
+      setToken(nextToken);
+      router.replace("/reset-password");
+    }
+  }, [queryToken, router]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
