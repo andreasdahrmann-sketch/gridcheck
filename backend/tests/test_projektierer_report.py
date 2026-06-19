@@ -97,6 +97,18 @@ def _latest_report_revision() -> ReportRevisionRecord:
         db.close()
 
 
+def _count_report_revisions() -> int:
+    db = SessionLocal()
+    try:
+        return (
+            db.query(ReportRevisionRecord)
+            .filter(ReportRevisionRecord.report_type == "projektierer")
+            .count()
+        )
+    finally:
+        db.close()
+
+
 def _engine_result() -> dict:
     return {
         "status": "OK",
@@ -316,6 +328,32 @@ def test_post_projektierer_report_pdf(
     assert r.headers.get("x-gridcheck-report-revision-hash") == latest.hash
     assert r.headers.get("x-gridcheck-report-revision-uuid") == latest.uuid
     assert r.headers.get("x-gridcheck-report-verify-path", "").endswith(latest.hash)
+
+
+def test_post_projektierer_pdf_quality_failure_does_not_persist_revision(
+    isolierte_revisionen,
+    isolierte_report_revisionen,
+    monkeypatch,
+):
+    from api import v2_reports as reports_api
+
+    _mock_report_analysis(monkeypatch, _engine_result())
+    monkeypatch.setattr(
+        reports_api,
+        "run_pre_pdf_quality_checks",
+        lambda *args, **kwargs: ["forced quality failure"],
+    )
+    before = _count_report_revisions()
+
+    r = client.post(
+        "/api/v2/reports/projektierer?format=pdf",
+        json={"analyze_request": _report_request()},
+        headers=_auth_headers(),
+    )
+
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["code"] == "REPORT_PDF_QUALITY_FAILED"
+    assert _count_report_revisions() == before
 
 
 def test_report_route_rejects_client_supplied_engine_result():

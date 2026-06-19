@@ -3,19 +3,13 @@
  * Route Handlers (/api/auth/*, /api/health) read BACKEND_URL again at runtime (serverless).
  * Set BACKEND_URL for Production and Preview in Vercel (not build-only).
  */
-/** Project-specific production default when Vercel omits BACKEND_URL (GridCheck prod Railway only). */
-const VERCEL_PROD_BACKEND_FALLBACK = "https://gridcheck-production.up.railway.app";
-
 /** @type {import("next").NextConfig} */
 let rawBackendUrl = process.env.BACKEND_URL?.trim().replace(/[\r\n]+/g, "") ?? "";
 
 if (process.env.VERCEL === "1" && !rawBackendUrl) {
-  console.warn(
-    "[next.config] BACKEND_URL fehlt auf Vercel — verwende Projekt-Fallback:",
-    VERCEL_PROD_BACKEND_FALLBACK,
-    "(bitte BACKEND_URL in Vercel Project Settings setzen und redeployen)",
+  throw new Error(
+    "BACKEND_URL fehlt auf Vercel. Bitte BACKEND_URL fuer Production und Preview in den Vercel Project Settings setzen.",
   );
-  rawBackendUrl = VERCEL_PROD_BACKEND_FALLBACK;
 }
 
 if (rawBackendUrl && !/^https?:\/\//.test(rawBackendUrl)) {

@@ -1,14 +1,8 @@
 /** Server-only BACKEND_URL helpers (Route Handlers, diagnostics). */
 
-/** Project-specific production default when Vercel omits BACKEND_URL (GridCheck prod Railway only). */
-export const VERCEL_PROD_BACKEND_FALLBACK = "https://gridcheck-production.up.railway.app";
-
 function readBackendUrlFromEnv(): string | null {
   const raw = process.env.BACKEND_URL?.trim().replace(/[\r\n]+/g, "");
   if (raw) return raw;
-  if (process.env.VERCEL === "1") {
-    return VERCEL_PROD_BACKEND_FALLBACK;
-  }
   return null;
 }
 

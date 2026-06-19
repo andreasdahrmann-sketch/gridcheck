@@ -18,6 +18,7 @@ import {
 } from "@/lib/billing-plans";
 import { getPurchaseIntentProfile, normalizePurchaseIntent } from "@/lib/purchase-intents";
 import { formSelectClass as selectClass } from "@/lib/form-classes";
+import { safeNextPath } from "@/lib/safe-next-path";
 
 const cardClass = "rounded-[28px] border border-white/10 bg-bg-card/80 p-6 shadow-[0_12px_42px_rgba(0,0,0,0.18)]";
 const fieldClass =
@@ -40,7 +41,7 @@ function RegisterPageContent() {
       : intent === "upgrade" || intent === "pro"
         ? "/settings"
         : "/onboarding";
-  const nextTarget = searchParams.get("next") || defaultNext;
+  const nextTarget = safeNextPath(searchParams.get("next"), defaultNext);
   const loginParams = new URLSearchParams({ intent, next: nextTarget });
   if (checkoutPlan) loginParams.set("plan", checkoutPlan);
   const loginHref = `/login?${loginParams.toString()}`;
