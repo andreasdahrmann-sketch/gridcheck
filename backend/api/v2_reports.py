@@ -514,6 +514,13 @@ def _export_stakeholder_report(
     )
     report["gridcheck_report_data"] = gridcheck_report_data
 
+    if out_fmt == "pdf":
+        quality_issues = run_pre_pdf_quality_checks(
+            gridcheck_report_data, report_wrapper=report
+        )
+        if quality_issues:
+            raise _report_pdf_quality_failed(quality_issues)
+
     rev = persist_report_revision(
         report,
         render_html,
@@ -550,11 +557,6 @@ def _export_stakeholder_report(
             raise _report_pdf_quality_failed(
                 ["gridcheck_report_data fehlt oder ist ungueltig"]
             )
-        quality_issues = run_pre_pdf_quality_checks(
-            gc_data, report_wrapper=final_report
-        )
-        if quality_issues:
-            raise _report_pdf_quality_failed(quality_issues)
         pdf_bytes = build_stakeholder_report_pdf(final_report)
         return _pdf_attachment_response(
             pdf_bytes,
