@@ -40,6 +40,7 @@ from db.models import (
     User,
 )
 from engine.revision import speichere_revision
+from services.billing_service import cancel_subscription_for_account_deletion
 
 
 EXPORT_SCHEMA_VERSION = "dsgvo-export-1.0"
@@ -477,6 +478,8 @@ def delete_user_account(
     original_email = (user.email or "").strip().lower()
     email_hash = _email_hash(original_email) if original_email else None
 
+    canceled_subscription = cancel_subscription_for_account_deletion(db, user)
+
     # Aktive Passwort-Reset-Tokens invalidieren.
     db.query(PasswordResetToken).filter(
         PasswordResetToken.user_id == user.id,
@@ -495,6 +498,9 @@ def delete_user_account(
     user.password_hash = ""
     user.is_active = False
     user.full_name = None
+    user.plan_tier = "free"
+    user.billing_status = "canceled" if canceled_subscription else user.billing_status
+    user.billing_current_period_end = None
     user.stripe_customer_id = None
     user.stripe_subscription_id = None
     user.stripe_price_id = None

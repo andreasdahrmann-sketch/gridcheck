@@ -116,7 +116,6 @@ export default function AddressGeocoder({
       ort: item.ort,
       label: item.label,
     });
-    onChange(item.label);
     setOpen(false);
     setSuggestions([]);
   }

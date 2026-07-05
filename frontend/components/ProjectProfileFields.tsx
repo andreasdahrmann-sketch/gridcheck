@@ -144,6 +144,12 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
     patch({ project_location: { ...projectLocation, ...delta } });
   const patchUmspannwerk = (delta: Partial<UmspannwerkInput>) =>
     patch({ umspannwerk: { ...umspannwerk, ...delta } });
+  const patchAddressHint = (hint: string) =>
+    patchLocation({
+      address_hint: hint || undefined,
+      latitude: undefined,
+      longitude: undefined,
+    });
 
   const updateComponent = (index: number, delta: Partial<ProjectComponentInput>) => {
     const next = [...projectComponents];
@@ -465,7 +471,7 @@ export default function ProjectProfileFields({ value, onChange, compact = false 
               value={projectLocation.address_hint ?? ""}
               plz={value.plz}
               ort={value.ort}
-              onChange={(hint) => patchLocation({ address_hint: hint || undefined })}
+              onChange={patchAddressHint}
               onSelect={(selection: AddressGeocodeSelection) => {
                 patchLocation({
                   address_hint: selection.address_hint,
