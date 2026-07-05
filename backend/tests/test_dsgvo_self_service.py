@@ -22,6 +22,8 @@ from fastapi.testclient import TestClient
 
 from db.database import Base, get_db
 from db.models import (
+    BillingEntitlement,
+    BillingEvent,
     PasswordResetToken,
     Project,
     RevisionRecord,
@@ -272,6 +274,139 @@ def test_delete_account_soft_deletes_user_and_projects() -> None:
             project = db.query(Project).filter(Project.id == project_id).first()
             assert project is not None
             assert project.deleted_at is not None
+    finally:
+        _close_client(client)
+
+
+def test_delete_account_cancels_active_stripe_subscription(monkeypatch) -> None:
+    client = build_client()
+    try:
+        email = _unique_email("delete-subscription")
+        _register(client, email)
+        token = _login(client, email)
+
+        with client._gridcheck_session_factory() as db:  # type: ignore[attr-defined]
+            user = db.query(User).filter(User.email == email).first()
+            assert user is not None
+            user.plan_tier = "pro"
+            user.billing_status = "active"
+            user.stripe_customer_id = "cus_delete_account"
+            user.stripe_subscription_id = "sub_delete_account"
+            db.add(
+                BillingEntitlement(
+                    user_id=user.id,
+                    offer_id="pro_lizenz",
+                    offer_category="saas",
+                    package_scope="premium",
+                    source="subscription",
+                    status="active",
+                    total_credits=20,
+                    used_credits=0,
+                    stripe_subscription_id="sub_delete_account",
+                    metadata_json="{}",
+                )
+            )
+            db.commit()
+            user_id = user.id
+
+        from services import billing_service
+
+        class FakeSubscription:
+            canceled: list[str] = []
+
+            @staticmethod
+            def cancel(subscription_id: str) -> dict:
+                FakeSubscription.canceled.append(subscription_id)
+                return {
+                    "id": subscription_id,
+                    "customer": "cus_delete_account",
+                    "status": "canceled",
+                }
+
+        class FakeStripeModule:
+            Subscription = FakeSubscription
+
+        monkeypatch.setattr(billing_service, "_load_stripe_module", lambda: FakeStripeModule)
+
+        res = client.post(
+            "/api/v1/users/me/delete-account",
+            headers=_auth(token),
+            json={"confirm_password": PASSWORD},
+        )
+        assert res.status_code == 204, res.text
+        assert FakeSubscription.canceled == ["sub_delete_account"]
+
+        with client._gridcheck_session_factory() as db:  # type: ignore[attr-defined]
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.deleted_at is not None
+            assert user.plan_tier == "free"
+            assert user.billing_status == "canceled"
+            assert user.stripe_customer_id is None
+            assert user.stripe_subscription_id is None
+            entitlement = (
+                db.query(BillingEntitlement)
+                .filter(BillingEntitlement.user_id == user_id, BillingEntitlement.offer_id == "pro_lizenz")
+                .first()
+            )
+            assert entitlement is not None
+            assert entitlement.status == "canceled"
+            event = (
+                db.query(BillingEvent)
+                .filter(BillingEvent.user_id == user_id, BillingEvent.event_type == "dsgvo.subscription_canceled")
+                .first()
+            )
+            assert event is not None
+            assert event.provider_subscription_id == "sub_delete_account"
+    finally:
+        _close_client(client)
+
+
+def test_delete_account_aborts_when_stripe_subscription_cancel_fails(monkeypatch) -> None:
+    client = build_client()
+    try:
+        email = _unique_email("delete-subscription-fail")
+        _register(client, email)
+        token = _login(client, email)
+
+        with client._gridcheck_session_factory() as db:  # type: ignore[attr-defined]
+            user = db.query(User).filter(User.email == email).first()
+            assert user is not None
+            user.plan_tier = "pro"
+            user.billing_status = "active"
+            user.stripe_customer_id = "cus_delete_fail"
+            user.stripe_subscription_id = "sub_delete_fail"
+            db.commit()
+            user_id = user.id
+
+        from services import billing_service
+
+        class FakeSubscription:
+            @staticmethod
+            def cancel(subscription_id: str) -> dict:
+                raise RuntimeError("stripe unavailable")
+
+        class FakeStripeModule:
+            Subscription = FakeSubscription
+
+        monkeypatch.setattr(billing_service, "_load_stripe_module", lambda: FakeStripeModule)
+
+        res = client.post(
+            "/api/v1/users/me/delete-account",
+            headers=_auth(token),
+            json={"confirm_password": PASSWORD},
+        )
+        assert res.status_code == 502, res.text
+        assert res.json()["detail"]["code"] == "STRIPE_SUBSCRIPTION_CANCEL_FAILED"
+
+        with client._gridcheck_session_factory() as db:  # type: ignore[attr-defined]
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.deleted_at is None
+            assert user.is_active is True
+            assert user.email == email
+            assert user.stripe_customer_id == "cus_delete_fail"
+            assert user.stripe_subscription_id == "sub_delete_fail"
     finally:
         _close_client(client)
 

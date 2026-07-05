@@ -1849,6 +1849,60 @@ def create_portal_session(db: Session, user: User) -> dict[str, str]:
     return {"url": str(portal_url)}
 
 
+def cancel_subscription_for_account_deletion(db: Session, user: User) -> bool:
+    """Cancel a Stripe subscription before DSGVO account anonymization locks the user out."""
+    subscription_id = str(user.stripe_subscription_id or "").strip()
+    if not subscription_id or str(user.billing_status or "").strip().lower() == "canceled":
+        return False
+
+    stripe_mod = _load_stripe_module()
+    subscription_api = getattr(stripe_mod, "Subscription", None)
+    cancel_subscription = getattr(subscription_api, "cancel", None) if subscription_api is not None else None
+    if not callable(cancel_subscription):
+        cancel_subscription = getattr(subscription_api, "delete", None) if subscription_api is not None else None
+    if not callable(cancel_subscription):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "STRIPE_SUBSCRIPTION_CANCEL_UNAVAILABLE",
+                "message": "Stripe-Subscription-Cancel ist in dieser Umgebung nicht verfuegbar.",
+                "hint": "Bitte Stripe-Konfiguration pruefen oder Support kontaktieren, bevor das Konto geloescht wird.",
+            },
+        )
+
+    try:
+        canceled_subscription = cancel_subscription(subscription_id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "STRIPE_SUBSCRIPTION_CANCEL_FAILED",
+                "message": "Die laufende Stripe-Subscription konnte vor der Konto-Loeschung nicht beendet werden.",
+                "hint": "Bitte Billing Portal oder Support nutzen; das Konto wurde nicht anonymisiert.",
+            },
+        ) from exc
+
+    try:
+        payload = _as_dict(canceled_subscription) if canceled_subscription is not None else {}
+    except Exception:
+        payload = {"subscription_id": subscription_id}
+    status = str(payload.get("status") or "canceled")
+    _mark_subscription_entitlements_inactive(db, user)
+    _record_billing_event(
+        db,
+        user_id=user.id,
+        event_type="dsgvo.subscription_canceled",
+        status=status,
+        payload={
+            "reason": "account_deletion",
+            "subscription": payload,
+        },
+        provider_customer_id=user.stripe_customer_id,
+        provider_subscription_id=subscription_id,
+    )
+    return True
+
+
 def _resolve_user_for_event(db: Session, event_type: str, data_object: dict[str, Any]) -> User | None:
     metadata = data_object.get("metadata")
     if isinstance(metadata, dict) and metadata.get("user_id"):
