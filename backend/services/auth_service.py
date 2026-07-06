@@ -148,9 +148,21 @@ def issue_token_pair(user: User) -> dict[str, str]:
     }
 
 
-def refresh_access_token(refresh_token: str) -> dict[str, str]:
+def refresh_access_token(db: Session, refresh_token: str) -> dict[str, str]:
     payload = decode_token(refresh_token, refresh=True)
-    access_payload = {"sub": str(payload["sub"]), "email": payload["email"], "role": payload["role"]}
+    user_id = payload.get("sub")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or user.deleted_at is not None or not user.is_active:
+        log_security_event("auth_refresh_invalid_user", user_id=user_id)
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "AUTH_USER_INVALID",
+                "message": "Benutzer ungueltig",
+                "hint": "Bitte erneut anmelden.",
+            },
+        )
+    access_payload = {"sub": str(user.id), "email": user.email, "role": user.role}
     return {
         "access_token": create_token(access_payload, ACCESS_TTL_MIN, refresh=False),
         "token_type": "bearer",

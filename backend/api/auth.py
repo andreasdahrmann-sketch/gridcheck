@@ -167,7 +167,7 @@ def refresh(
             status_code=401,
             detail={"code": "AUTH_REFRESH_REQUIRED", "message": "Refresh-Token fehlt", "hint": "Bitte erneut einloggen."},
         )
-    token = refresh_access_token(refresh_token)
+    token = refresh_access_token(db, refresh_token)
     secure_cookie = settings.app_env in {"staging", "prod", "production"}
     response.set_cookie(
         key=settings.auth_access_cookie,

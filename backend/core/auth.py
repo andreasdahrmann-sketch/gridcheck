@@ -147,7 +147,7 @@ def get_current_user(
     payload = decode_token(token, refresh=False)
     user_id = payload.get("sub")
     user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.is_active:
+    if not user or user.deleted_at is not None or not user.is_active:
         raise HTTPException(
             status_code=401,
             detail={"code": "AUTH_USER_INVALID", "message": "Benutzer ungueltig", "hint": "Bitte erneut anmelden."},
