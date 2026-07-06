@@ -84,6 +84,12 @@ def _login(client: TestClient, email: str, password: str = PASSWORD) -> str:
     return res.json()["access_token"]
 
 
+def _login_tokens(client: TestClient, email: str, password: str = PASSWORD) -> dict:
+    res = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
 def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
@@ -365,5 +371,51 @@ def test_deleted_user_cannot_login() -> None:
         )
         assert reregister.status_code == 409, reregister.text
         assert reregister.json()["detail"]["code"] == "EMAIL_DELETED_BLOCKED"
+    finally:
+        _close_client(client)
+
+
+def test_deleted_user_cannot_refresh_token() -> None:
+    client = build_client()
+    try:
+        email = _unique_email("delete-refresh")
+        _register(client, email)
+        tokens = _login_tokens(client, email)
+
+        res = client.post(
+            "/api/v1/users/me/delete-account",
+            headers=_auth(tokens["access_token"]),
+            json={"confirm_password": PASSWORD},
+        )
+        assert res.status_code == 204, res.text
+
+        refresh = client.post(
+            "/api/v1/auth/refresh",
+            headers=_auth(tokens["access_token"]),
+            json={"refresh_token": tokens["refresh_token"]},
+        )
+        assert refresh.status_code == 401, refresh.text
+        assert refresh.json()["detail"]["code"] == "AUTH_USER_INVALID"
+    finally:
+        _close_client(client)
+
+
+def test_soft_deleted_active_user_is_rejected_by_current_user_dependency() -> None:
+    client = build_client()
+    try:
+        email = _unique_email("delete-active")
+        _register(client, email)
+        token = _login(client, email)
+
+        with client._gridcheck_session_factory() as db:  # type: ignore[attr-defined]
+            user = db.query(User).filter(User.email == email).first()
+            assert user is not None
+            user.deleted_at = datetime.now(timezone.utc)
+            user.is_active = True
+            db.commit()
+
+        me = client.get("/api/v1/auth/me", headers=_auth(token))
+        assert me.status_code == 401, me.text
+        assert me.json()["detail"]["code"] == "AUTH_USER_INVALID"
     finally:
         _close_client(client)
