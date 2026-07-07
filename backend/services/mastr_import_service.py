@@ -362,10 +362,27 @@ def run_mastr_import(
         db_session.commit()
     except Exception as exc:
         finished_at = datetime.now(timezone.utc)
-        audit.finished_at = finished_at
-        audit.status = "failed"
-        audit.error_summary = f"{type(exc).__name__}: {exc}"
-        db_session.commit()
+        db_session.rollback()
+        failure_audit = MastrImport(
+            id=run_id,
+            started_at=started_at,
+            finished_at=finished_at,
+            parser_version=PARSER_VERSION,
+            source_file=str(source_path),
+            rows_total=stats.rows_total,
+            rows_inserted=0,
+            rows_updated=0,
+            rows_skipped=0,
+            rows_failed=stats.rows_failed + 1,
+            status="failed",
+            error_summary=f"{type(exc).__name__}: {exc}",
+        )
+        try:
+            db_session.add(failure_audit)
+            db_session.commit()
+        except Exception as audit_exc:
+            db_session.rollback()
+            logger.error("mastr_import_failure_audit_failed", run_id=run_id, error=str(audit_exc))
         logger.error("mastr_import_aborted", run_id=run_id, error=str(exc))
         raise
 
