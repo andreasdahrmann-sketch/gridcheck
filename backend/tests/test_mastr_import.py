@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+import services.mastr_import_service as mastr_import_service
 from db.database import Base
 from db.models import MastrImport, MastrUnit
 from services.mastr_import_service import (
@@ -169,6 +170,28 @@ def test_run_fail_soft_on_bad_row(db_session_factory):
     assert run.stats.rows_inserted >= 8
     assert run.error_summary is not None
     assert run.status == "success"
+
+
+def test_run_rolls_back_units_when_extract_aborts(db_session_factory, monkeypatch):
+    def broken_extract(_source_path):
+        yield _valid_row(**{"MaStR-Nr": "SEE-ABORT-001"})
+        yield _valid_row(**{"MaStR-Nr": "SEE-ABORT-002"})
+        raise OSError("truncated csv")
+
+    monkeypatch.setattr(mastr_import_service, "extract", broken_extract)
+
+    with db_session_factory() as db:
+        with pytest.raises(OSError, match="truncated csv"):
+            run_mastr_import(FIXTURE_PATH, db_session=db)
+
+    with db_session_factory() as db:
+        assert db.query(MastrUnit).count() == 0
+        audit = db.query(MastrImport).one()
+        assert audit.status == "failed"
+        assert audit.rows_total == 2
+        assert audit.rows_inserted == 0
+        assert audit.rows_failed == 1
+        assert "truncated csv" in (audit.error_summary or "")
 
 
 def test_dry_run_no_db_writes(db_session_factory):
