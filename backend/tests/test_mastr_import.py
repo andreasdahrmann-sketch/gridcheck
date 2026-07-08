@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+import services.mastr_import_service as mastr_import_service
 from db.database import Base
 from db.models import MastrImport, MastrUnit
 from services.mastr_import_service import (
@@ -146,6 +147,31 @@ def test_load_skips_when_hash_unchanged(db_session_factory):
         assert stats.rows_skipped == 1
 
 
+def test_load_updates_when_parser_version_changes_with_same_raw_hash(db_session_factory):
+    rec1 = transform(_valid_row(**{"MaStR-Nr": "SEE-PARSER-001"}))
+    rec2 = rec1.model_copy(
+        update={
+            "unit_type": "wind",
+            "normalized_hash": "c" * 64,
+            "parser_version": "mastr-csv-0.2.0",
+        }
+    )
+    assert rec1.raw_hash == rec2.raw_hash
+    stats = ImportStats()
+    with db_session_factory() as db:
+        load([rec1], db=db, stats=stats)
+        db.commit()
+        load([rec2], db=db, stats=stats)
+        db.commit()
+        assert stats.rows_inserted == 1
+        assert stats.rows_updated == 1
+        assert stats.rows_skipped == 0
+        unit = db.query(MastrUnit).one()
+        assert unit.unit_type == "wind"
+        assert unit.parser_version == "mastr-csv-0.2.0"
+        assert unit.normalized_hash == "c" * 64
+
+
 def test_run_logs_import_audit(db_session_factory):
     with db_session_factory() as db:
         run = run_mastr_import(FIXTURE_PATH, db_session=db)
@@ -178,3 +204,30 @@ def test_dry_run_no_db_writes(db_session_factory):
     with db_session_factory() as db:
         assert db.query(MastrUnit).count() == 0
         assert db.query(MastrImport).count() == 0
+
+
+def test_run_rolls_back_partial_units_on_catastrophic_extract_error(
+    db_session_factory,
+    monkeypatch,
+    tmp_path,
+):
+    def broken_extract(_source_path):
+        yield _valid_row(**{"MaStR-Nr": "SEE-ABORT-001"})
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr(mastr_import_service, "extract", broken_extract)
+
+    with db_session_factory() as db:
+        with pytest.raises(UnicodeDecodeError):
+            mastr_import_service.run_mastr_import(tmp_path / "broken.csv", db_session=db)
+
+    with db_session_factory() as db:
+        assert db.query(MastrUnit).filter(MastrUnit.mastr_id == "SEE-ABORT-001").count() == 0
+        audit = db.query(MastrImport).one()
+        assert audit.status == "failed"
+        assert audit.rows_total == 1
+        assert audit.rows_inserted == 0
+        assert audit.rows_updated == 0
+        assert audit.rows_skipped == 0
+        assert audit.rows_failed == 1
+        assert "UnicodeDecodeError" in (audit.error_summary or "")

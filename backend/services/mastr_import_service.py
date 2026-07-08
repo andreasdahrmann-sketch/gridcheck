@@ -246,7 +246,7 @@ def _upsert(db: Session, record: MastrUnitRecord) -> tuple[str, MastrUnit]:
         db.flush()
         return "inserted", unit
 
-    if existing.raw_hash == record.raw_hash:
+    if existing.raw_hash == record.raw_hash and existing.parser_version == record.parser_version:
         return "skipped", existing
 
     existing.unit_type = record.unit_type
@@ -362,9 +362,22 @@ def run_mastr_import(
         db_session.commit()
     except Exception as exc:
         finished_at = datetime.now(timezone.utc)
-        audit.finished_at = finished_at
-        audit.status = "failed"
-        audit.error_summary = f"{type(exc).__name__}: {exc}"
+        db_session.rollback()
+        failed_audit = MastrImport(
+            id=run_id,
+            started_at=started_at,
+            finished_at=finished_at,
+            parser_version=PARSER_VERSION,
+            source_file=str(source_path),
+            rows_total=stats.rows_total,
+            rows_inserted=0,
+            rows_updated=0,
+            rows_skipped=0,
+            rows_failed=max(stats.rows_failed, 1),
+            status="failed",
+            error_summary=f"{type(exc).__name__}: {exc}",
+        )
+        db_session.add(failed_audit)
         db_session.commit()
         logger.error("mastr_import_aborted", run_id=run_id, error=str(exc))
         raise

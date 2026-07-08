@@ -18,8 +18,10 @@ import uuid
 import zipfile
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+import api.users as users_api
 from db.database import Base, get_db
 from db.models import (
     PasswordResetToken,
@@ -166,6 +168,40 @@ def test_data_export_rate_limited_to_1_per_24h() -> None:
         second = client.post("/api/v1/users/me/data-export", headers=_auth(token))
         assert second.status_code == 429, second.text
         assert second.json()["detail"]["code"] == "RATE_LIMITED"
+    finally:
+        _close_client(client)
+
+
+def test_data_export_failed_zip_build_does_not_consume_rate_limit(monkeypatch) -> None:
+    client = build_client()
+    original_build = users_api.build_user_export_zip
+    calls = {"count": 0}
+
+    def flaky_build_user_export_zip(user_id, db):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "EXPORT_TEMPORARY_FAILURE",
+                    "message": "Datenexport temporaer nicht verfuegbar.",
+                    "hint": "Bitte erneut versuchen.",
+                },
+            )
+        return original_build(user_id, db)
+
+    monkeypatch.setattr(users_api, "build_user_export_zip", flaky_build_user_export_zip)
+    try:
+        email = _unique_email("export-flaky")
+        _register(client, email)
+        token = _login(client, email)
+
+        first = client.post("/api/v1/users/me/data-export", headers=_auth(token))
+        assert first.status_code == 503, first.text
+
+        retry = client.post("/api/v1/users/me/data-export", headers=_auth(token))
+        assert retry.status_code == 200, retry.text
+        assert retry.headers["content-type"].startswith("application/zip")
     finally:
         _close_client(client)
 
