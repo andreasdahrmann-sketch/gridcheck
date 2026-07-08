@@ -103,6 +103,7 @@ def post_data_export(
     Rate-Limit: 1 Export pro 24h pro User (Admins ausgenommen).
     Audit-Eintrag: `dsgvo_export_requested` ueber RevisionRecord-Hash-Chain.
     """
+    payload = build_user_export_zip(current_user.id, db)
     if (current_user.role or "").strip().lower() != "admin":
         enforce_rate_limit(
             f"dsgvo:export:user:{current_user.id}",
@@ -111,7 +112,6 @@ def post_data_export(
             message="Datenexport bereits angefordert",
             hint="Pro Konto ist nur ein Export je 24 Stunden vorgesehen. Bitte spaeter erneut versuchen.",
         )
-    payload = build_user_export_zip(current_user.id, db)
     record_export_audit(db, current_user, request_ip=get_client_ip(request))
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
     filename = f"gridcheck_export_{current_user.id}_{timestamp}.zip"
