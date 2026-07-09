@@ -246,7 +246,11 @@ def _upsert(db: Session, record: MastrUnitRecord) -> tuple[str, MastrUnit]:
         db.flush()
         return "inserted", unit
 
-    if existing.raw_hash == record.raw_hash:
+    if (
+        existing.raw_hash == record.raw_hash
+        and existing.normalized_hash == record.normalized_hash
+        and existing.parser_version == record.parser_version
+    ):
         return "skipped", existing
 
     existing.unit_type = record.unit_type
@@ -338,17 +342,16 @@ def run_mastr_import(
             error_summary="; ".join(stats.errors[:5]) if stats.errors else None,
         )
 
-    audit = MastrImport(
-        id=run_id,
-        started_at=started_at,
-        parser_version=PARSER_VERSION,
-        source_file=str(source_path),
-        status="running",
-    )
-    db_session.add(audit)
-    db_session.flush()
-
     try:
+        audit = MastrImport(
+            id=run_id,
+            started_at=started_at,
+            parser_version=PARSER_VERSION,
+            source_file=str(source_path),
+            status="running",
+        )
+        db_session.add(audit)
+        db_session.flush()
         load(_iter_validated(extract(Path(source_path)), stats), db=db_session, stats=stats)
         finished_at = datetime.now(timezone.utc)
         audit.finished_at = finished_at
@@ -361,11 +364,32 @@ def run_mastr_import(
         audit.error_summary = "; ".join(stats.errors[:5]) if stats.errors else None
         db_session.commit()
     except Exception as exc:
+        db_session.rollback()
         finished_at = datetime.now(timezone.utc)
-        audit.finished_at = finished_at
-        audit.status = "failed"
-        audit.error_summary = f"{type(exc).__name__}: {exc}"
-        db_session.commit()
+        failed_audit = MastrImport(
+            id=run_id,
+            started_at=started_at,
+            finished_at=finished_at,
+            parser_version=PARSER_VERSION,
+            source_file=str(source_path),
+            rows_total=stats.rows_total,
+            rows_inserted=0,
+            rows_updated=0,
+            rows_skipped=0,
+            rows_failed=stats.rows_failed,
+            status="failed",
+            error_summary=f"{type(exc).__name__}: {exc}",
+        )
+        db_session.add(failed_audit)
+        try:
+            db_session.commit()
+        except Exception as audit_exc:
+            db_session.rollback()
+            logger.error(
+                "mastr_import_failed_audit_persist_failed",
+                run_id=run_id,
+                error=str(audit_exc),
+            )
         logger.error("mastr_import_aborted", run_id=run_id, error=str(exc))
         raise
 
