@@ -4,7 +4,7 @@ Pflicht-Cases laut Auftrag:
 - extract liefert Zeilen
 - transform akzeptiert valide Zeile
 - transform lehnt ungueltige Latitude ab
-- load inserts/updates/skips je nach raw_hash
+- load inserts/updates/skips je nach Provenienz-Hashes + Parser-Version
 - run() schreibt Audit
 - run() fail-soft auf bad row
 - dry-run schreibt keine DB-Writes
@@ -146,6 +146,35 @@ def test_load_skips_when_hash_unchanged(db_session_factory):
         assert stats.rows_skipped == 1
 
 
+def test_load_updates_when_parser_output_changes_with_same_raw_hash(db_session_factory):
+    rec1 = transform(
+        _valid_row(**{"MaStR-Nr": "SEE-PARSER-001", "Anlagentyp": "Solar"})
+    )
+    rec2 = rec1.model_copy(
+        update={
+            "unit_type": "other",
+            "normalized_hash": "f" * 64,
+            "parser_version": "mastr-csv-0.2.0",
+        }
+    )
+    assert rec1.raw_hash == rec2.raw_hash
+    assert rec1.normalized_hash != rec2.normalized_hash
+    assert rec1.parser_version != rec2.parser_version
+    stats = ImportStats()
+    with db_session_factory() as db:
+        load([rec1], db=db, stats=stats)
+        db.commit()
+        load([rec2], db=db, stats=stats)
+        db.commit()
+        assert stats.rows_inserted == 1
+        assert stats.rows_updated == 1
+        assert stats.rows_skipped == 0
+        unit = db.query(MastrUnit).one()
+        assert unit.unit_type == "other"
+        assert unit.normalized_hash == "f" * 64
+        assert unit.parser_version == "mastr-csv-0.2.0"
+
+
 def test_run_logs_import_audit(db_session_factory):
     with db_session_factory() as db:
         run = run_mastr_import(FIXTURE_PATH, db_session=db)
@@ -178,3 +207,38 @@ def test_dry_run_no_db_writes(db_session_factory):
     with db_session_factory() as db:
         assert db.query(MastrUnit).count() == 0
         assert db.query(MastrImport).count() == 0
+
+
+def test_run_rolls_back_units_on_catastrophic_stream_abort(db_session_factory, monkeypatch):
+    from services import mastr_import_service
+
+    rec = transform(_valid_row(**{"MaStR-Nr": "SEE-ABORT-001"}))
+
+    def broken_extract(_source_path):
+        yield {
+            "MaStR-Nr": rec.mastr_id,
+            "Anlagentyp": "Solar",
+            "Bruttoleistung_kW": "12.345",
+            "Inbetriebnahme": "2021-04-15",
+            "PLZ": "10115",
+            "Bundesland": "Berlin",
+            "Laengengrad": "13.388860",
+            "Breitengrad": "52.517037",
+            "Netzbetreiber": "Stromnetz Berlin GmbH",
+            "Spannungsebene": "Niederspannung",
+        }
+        raise RuntimeError("stream aborted")
+
+    monkeypatch.setattr(mastr_import_service, "extract", broken_extract)
+
+    with db_session_factory() as db:
+        with pytest.raises(RuntimeError, match="stream aborted"):
+            run_mastr_import(Path("broken.csv"), db_session=db)
+
+    with db_session_factory() as db:
+        assert db.query(MastrUnit).count() == 0
+        audit = db.query(MastrImport).one()
+        assert audit.status == "failed"
+        assert audit.rows_total == 1
+        assert audit.rows_inserted == 0
+        assert "RuntimeError: stream aborted" in audit.error_summary
