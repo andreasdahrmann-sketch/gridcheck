@@ -246,7 +246,11 @@ def _upsert(db: Session, record: MastrUnitRecord) -> tuple[str, MastrUnit]:
         db.flush()
         return "inserted", unit
 
-    if existing.raw_hash == record.raw_hash:
+    if (
+        existing.raw_hash == record.raw_hash
+        and existing.normalized_hash == record.normalized_hash
+        and existing.parser_version == record.parser_version
+    ):
         return "skipped", existing
 
     existing.unit_type = record.unit_type
@@ -280,17 +284,19 @@ def load(
     """Persistiert validierte Records (UPSERT auf mastr_id)."""
     for record in records:
         try:
-            action, _ = _upsert(db, record)
-            if action == "inserted":
-                stats.rows_inserted += 1
-            elif action == "updated":
-                stats.rows_updated += 1
-            else:
-                stats.rows_skipped += 1
+            with db.begin_nested():
+                action, _ = _upsert(db, record)
         except Exception as exc:  # fail-soft pro Zeile
             stats.rows_failed += 1
             stats.errors.append(f"load:{record.mastr_id}:{type(exc).__name__}:{exc}")
             logger.warning("mastr_load_failed", mastr_id=record.mastr_id, error=str(exc))
+            continue
+        if action == "inserted":
+            stats.rows_inserted += 1
+        elif action == "updated":
+            stats.rows_updated += 1
+        else:
+            stats.rows_skipped += 1
     return stats
 
 

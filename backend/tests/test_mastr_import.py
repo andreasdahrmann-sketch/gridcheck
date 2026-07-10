@@ -146,6 +146,47 @@ def test_load_skips_when_hash_unchanged(db_session_factory):
         assert stats.rows_skipped == 1
 
 
+def test_load_updates_when_parser_version_changes_with_same_raw_hash(db_session_factory):
+    rec1 = transform(_valid_row(**{"MaStR-Nr": "SEE-PARSER-001"}))
+    rec2 = rec1.model_copy(
+        update={
+            "unit_type": "wind",
+            "normalized_hash": "b" * 64,
+            "parser_version": "mastr-csv-0.1.1",
+        }
+    )
+    assert rec1.raw_hash == rec2.raw_hash
+    assert rec1.normalized_hash != rec2.normalized_hash
+    stats = ImportStats()
+    with db_session_factory() as db:
+        load([rec1], db=db, stats=stats)
+        db.commit()
+        load([rec2], db=db, stats=stats)
+        db.commit()
+        assert stats.rows_inserted == 1
+        assert stats.rows_updated == 1
+        assert stats.rows_skipped == 0
+        unit = db.query(MastrUnit).one()
+        assert unit.unit_type == "wind"
+        assert unit.parser_version == "mastr-csv-0.1.1"
+
+
+def test_load_db_error_rolls_back_only_failed_row(db_session_factory):
+    rec1 = transform(_valid_row(**{"MaStR-Nr": "SEE-ERR-001"}))
+    rec_bad = transform(_valid_row(**{"MaStR-Nr": "SEE-ERR-BAD"})).model_copy(
+        update={"parser_version": "x" * 21}
+    )
+    rec2 = transform(_valid_row(**{"MaStR-Nr": "SEE-ERR-002"}))
+    stats = ImportStats()
+    with db_session_factory() as db:
+        load([rec1, rec_bad, rec2], db=db, stats=stats)
+        db.commit()
+        assert stats.rows_inserted == 2
+        assert stats.rows_failed == 1
+        assert db.query(MastrUnit).count() == 2
+        assert db.query(MastrUnit).filter(MastrUnit.mastr_id == "SEE-ERR-BAD").count() == 0
+
+
 def test_run_logs_import_audit(db_session_factory):
     with db_session_factory() as db:
         run = run_mastr_import(FIXTURE_PATH, db_session=db)
