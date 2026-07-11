@@ -3,7 +3,8 @@
 Pflicht-Verhalten:
 - Default (`billing_enabled=False`) → Routen unter /api/v1/billing/* antworten 503
   mit Code BILLING_DISABLED, EXCEPT der Stripe-Webhook (der nimmt das Event auf
-  und beantwortet es mit 200, damit Stripe nicht in einen Retry-Loop faellt).
+  und beantwortet es ohne DB-Persistenz mit 200, damit Stripe nicht in einen
+  Retry-Loop faellt).
 - Admin (User.role == "admin") umgeht den 503 weiterhin.
 - has_paid_access ignoriert den DB-Stand bei deaktiviertem Billing fuer
   Nicht-Admins (Frontend muss ohne Stripe-Pfad strikt Free-Erlebnis sehen).
@@ -156,8 +157,8 @@ def test_billing_routes_work_when_enabled(monkeypatch):
         _close_client(client)
 
 
-def test_webhook_logs_but_does_not_503(monkeypatch):
-    """Webhook bleibt erreichbar; bei deaktiviertem Billing 200 + Audit-Log."""
+def test_webhook_noops_without_persisting_when_disabled(monkeypatch):
+    """Webhook bleibt erreichbar; bei deaktiviertem Billing keine DB-Schreiblast."""
     client = _build_client()
     try:
         _set_billing_enabled(monkeypatch, enabled=False)
@@ -176,8 +177,7 @@ def test_webhook_logs_but_does_not_503(monkeypatch):
                 .filter(BillingEvent.event_type == "webhook_received_while_disabled")
                 .all()
             )
-            assert len(events) == 1
-            assert events[0].status == "ignored"
+            assert events == []
     finally:
         _close_client(client)
 
