@@ -7,7 +7,7 @@ Ziel:
   sehen weiter alle Billing-Endpunkte und Funktionen.
 - Stripe-Webhook bleibt erreichbar (kein 503), damit Stripe nicht in einen
   Retry-Loop faellt; der eigentliche Webhook-Handler entscheidet selbst,
-  ob Events verarbeitet oder nur audit-loggend ignoriert werden.
+  ob Events verarbeitet oder ohne Persistenz ignoriert werden.
 
 Single source of truth fuer den Schalter ist `settings.billing_enabled`
 aus `core.config`.

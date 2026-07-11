@@ -2153,24 +2153,9 @@ def get_checkout_session_status(db: Session, user: User, session_id: str) -> dic
 
 def handle_stripe_webhook(db: Session, payload: bytes, stripe_signature: str | None) -> dict[str, str]:
     # Billing-Hide-Schalter: wenn Billing in dieser Umgebung deaktiviert ist,
-    # nehmen wir das Event entgegen, audit-loggen es und antworten mit 200,
-    # damit Stripe nicht in einen Retry-Loop faellt. Es findet KEINE
-    # User-/Subscription-Mutation statt.
+    # nehmen wir das Event entgegen und antworten mit 200, damit Stripe nicht
+    # in einen Retry-Loop faellt. Ohne Signaturpruefung wird nichts persistiert.
     if not settings.billing_enabled:
-        try:
-            _record_billing_event(
-                db,
-                user_id=None,
-                event_type="webhook_received_while_disabled",
-                status="ignored",
-                payload={
-                    "raw_size": len(payload or b""),
-                    "has_signature": bool(stripe_signature),
-                },
-            )
-            db.commit()
-        except Exception:
-            db.rollback()
         return {"status": "ignored_billing_disabled"}
     if not settings.stripe_webhook_secret:
         raise HTTPException(
