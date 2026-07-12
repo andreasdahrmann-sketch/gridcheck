@@ -238,9 +238,15 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
         const user = await me();
         if (!active) return;
         setAuthUser(user);
-        const billing = await getBillingStatus();
-        if (!active) return;
-        setBillingStatus(billing);
+        try {
+          const billing = await getBillingStatus();
+          if (!active) return;
+          setBillingStatus(billing);
+        } catch {
+          if (!active) return;
+          setBillingStatus(null);
+          setSelectedOfferId("free");
+        }
       } catch {
         if (!active) return;
         setAuthUser(null);

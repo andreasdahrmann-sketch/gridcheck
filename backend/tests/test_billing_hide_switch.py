@@ -2,8 +2,8 @@
 
 Pflicht-Verhalten:
 - Default (`billing_enabled=False`) → Routen unter /api/v1/billing/* antworten 503
-  mit Code BILLING_DISABLED, EXCEPT der Stripe-Webhook (der nimmt das Event auf
-  und beantwortet es mit 200, damit Stripe nicht in einen Retry-Loop faellt).
+  mit Code BILLING_DISABLED, EXCEPT der Stripe-Webhook (der beantwortet das Event
+  ohne DB-Write mit 200, damit Stripe nicht in einen Retry-Loop faellt).
 - Admin (User.role == "admin") umgeht den 503 weiterhin.
 - has_paid_access ignoriert den DB-Stand bei deaktiviertem Billing fuer
   Nicht-Admins (Frontend muss ohne Stripe-Pfad strikt Free-Erlebnis sehen).
@@ -11,12 +11,13 @@ Pflicht-Verhalten:
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
 
 from db.database import Base, get_db
-from db.models import BillingEvent, User
+from db.models import BillingEntitlement, BillingEvent, User
 from main import app
 from tests.postgres_test_utils import build_isolated_postgres_session_factory
 
@@ -156,8 +157,8 @@ def test_billing_routes_work_when_enabled(monkeypatch):
         _close_client(client)
 
 
-def test_webhook_logs_but_does_not_503(monkeypatch):
-    """Webhook bleibt erreichbar; bei deaktiviertem Billing 200 + Audit-Log."""
+def test_webhook_ignores_without_db_write_when_disabled(monkeypatch):
+    """Webhook bleibt erreichbar; deaktiviertes Billing ist aber kein unauth Write-Pfad."""
     client = _build_client()
     try:
         _set_billing_enabled(monkeypatch, enabled=False)
@@ -171,13 +172,74 @@ def test_webhook_logs_but_does_not_503(monkeypatch):
         assert res.json()["status"] == "ignored_billing_disabled"
 
         with _db_session(client) as db:
-            events = (
-                db.query(BillingEvent)
-                .filter(BillingEvent.event_type == "webhook_received_while_disabled")
-                .all()
+            assert db.query(BillingEvent).count() == 0
+    finally:
+        _close_client(client)
+
+
+def test_package_access_uses_free_only_when_disabled_with_paid_entitlement(monkeypatch):
+    """Analyse-Pfad ignoriert stale Paid-Entitlements, solange Billing aus ist."""
+    client = _build_client()
+    try:
+        _set_billing_enabled(monkeypatch, enabled=False)
+        _register_and_login(client, "disabled-paid-entitlement@example.com")
+
+        from services.billing_service import package_access_context
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "disabled-paid-entitlement@example.com").first()
+            assert user is not None
+            db.add(
+                BillingEntitlement(
+                    user_id=user.id,
+                    offer_id="premium_pre_check",
+                    offer_category="pay_per_use",
+                    package_scope="premium",
+                    source="checkout",
+                    status="active",
+                    total_credits=1,
+                    used_credits=0,
+                    valid_from=datetime.now(timezone.utc),
+                    metadata_json='{"report_scope":"premium"}',
+                )
             )
-            assert len(events) == 1
-            assert events[0].status == "ignored"
+            db.commit()
+
+            access = package_access_context(db, user, requested_offer_id="premium_pre_check")
+            assert access["billing_category"] == "free"
+            assert access["offer_id"] == "free"
+            assert access["package_scope"] == "basic"
+            assert access["entitlement"] is None
+
+            entitlement = db.query(BillingEntitlement).filter(BillingEntitlement.offer_id == "premium_pre_check").one()
+            assert entitlement.used_credits == 0
+            assert entitlement.status == "active"
+    finally:
+        _close_client(client)
+
+
+def test_billing_overview_does_not_create_subscription_entitlement_when_disabled(monkeypatch):
+    """Stale Pro-Status darf bei deaktiviertem Billing keine Entitlement-Zeile erzeugen."""
+    client = _build_client()
+    try:
+        _set_billing_enabled(monkeypatch, enabled=False)
+        _register_and_login(client, "disabled-pro-overview@example.com")
+
+        from services.billing_service import build_billing_overview
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "disabled-pro-overview@example.com").first()
+            assert user is not None
+            user.plan_tier = "pro"
+            user.billing_status = "active"
+            db.commit()
+
+            overview = build_billing_overview(db, user)
+            assert overview["has_active_subscription"] is False
+            assert overview["has_prepaid_credits"] is False
+            assert overview["active_paid_entitlements_count"] == 0
+            assert [option["offer_id"] for option in overview["analysis_options"]] == ["free"]
+            assert db.query(BillingEntitlement).count() == 0
     finally:
         _close_client(client)
 

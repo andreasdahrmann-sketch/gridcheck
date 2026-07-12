@@ -397,6 +397,8 @@ def _sync_subscription_quota(user: User, entitlement: BillingEntitlement, offer:
 
 
 def _ensure_subscription_entitlement(db: Session, user: User) -> BillingEntitlement | None:
+    if not settings.billing_enabled and not _is_unlimited_admin(user):
+        return None
     if user.plan_tier != "pro" or user.billing_status not in PAID_ACCESS_STATUSES:
         return None
     offer = _offer_lookup("pro_lizenz")
@@ -1065,15 +1067,16 @@ def update_ops_followup_status(
 
 def build_billing_overview(db: Session, user: User) -> dict[str, Any]:
     _ensure_subscription_entitlement(db, user)
+    billing_disabled_for_user = not settings.billing_enabled and not _is_unlimited_admin(user)
     free_checks_limit = settings.free_checks_limit
     free_checks_used = count_consumed_free_checks(db, user)
     paid_access = has_paid_access(user)
     free_checks_remaining = max(0, free_checks_limit - free_checks_used)
     catalog = get_public_billing_catalog()
     checkout_enabled = any(offer["checkout_enabled"] for offer in catalog["offers"])
-    entitlements = list_active_entitlements(db, user)
-    entitlement_history = list_entitlement_history(db, user, limit=20)
-    ops_followups = list_ops_followups(db, user, limit=10)
+    entitlements = [] if billing_disabled_for_user else list_active_entitlements(db, user)
+    entitlement_history = [] if billing_disabled_for_user else list_entitlement_history(db, user, limit=20)
+    ops_followups = [] if billing_disabled_for_user else list_ops_followups(db, user, limit=10)
     stripe_readiness = _build_stripe_readiness()
     subscription_state = _subscription_state(user)
     billing_attention = _billing_attention(user)
@@ -1231,6 +1234,23 @@ def ensure_analysis_allowed(db: Session, user: User) -> dict[str, Any]:
     raise HTTPException(status_code=402, detail=_paywall_detail(db, user))
 
 
+def _free_tier_access_context(db: Session, user: User) -> dict[str, Any]:
+    if count_consumed_free_checks(db, user) < settings.free_checks_limit:
+        free_offer = _offer_lookup("basic_schnellcheck")
+        return {
+            "billing_category": "free",
+            "free_quota_consumed": True,
+            "offer_id": "free",
+            "package_scope": "basic",
+            "usage_bucket": "free",
+            "entitlement": None,
+            "report_scope": free_offer["report_scope"],
+            "feature_flags": _feature_flags(free_offer),
+            "ops_followup_required": False,
+        }
+    raise HTTPException(status_code=402, detail=_paywall_detail(db, user))
+
+
 def package_access_context(
     db: Session,
     user: User,
@@ -1243,6 +1263,9 @@ def package_access_context(
     # entitlement=None und free_quota_consumed=False (siehe persist_completed_analysis_run).
     if _is_unlimited_admin(user):
         return _admin_access_context(requested_offer_id)
+
+    if not settings.billing_enabled:
+        return _free_tier_access_context(db, user)
 
     _ensure_subscription_entitlement(db, user)
 
@@ -2153,24 +2176,10 @@ def get_checkout_session_status(db: Session, user: User, session_id: str) -> dic
 
 def handle_stripe_webhook(db: Session, payload: bytes, stripe_signature: str | None) -> dict[str, str]:
     # Billing-Hide-Schalter: wenn Billing in dieser Umgebung deaktiviert ist,
-    # nehmen wir das Event entgegen, audit-loggen es und antworten mit 200,
-    # damit Stripe nicht in einen Retry-Loop faellt. Es findet KEINE
-    # User-/Subscription-Mutation statt.
+    # nehmen wir das Event entgegen und antworten mit 200, damit Stripe nicht in
+    # einen Retry-Loop faellt. Ohne Signaturpruefung schreiben wir bewusst keine
+    # DB-Zeile, damit der public Webhook kein unauthentifizierter Write-Pfad ist.
     if not settings.billing_enabled:
-        try:
-            _record_billing_event(
-                db,
-                user_id=None,
-                event_type="webhook_received_while_disabled",
-                status="ignored",
-                payload={
-                    "raw_size": len(payload or b""),
-                    "has_signature": bool(stripe_signature),
-                },
-            )
-            db.commit()
-        except Exception:
-            db.rollback()
         return {"status": "ignored_billing_disabled"}
     if not settings.stripe_webhook_secret:
         raise HTTPException(
