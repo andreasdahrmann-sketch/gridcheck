@@ -417,13 +417,20 @@ def record_export_audit(db: Session, user: User, *, request_ip: str | None) -> N
         # speichere_revision committed nur, wenn es eine eigene Session besitzt.
         # Hier wurde die FastAPI-Session uebergeben, daher manuell committen.
         db.commit()
-    except Exception:
-        # Audit-Schreibfehler darf den Export nicht blockieren; Security-Log greift.
+    except Exception as exc:
         db.rollback()
         log_security_event(
             "dsgvo_export_audit_failed",
             user_id=user.id,
         )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "AUDIT_WRITE_FAILED",
+                "message": "Der DSGVO-Export konnte nicht revisionssicher protokolliert werden.",
+                "hint": "Bitte den Export spaeter erneut anfordern oder Support kontaktieren.",
+            },
+        ) from exc
     log_security_event("dsgvo_export_requested", user_id=user.id, request_ip=request_ip or "unknown")
 
 
@@ -500,8 +507,6 @@ def delete_user_account(
     user.stripe_price_id = None
     user.updated_at = now
 
-    db.commit()
-
     # Revisionssicheres Audit (Hash-Chain).
     payload = {
         "eingabe": {
@@ -523,9 +528,17 @@ def delete_user_account(
             db=db,
         )
         db.commit()
-    except Exception:
+    except Exception as exc:
         db.rollback()
         log_security_event("dsgvo_account_delete_audit_failed", user_id=user.id)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "AUDIT_WRITE_FAILED",
+                "message": "Die Konto-Loeschung konnte nicht revisionssicher protokolliert werden.",
+                "hint": "Bitte die Loeschung spaeter erneut ausloesen oder Support kontaktieren.",
+            },
+        ) from exc
 
     log_security_event(
         "dsgvo_account_deleted",

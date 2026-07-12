@@ -19,6 +19,7 @@ from pydantic import ValidationError
 
 from db.database import Base
 from db.models import MastrImport, MastrUnit
+from services import mastr_import_service as mastr_service
 from services.mastr_import_service import (
     PARSER_VERSION,
     ImportStats,
@@ -146,6 +147,23 @@ def test_load_skips_when_hash_unchanged(db_session_factory):
         assert stats.rows_skipped == 1
 
 
+def test_load_updates_when_parser_version_changes(db_session_factory):
+    rec = transform(_valid_row(**{"MaStR-Nr": "SEE-PARSER-001"}))
+    reparsed = rec.model_copy(update={"parser_version": "mastr-csv-0.2.0"})
+    stats = ImportStats()
+    with db_session_factory() as db:
+        load([rec], db=db, stats=stats)
+        db.commit()
+        load([reparsed], db=db, stats=stats)
+        db.commit()
+
+        unit = db.query(MastrUnit).one()
+        assert stats.rows_inserted == 1
+        assert stats.rows_updated == 1
+        assert stats.rows_skipped == 0
+        assert unit.parser_version == "mastr-csv-0.2.0"
+
+
 def test_run_logs_import_audit(db_session_factory):
     with db_session_factory() as db:
         run = run_mastr_import(FIXTURE_PATH, db_session=db)
@@ -169,6 +187,27 @@ def test_run_fail_soft_on_bad_row(db_session_factory):
     assert run.stats.rows_inserted >= 8
     assert run.error_summary is not None
     assert run.status == "success"
+
+
+def test_run_rolls_back_units_on_catastrophic_abort(db_session_factory, monkeypatch):
+    def aborting_extract(_source_path):
+        yield _valid_row(**{"MaStR-Nr": "SEE-ABORT-001"})
+        raise OSError("read failed after first row")
+
+    monkeypatch.setattr(mastr_service, "extract", aborting_extract)
+
+    with db_session_factory() as db:
+        with pytest.raises(OSError):
+            run_mastr_import(FIXTURE_PATH, db_session=db)
+
+    with db_session_factory() as db:
+        audits = db.query(MastrImport).all()
+        assert len(audits) == 1
+        assert audits[0].status == "failed"
+        assert audits[0].rows_total == 1
+        assert audits[0].rows_inserted == 0
+        assert "OSError" in (audits[0].error_summary or "")
+        assert db.query(MastrUnit).count() == 0
 
 
 def test_dry_run_no_db_writes(db_session_factory):

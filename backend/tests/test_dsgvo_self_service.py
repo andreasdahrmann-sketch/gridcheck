@@ -215,6 +215,31 @@ def test_data_export_writes_revision_audit_entry() -> None:
         _close_client(client)
 
 
+def test_data_export_returns_503_when_audit_write_fails(monkeypatch) -> None:
+    from services import dsgvo_service
+
+    def fail_revision(*_args, **_kwargs):
+        raise RuntimeError("revision writer unavailable")
+
+    client = build_client()
+    try:
+        email = _unique_email("export-audit-fail")
+        _register(client, email)
+        token = _login(client, email)
+        monkeypatch.setattr(dsgvo_service, "speichere_revision", fail_revision)
+
+        res = client.post("/api/v1/users/me/data-export", headers=_auth(token))
+        assert res.status_code == 503, res.text
+        assert res.json()["detail"]["code"] == "AUDIT_WRITE_FAILED"
+        assert not res.headers.get("content-type", "").startswith("application/zip")
+
+        with client._gridcheck_session_factory() as db:  # type: ignore[attr-defined]
+            entries = db.query(RevisionRecord).filter(RevisionRecord.action_type == "dsgvo_export_requested").all()
+            assert entries == []
+    finally:
+        _close_client(client)
+
+
 # ---------------------------------------------------------------------------
 # Konto-Loeschung
 # ---------------------------------------------------------------------------
@@ -334,6 +359,44 @@ def test_delete_account_writes_audit_entry() -> None:
                 .all()
             )
             assert len(entries) == 1
+    finally:
+        _close_client(client)
+
+
+def test_delete_account_rolls_back_when_audit_write_fails(monkeypatch) -> None:
+    from services import dsgvo_service
+
+    def fail_revision(*_args, **_kwargs):
+        raise RuntimeError("revision writer unavailable")
+
+    client = build_client()
+    try:
+        email = _unique_email("delete-audit-fail")
+        _register(client, email)
+        token = _login(client, email)
+        project_id = _create_project(client, email)
+        monkeypatch.setattr(dsgvo_service, "speichere_revision", fail_revision)
+
+        res = client.post(
+            "/api/v1/users/me/delete-account",
+            headers=_auth(token),
+            json={"confirm_password": PASSWORD},
+        )
+        assert res.status_code == 503, res.text
+        assert res.json()["detail"]["code"] == "AUDIT_WRITE_FAILED"
+
+        with client._gridcheck_session_factory() as db:  # type: ignore[attr-defined]
+            user = db.query(User).filter(User.email == email).first()
+            assert user is not None
+            assert user.deleted_at is None
+            assert user.deleted_email_hash is None
+            assert user.is_active is True
+            assert user.password_hash != ""
+            project = db.query(Project).filter(Project.id == project_id).first()
+            assert project is not None
+            assert project.deleted_at is None
+            entries = db.query(RevisionRecord).filter(RevisionRecord.action_type == "dsgvo_account_deleted").all()
+            assert entries == []
     finally:
         _close_client(client)
 

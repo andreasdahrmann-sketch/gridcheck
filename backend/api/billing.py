@@ -130,6 +130,6 @@ async def stripe_webhook(
     # Webhook bleibt absichtlich erreichbar (kein 503), damit Stripe nicht in einen
     # Retry-Loop faellt, falls der Schalter im laufenden Betrieb umgestellt wird.
     # Der Service entscheidet anhand `settings.billing_enabled`, ob das Event
-    # tatsaechlich verarbeitet oder nur audit-loggend ignoriert wird.
+    # tatsaechlich verarbeitet oder ohne DB-Write ignoriert wird.
     payload = await request.body()
     return handle_stripe_webhook(db, payload, stripe_signature)
