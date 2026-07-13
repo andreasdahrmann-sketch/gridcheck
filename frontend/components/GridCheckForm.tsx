@@ -39,6 +39,7 @@ import {
   resolveStakeholderProductPath,
 } from "@/lib/stakeholder-product";
 import { buildSiteMarkerHref } from "@/lib/app-flow";
+import { isBillingEnabled } from "@/lib/billing-flag";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { pushCompareSnapshot, STANDALONE_COMPARE_PROJECT_ID } from "@/lib/scenario-compare-snapshots";
 
@@ -238,12 +239,27 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
         const user = await me();
         if (!active) return;
         setAuthUser(user);
+      } catch {
+        if (!active) return;
+        setAuthUser(null);
+        setBillingStatus(null);
+        setIsBillingLoading(false);
+        return;
+      }
+
+      if (!isBillingEnabled()) {
+        if (!active) return;
+        setBillingStatus(null);
+        setIsBillingLoading(false);
+        return;
+      }
+
+      try {
         const billing = await getBillingStatus();
         if (!active) return;
         setBillingStatus(billing);
       } catch {
         if (!active) return;
-        setAuthUser(null);
         setBillingStatus(null);
       } finally {
         if (active) {
