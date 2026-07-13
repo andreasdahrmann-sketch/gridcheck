@@ -39,6 +39,7 @@ import {
   resolveStakeholderProductPath,
 } from "@/lib/stakeholder-product";
 import { buildSiteMarkerHref } from "@/lib/app-flow";
+import { isBillingEnabled } from "@/lib/billing-flag";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { pushCompareSnapshot, STANDALONE_COMPARE_PROJECT_ID } from "@/lib/scenario-compare-snapshots";
 
@@ -138,6 +139,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
   });
   const stakeholderCopy = getStakeholderProductCopy(stakeholderPath);
   const showDeepTechnicalDetails = canViewDeepTechnicalDetails(stakeholderPath);
+  const billingUiEnabled = isBillingEnabled();
 
   const updateInput = (patch: Partial<GridCheckInput>) => setInput(prev => ({ ...prev, ...patch }));
   const updateMeta = (patch: Partial<MetaData>) => setMeta(prev => ({ ...prev, ...patch }));
@@ -238,12 +240,27 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
         const user = await me();
         if (!active) return;
         setAuthUser(user);
+      } catch {
+        if (!active) return;
+        setAuthUser(null);
+        setBillingStatus(null);
+        setIsBillingLoading(false);
+        return;
+      }
+
+      if (!billingUiEnabled) {
+        if (!active) return;
+        setBillingStatus(null);
+        setIsBillingLoading(false);
+        return;
+      }
+
+      try {
         const billing = await getBillingStatus();
         if (!active) return;
         setBillingStatus(billing);
       } catch {
         if (!active) return;
-        setAuthUser(null);
         setBillingStatus(null);
       } finally {
         if (active) {
@@ -256,7 +273,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
     return () => {
       active = false;
     };
-  }, []);
+  }, [billingUiEnabled]);
 
   useEffect(() => {
     if (!billingStatus) return;
@@ -608,6 +625,10 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-gray-300">
               Tarifstatus wird geladen...
             </div>
+          ) : !billingUiEnabled ? (
+            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-sm leading-6 text-emerald-100">
+              Billing ist deaktiviert. Analysen sind fuer angemeldete Nutzer ohne Tarifauswahl freigeschaltet.
+            </div>
           ) : billingStatus ? (
             <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -936,6 +957,8 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
             <div className="text-sm text-gray-400">
               {!authUser
                 ? "Bitte erst einloggen, damit Checks gespeichert und der History zugeordnet werden."
+                : !billingUiEnabled
+                  ? "Billing deaktiviert: Analyse ist ohne Tarifauswahl freigeschaltet."
                 : billingStatus?.subscription_state === "past_due"
                   ? "Pro Zahlung offen: Bitte Billing-Portal pruefen oder ein separates One-off-Paket fuer neue Analysen nutzen."
                   : billingStatus?.subscription_state === "checkout_pending"

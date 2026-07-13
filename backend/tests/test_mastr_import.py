@@ -19,6 +19,7 @@ from pydantic import ValidationError
 
 from db.database import Base
 from db.models import MastrImport, MastrUnit
+from services import mastr_import_service
 from services.mastr_import_service import (
     PARSER_VERSION,
     ImportStats,
@@ -146,6 +147,48 @@ def test_load_skips_when_hash_unchanged(db_session_factory):
         assert stats.rows_skipped == 1
 
 
+def test_load_updates_when_parser_version_changes_with_same_raw_hash(db_session_factory):
+    rec = transform(_valid_row(**{"MaStR-Nr": "SEE-PARSER-001"}))
+    reparsed = rec.model_copy(
+        update={
+            "unit_type": "wind",
+            "normalized_hash": "b" * 64,
+            "parser_version": "mastr-csv-0.2.0",
+        }
+    )
+    assert rec.raw_hash == reparsed.raw_hash
+    assert rec.normalized_hash != reparsed.normalized_hash
+    stats = ImportStats()
+    with db_session_factory() as db:
+        load([rec], db=db, stats=stats)
+        db.commit()
+        load([reparsed], db=db, stats=stats)
+        db.commit()
+        assert stats.rows_inserted == 1
+        assert stats.rows_updated == 1
+        assert stats.rows_skipped == 0
+        unit = db.query(MastrUnit).one()
+        assert unit.unit_type == "wind"
+        assert unit.parser_version == "mastr-csv-0.2.0"
+        assert unit.normalized_hash == "b" * 64
+
+
+def test_load_rolls_back_failed_row_without_poisoning_import_transaction(db_session_factory):
+    rec1 = transform(_valid_row(**{"MaStR-Nr": "SEE-SAVEPOINT-001"}))
+    bad_rec = transform(_valid_row(**{"MaStR-Nr": "SEE-SAVEPOINT-BAD"})).model_copy(
+        update={"dso_name": "x" * 201}
+    )
+    rec2 = transform(_valid_row(**{"MaStR-Nr": "SEE-SAVEPOINT-002"}))
+    stats = ImportStats()
+    with db_session_factory() as db:
+        load([rec1, bad_rec, rec2], db=db, stats=stats)
+        db.commit()
+        assert stats.rows_inserted == 2
+        assert stats.rows_failed == 1
+        assert db.query(MastrUnit).count() == 2
+        assert db.query(MastrUnit).filter(MastrUnit.mastr_id == "SEE-SAVEPOINT-BAD").count() == 0
+
+
 def test_run_logs_import_audit(db_session_factory):
     with db_session_factory() as db:
         run = run_mastr_import(FIXTURE_PATH, db_session=db)
@@ -169,6 +212,24 @@ def test_run_fail_soft_on_bad_row(db_session_factory):
     assert run.stats.rows_inserted >= 8
     assert run.error_summary is not None
     assert run.status == "success"
+
+
+def test_run_abort_rolls_back_units_before_failed_audit(db_session_factory, monkeypatch):
+    rec = transform(_valid_row(**{"MaStR-Nr": "SEE-ABORT-001"}))
+
+    def exploding_load(records, *, db, stats):
+        load([rec], db=db, stats=stats)
+        raise RuntimeError("boom after unit flush")
+
+    monkeypatch.setattr(mastr_import_service, "load", exploding_load)
+    with db_session_factory() as db:
+        with pytest.raises(RuntimeError, match="boom after unit flush"):
+            mastr_import_service.run_mastr_import(FIXTURE_PATH, db_session=db)
+    with db_session_factory() as db2:
+        assert db2.query(MastrUnit).filter(MastrUnit.mastr_id == "SEE-ABORT-001").count() == 0
+        audit = db2.query(MastrImport).one()
+        assert audit.status == "failed"
+        assert "RuntimeError: boom after unit flush" in (audit.error_summary or "")
 
 
 def test_dry_run_no_db_writes(db_session_factory):
