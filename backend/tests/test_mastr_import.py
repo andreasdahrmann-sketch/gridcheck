@@ -171,6 +171,29 @@ def test_run_fail_soft_on_bad_row(db_session_factory):
     assert run.status == "success"
 
 
+def test_run_rolls_back_units_when_source_aborts(db_session_factory, monkeypatch):
+    """Ein fataler Lesefehler darf keine zuvor geflushten Units publizieren."""
+
+    def interrupted_extract(_source_path):
+        yield _valid_row(**{"MaStR-Nr": "SEE-ABORT-001"})
+        raise OSError("source interrupted")
+
+    monkeypatch.setattr("services.mastr_import_service.extract", interrupted_extract)
+
+    with db_session_factory() as db:
+        with pytest.raises(OSError, match="source interrupted"):
+            run_mastr_import(FIXTURE_PATH, db_session=db)
+
+    with db_session_factory() as db:
+        assert db.query(MastrUnit).count() == 0
+        audit = db.query(MastrImport).one()
+        assert audit.status == "failed"
+        assert audit.rows_total == 1
+        assert audit.rows_inserted == 0
+        assert audit.rows_updated == 0
+        assert audit.error_summary == "OSError: source interrupted"
+
+
 def test_dry_run_no_db_writes(db_session_factory):
     run = run_mastr_import(FIXTURE_PATH, db_session=None, dry_run=True)  # type: ignore[arg-type]
     assert run.status.endswith("dry_run")
