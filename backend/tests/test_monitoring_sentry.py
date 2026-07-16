@@ -86,6 +86,47 @@ def test_init_called_when_dsn_set(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "integrations" in kwargs and kwargs["integrations"]
 
 
+@pytest.mark.parametrize(
+    ("traces_value", "profiles_value"),
+    [
+        ("", ""),
+        ("not-a-number", "2.0"),
+    ],
+)
+def test_invalid_sample_rates_fall_back_without_crashing(
+    monkeypatch: pytest.MonkeyPatch,
+    traces_value: str,
+    profiles_value: str,
+) -> None:
+    init_calls: list[dict] = []
+    _install_fake_sentry(monkeypatch, init_calls)
+    monkeypatch.setenv("SENTRY_DSN", "https://public@sentry.example/1")
+    monkeypatch.setenv("SENTRY_TRACES_SAMPLE_RATE", traces_value)
+    monkeypatch.setenv("SENTRY_PROFILES_SAMPLE_RATE", profiles_value)
+
+    monitoring.init_sentry()
+
+    assert len(init_calls) == 1
+    assert init_calls[0]["traces_sample_rate"] == 0.1
+    assert init_calls[0]["profiles_sample_rate"] == 0.0
+    assert monitoring.is_initialized() is True
+
+
+def test_sentry_sdk_init_failure_does_not_crash(monkeypatch: pytest.MonkeyPatch) -> None:
+    init_calls: list[dict] = []
+    fake_sentry = _install_fake_sentry(monkeypatch, init_calls)
+    monkeypatch.setenv("SENTRY_DSN", "invalid-dsn")
+
+    def fail_init(**kwargs):  # noqa: ANN003
+        raise ValueError("invalid DSN")
+
+    fake_sentry.init = fail_init  # type: ignore[attr-defined]
+
+    monitoring.init_sentry()
+
+    assert monitoring.is_initialized() is False
+
+
 def test_init_is_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:
     init_calls: list[dict] = []
     _install_fake_sentry(monkeypatch, init_calls)

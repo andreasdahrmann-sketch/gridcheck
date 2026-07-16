@@ -23,6 +23,31 @@ def _truthy(value: str | None) -> bool:
     return bool(value and value.strip())
 
 
+def _sample_rate(env_name: str, default: float) -> float:
+    raw_value = os.getenv(env_name, "").strip()
+    if not raw_value:
+        return default
+    try:
+        value = float(raw_value)
+    except ValueError:
+        logger.warning(
+            "sentry_config_fallback",
+            variable=env_name,
+            reason="not_a_number",
+            fallback=default,
+        )
+        return default
+    if not 0.0 <= value <= 1.0:
+        logger.warning(
+            "sentry_config_fallback",
+            variable=env_name,
+            reason="outside_zero_to_one",
+            fallback=default,
+        )
+        return default
+    return value
+
+
 def init_sentry() -> None:
     """Initialisiert Sentry, falls SENTRY_DSN gesetzt ist.
 
@@ -57,21 +82,30 @@ def init_sentry() -> None:
         _initialized = True
         return
 
-    traces_sample_rate = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
-    profiles_sample_rate = float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.0"))
+    traces_sample_rate = _sample_rate("SENTRY_TRACES_SAMPLE_RATE", 0.1)
+    profiles_sample_rate = _sample_rate("SENTRY_PROFILES_SAMPLE_RATE", 0.0)
 
-    sentry_sdk.init(
-        dsn=dsn,
-        environment=settings.app_env,
-        release=settings.app_version,
-        traces_sample_rate=traces_sample_rate,
-        profiles_sample_rate=profiles_sample_rate,
-        send_default_pii=False,
-        integrations=[
-            StarletteIntegration(),
-            FastApiIntegration(),
-        ],
-    )
+    try:
+        sentry_sdk.init(
+            dsn=dsn,
+            environment=settings.app_env,
+            release=settings.app_version,
+            traces_sample_rate=traces_sample_rate,
+            profiles_sample_rate=profiles_sample_rate,
+            send_default_pii=False,
+            integrations=[
+                StarletteIntegration(),
+                FastApiIntegration(),
+            ],
+        )
+    except Exception as exc:  # noqa: BLE001 - optionale Telemetrie darf den App-Start nie kippen.
+        logger.warning(
+            "sentry_skip",
+            reason="initialization_failed",
+            exc_type=type(exc).__name__,
+        )
+        _initialized = True
+        return
     _sentry_module = sentry_sdk
     _initialized = True
     logger.info(
