@@ -280,7 +280,11 @@ def load(
     """Persistiert validierte Records (UPSERT auf mastr_id)."""
     for record in records:
         try:
-            action, _ = _upsert(db, record)
+            # PostgreSQL marks the whole transaction as failed after a flush
+            # error. A savepoint keeps one invalid/concurrent row from
+            # poisoning all subsequent rows in this import.
+            with db.begin_nested():
+                action, _ = _upsert(db, record)
             if action == "inserted":
                 stats.rows_inserted += 1
             elif action == "updated":

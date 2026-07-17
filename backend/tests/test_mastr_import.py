@@ -115,6 +115,28 @@ def test_load_inserts_new_records(db_session_factory):
         assert db.query(MastrUnit).count() == 1
 
 
+def test_load_continues_after_row_flush_error(db_session_factory):
+    overflowing = transform(
+        _valid_row(
+            **{
+                "MaStR-Nr": "SEE-OVERFLOW-001",
+                "Bruttoleistung_kW": "100000000000.000",
+            }
+        )
+    )
+    valid = transform(_valid_row(**{"MaStR-Nr": "SEE-AFTER-ERROR-001"}))
+    stats = ImportStats()
+
+    with db_session_factory() as db:
+        load([overflowing, valid], db=db, stats=stats)
+        db.commit()
+
+        assert stats.rows_failed == 1
+        assert stats.rows_inserted == 1
+        assert db.query(MastrUnit).count() == 1
+        assert db.query(MastrUnit).one().mastr_id == "SEE-AFTER-ERROR-001"
+
+
 def test_load_updates_on_raw_hash_diff(db_session_factory):
     rec1 = transform(_valid_row(**{"MaStR-Nr": "SEE-UPD-001"}))
     rec2 = transform(
