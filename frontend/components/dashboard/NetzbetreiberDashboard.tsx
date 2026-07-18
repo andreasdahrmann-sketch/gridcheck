@@ -86,7 +86,7 @@ function toAntrag(project: Project): Antrag {
   return {
     id: `PRJ-${project.id}`,
     antragsteller: roleInputs.antragsteller ?? project.name,
-    plz: roleInputs.plz ?? project.plz,
+    plz: roleInputs.plz ?? project.plz ?? "",
     ort: roleInputs.ort,
     anlagentyp: mapTyp(roleInputs.anlagentyp ?? project.typ),
     leistung_kw: roleInputs.anschlussleistung_kw ?? project.leistung_kw,

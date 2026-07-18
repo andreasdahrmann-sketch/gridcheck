@@ -165,7 +165,7 @@ export default function ProjectDetailWorkspace({ projectId: projectIdStr }: { pr
   useEffect(() => {
     if (!project) return;
     setName(project.name);
-    setPlz(project.plz);
+    setPlz(project.plz ?? "");
     setTyp(project.typ);
     setLeistungKw(String(project.leistung_kw));
     setDescription(project.description ?? "");

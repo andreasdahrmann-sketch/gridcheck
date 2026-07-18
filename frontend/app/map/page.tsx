@@ -29,7 +29,7 @@ function extractMarker(project: Project): ProjectMapMarker | null {
   return {
     id: project.id,
     name: project.name,
-    plz: project.plz,
+    plz: project.plz ?? "",
     typ: project.typ,
     leistung_kw: project.leistung_kw,
     latitude: lat,
