@@ -16,8 +16,8 @@ export default function AgbPage() {
     >
       <LegalSection title="1. Geltungsbereich und Vertragspartner">
         <p>
-          Diese Allgemeinen Geschaeftsbedingungen (nachfolgend „AGB") regeln die Nutzung der
-          SaaS-Plattform GridCheck (nachfolgend „Plattform") zwischen
+          Diese Allgemeinen Geschaeftsbedingungen (nachfolgend „AGB“) regeln die Nutzung der
+          SaaS-Plattform GridCheck (nachfolgend „Plattform“) zwischen
         </p>
         <p className="whitespace-pre-line">
           <strong className="text-white">{LEGAL_DATA.FIRMA_NAME}</strong>
@@ -26,9 +26,9 @@ export default function AgbPage() {
           {"\n"}
           {renderLegalText("{{STRASSE_HAUSNR}}")}, {renderLegalText("{{PLZ_ORT}}")}, {renderLegalText("{{LAND}}")}
           {"\n"}
-          (nachfolgend „Anbieter")
+          (nachfolgend „Anbieter“)
         </p>
-        <p>und der jeweiligen Nutzerin / dem jeweiligen Nutzer (nachfolgend „Nutzer").</p>
+        <p>und der jeweiligen Nutzerin / dem jeweiligen Nutzer (nachfolgend „Nutzer“).</p>
         <p>
           Die Plattform richtet sich primaer an Unternehmer im Sinne des § 14 BGB (Projektentwickler,
           Planungsbueros, Netzbetreiber, Investoren, Kommunen). Soweit Verbraucher (§ 13 BGB) die
