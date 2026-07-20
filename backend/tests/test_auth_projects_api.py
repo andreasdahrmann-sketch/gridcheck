@@ -559,6 +559,66 @@ def test_project_crud_sharing_and_upload(monkeypatch):
         _close_client(client)
 
 
+def test_project_editor_can_update_but_cannot_delete_owner_project():
+    client = build_client()
+    try:
+        owner_tokens = _register_and_login(client, "delete-owner@example.com")
+        editor = client.post(
+            "/api/v1/auth/register",
+            json={"email": "delete-editor@example.com", "password": "Passwort123!", "role": "projektierer"},
+        )
+        assert editor.status_code == 200, editor.text
+        owner_headers = {"Authorization": f"Bearer {owner_tokens['access_token']}"}
+
+        created = client.post(
+            "/api/v1/projects",
+            headers=owner_headers,
+            json={
+                "name": "Owner-only deletion",
+                "plz": "10115",
+                "typ": "pv",
+                "leistung_kw": 1200,
+            },
+        )
+        assert created.status_code == 200, created.text
+        project_id = created.json()["id"]
+
+        shared = client.post(
+            f"/api/v1/projects/{project_id}/share",
+            headers=owner_headers,
+            json={"target_user_id": editor.json()["id"], "project_role": "editor"},
+        )
+        assert shared.status_code == 200, shared.text
+
+        editor_login = client.post(
+            "/api/v1/auth/login",
+            json={"email": "delete-editor@example.com", "password": "Passwort123!"},
+        )
+        assert editor_login.status_code == 200, editor_login.text
+        editor_headers = {"Authorization": f"Bearer {editor_login.json()['access_token']}"}
+
+        updated = client.patch(
+            f"/api/v1/projects/{project_id}",
+            headers=editor_headers,
+            json={"description": "Editor update remains allowed"},
+        )
+        assert updated.status_code == 200, updated.text
+
+        denied = client.delete(f"/api/v1/projects/{project_id}", headers=editor_headers)
+        assert denied.status_code == 403, denied.text
+        assert denied.json()["detail"]["code"] == "PROJECT_FORBIDDEN"
+
+        with _db_session(client) as db:
+            project = db.get(Project, project_id)
+            assert project is not None
+            assert project.deleted_at is None
+
+        owner_deleted = client.delete(f"/api/v1/projects/{project_id}", headers=owner_headers)
+        assert owner_deleted.status_code == 200, owner_deleted.text
+    finally:
+        _close_client(client)
+
+
 def test_project_viewer_receives_server_side_redacted_fields():
     client = build_client()
     try:
