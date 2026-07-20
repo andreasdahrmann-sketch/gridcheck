@@ -222,7 +222,7 @@ def update_project(db: Session, user: User, project_id: int, payload: dict) -> P
 
 def delete_project(db: Session, user: User, project_id: int) -> None:
     project = get_project(db, user, project_id)
-    if not _can_write(user, project, db):
+    if project.owner_user_id != user.id and user.role != "admin":
         raise _forbidden()
     project.deleted_at = datetime.now(timezone.utc)
     project.updated_at = datetime.now(timezone.utc)
