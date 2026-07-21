@@ -362,9 +362,26 @@ def run_mastr_import(
         db_session.commit()
     except Exception as exc:
         finished_at = datetime.now(timezone.utc)
-        audit.finished_at = finished_at
-        audit.status = "failed"
-        audit.error_summary = f"{type(exc).__name__}: {exc}"
+        error_summary = f"{type(exc).__name__}: {exc}"
+        # A fatal source/transaction error must not publish a partial dataset.
+        # The initial audit row was part of the rolled-back transaction, so
+        # persist a fresh failed audit after restoring a clean session.
+        db_session.rollback()
+        audit = MastrImport(
+            id=run_id,
+            started_at=started_at,
+            finished_at=finished_at,
+            parser_version=PARSER_VERSION,
+            source_file=str(source_path),
+            status="failed",
+            rows_total=stats.rows_total,
+            rows_inserted=0,
+            rows_updated=0,
+            rows_skipped=stats.rows_skipped,
+            rows_failed=stats.rows_failed,
+            error_summary=error_summary,
+        )
+        db_session.add(audit)
         db_session.commit()
         logger.error("mastr_import_aborted", run_id=run_id, error=str(exc))
         raise
