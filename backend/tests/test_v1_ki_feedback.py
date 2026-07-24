@@ -9,25 +9,30 @@ from db.database import SessionLocal
 from db.models import Project, ProjectMember, User
 from engine.revision import speichere_revision
 from main import app
+from services.auth_service import approve_netzbetreiber
 
 client = TestClient(app)
 
 
-def _auth_identity(*, admin: bool = False) -> dict[str, str | int]:
+def _auth_identity(*, admin: bool = False, verified_vnb: bool = True) -> dict[str, str | int]:
     email = f"ki-feedback-{uuid.uuid4().hex}@example.com"
+    role = "netzbetreiber" if verified_vnb and not admin else "projektierer"
     reg = client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": "Passwort123!", "role": "projektierer"},
+        json={"email": email, "password": "Passwort123!", "role": role},
     )
     assert reg.status_code == 200, reg.text
     user_id = reg.json()["id"]
-    if admin:
+    if admin or verified_vnb:
         db = SessionLocal()
         try:
             user = db.query(User).filter(User.email == email).first()
             assert user is not None
-            user.role = "admin"
-            db.commit()
+            if admin:
+                user.role = "admin"
+                db.commit()
+            else:
+                approve_netzbetreiber(db, user_id=user.id)
         finally:
             db.close()
     login = client.post("/api/v1/auth/login", json={"email": email, "password": "Passwort123!"})
@@ -79,6 +84,22 @@ def test_feedback_happy_path(isolierte_ki_feedback, isolierte_revisionen):
     assert body["lernstatus"]["samples_total"] == 1
     assert body["lernstatus"]["korrigiert"] == 1
     assert body["audit_revision"]["hash"]
+
+
+def test_feedback_rejects_unverified_netzbetreiber_source(isolierte_ki_feedback, isolierte_revisionen):
+    identity = _auth_identity(verified_vnb=False)
+    payload = {
+        "feedback_typ": "korrigiert",
+        "ki_entscheidung": "A",
+        "nb_entscheidung": "B",
+        "revision_hash": _create_revision_hash(actor_user_id=int(identity["user_id"])),
+        "quelle": "netzbetreiber",
+    }
+
+    response = client.post("/api/v1/ki/feedback", json=payload, headers=identity["headers"])
+
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"]["code"] == "VNB_ACCESS_DENIED"
 
 
 def test_feedback_bestaetigung_uebernimmt_ki_entscheidung(isolierte_ki_feedback, isolierte_revisionen):
