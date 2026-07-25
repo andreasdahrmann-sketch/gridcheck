@@ -398,17 +398,19 @@ def resolve_plant_context(
     if dc_kwp is not None and ac_kw > 0:
         overbuild = round(dc_kwp / ac_kw, 3)
 
-    pf_range = config.power_factor_range
     explicit_pf = _f(eingabe.get("cos_phi"))
     if explicit_pf is None:
         explicit_pf = _f(eingabe.get("power_factor"))
 
-    cos_known = eingabe.get("cos_phi_known")
-    if (
-        explicit_pf is not None
-        and pf_range.min <= explicit_pf <= pf_range.max
-        and cos_known is not False
-    ):
+    # Absolute MVP bounds (frontend validates 0.8–1.0). An explicit value in this
+    # band must never be silently replaced by a plant default: for PV+Einspeisung the
+    # default jumps to 1.0, which understates Scheinleistung (anti-conservative) and
+    # contradicts the value shown/edited in the form. Plant-type range remains
+    # advisory metadata; cos_phi_known is documentation-only and must not discard
+    # a numeric cos φ that was actually sent.
+    _ABS_PF_MIN = 0.8
+    _ABS_PF_MAX = 1.0
+    if explicit_pf is not None and _ABS_PF_MIN <= explicit_pf <= _ABS_PF_MAX:
         power_factor = explicit_pf
         pf_source: PowerFactorSource = "nutzer"
     else:

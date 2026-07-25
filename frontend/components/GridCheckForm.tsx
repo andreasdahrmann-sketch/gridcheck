@@ -866,7 +866,7 @@ export default function GridCheckForm({ forcedCustomerType }: GridCheckFormProps
             </div>
             <div>
               <label className={labelClass}>cos phi</label>
-              <input type="number" step="0.01" min="0.8" max="1" className={inputClass} value={input.cos_phi} onChange={e => updateInput({ cos_phi: Number(e.target.value) })} />
+              <input type="number" step="0.01" min="0.8" max="1" className={inputClass} value={input.cos_phi} onChange={e => updateInput({ cos_phi: Number(e.target.value), cos_phi_known: true })} />
             </div>
             <div>
               <label className={labelClass}>Richtung</label>
