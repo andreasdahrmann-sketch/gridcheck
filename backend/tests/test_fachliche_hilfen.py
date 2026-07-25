@@ -29,6 +29,35 @@ class TestResolveCosPhi:
         assert r["cos_phi"] == 0.9
         assert r["quelle"] == "nutzer"
 
+    def test_explicit_cos_phi_honored_when_known_flag_false(self):
+        """Plant-type UI sets cos_phi_known=false with a filled cos_phi field.
+
+        That flag must not discard the numeric value — otherwise PV+Einspeisung
+        silently jumps to 1.0 and understates Scheinleistung.
+        """
+        r = resolve_cos_phi_for_calculation(
+            {
+                "cos_phi": 0.9,
+                "cos_phi_known": False,
+                "anlagentyp": "PV",
+                "anschlussart": "Einspeisung",
+            }
+        )
+        assert r["cos_phi"] == 0.9
+        assert r["quelle"] == "nutzer"
+
+    def test_ui_min_cos_phi_not_replaced_by_pv_feed_in_default(self):
+        """Frontend allows 0.8; PV plant range starts at 0.85. Do not jump to 1.0."""
+        r = resolve_cos_phi_for_calculation(
+            {
+                "cos_phi": 0.8,
+                "anlagentyp": "PV",
+                "anschlussart": "Einspeisung",
+            }
+        )
+        assert r["cos_phi"] == 0.8
+        assert r["quelle"] == "nutzer"
+
     def test_pv_default_near_one(self):
         r = resolve_cos_phi_for_calculation({"anlagentyp": "PV", "anschlussart": "Einspeisung"})
         assert r["cos_phi"] == 1.0
