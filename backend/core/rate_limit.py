@@ -74,8 +74,13 @@ def enforce_rate_limit(
     detail = _rate_limit_detail(window_seconds=window_seconds, message=message, hint=hint)
     redis_client = _get_redis_client()
     if redis_client:
-        current = redis_client.incr(bucket_key)
-        if current == 1:
+        # INCR then EXPIRE-only-on-first-hit can leave a key without TTL when the
+        # process dies or EXPIRE fails after INCR. Without a TTL the counter never
+        # decays, so limit=1 buckets (e.g. DSGVO export / 24h) stay permanently
+        # blocked. Heal missing TTLs on every hit (ttl -1 = no expire, -2 = gone).
+        current = int(redis_client.incr(bucket_key))
+        ttl = int(redis_client.ttl(bucket_key))
+        if current == 1 or ttl < 0:
             redis_client.expire(bucket_key, window_seconds)
         if current > limit:
             log_security_event("rate_limited", bucket=bucket_key, limit=limit, window_seconds=window_seconds, backend="redis")
