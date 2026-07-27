@@ -218,6 +218,68 @@ def _enrich_location_with_geocoding(payload: dict[str, Any]) -> list[str]:
     return warnings
 
 
+_ADDRESS_PATCH_KEYS = ("street", "house_number", "plz", "city")
+_COORD_PATCH_KEYS = ("latitude", "longitude")
+_LOCATION_PATCH_KEYS = ("street", "house_number", "plz", "city", "ort", "latitude", "longitude")
+
+
+def _prepare_project_update_payload(existing, patch: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Merges PATCH fields with the existing project and re-runs geocoding when needed.
+
+    Critical correctness: create_project geocodes address -> lat/lon, but a naive PATCH
+    that only updates address fields (and uses exclude_none) would leave stale coordinates
+    pointing at the old site. When a full address changes without new coordinates, we clear
+    lat/lon and forward-geocode again so GIS/export consumers cannot silently keep the old site.
+    """
+    address_patched = any(key in patch for key in _ADDRESS_PATCH_KEYS)
+    coords_patched = any(key in patch for key in _COORD_PATCH_KEYS)
+    if not address_patched and not coords_patched:
+        return patch, []
+
+    merged: dict[str, Any] = {
+        "street": getattr(existing, "street", None),
+        "house_number": getattr(existing, "house_number", None),
+        "plz": getattr(existing, "plz", None),
+        "city": getattr(existing, "city", None),
+        "ort": getattr(existing, "ort", None),
+        "latitude": getattr(existing, "latitude", None),
+        "longitude": getattr(existing, "longitude", None),
+        "role_inputs": parse_project_role_inputs(getattr(existing, "role_inputs", None)),
+    }
+    for key in _LOCATION_PATCH_KEYS:
+        if key in patch:
+            merged[key] = patch[key]
+    if "role_inputs" in patch and isinstance(patch["role_inputs"], dict):
+        base_role_inputs = merged["role_inputs"] if isinstance(merged["role_inputs"], dict) else {}
+        merged["role_inputs"] = {**base_role_inputs, **patch["role_inputs"]}
+
+    # Invalidate stale coordinates only when we can (and should) forward-geocode.
+    # Coordinate-only projects that merely patch PLZ must keep their lat/lon and
+    # must not trigger reverse-geocoding as a side effect.
+    if address_patched and not coords_patched:
+        if _has_address(merged):
+            merged["latitude"] = None
+            merged["longitude"] = None
+        else:
+            return patch, []
+
+    warnings = _enrich_location_with_geocoding(merged)
+
+    for key in _LOCATION_PATCH_KEYS:
+        if key in patch or merged.get(key) != getattr(existing, key, None):
+            patch[key] = merged.get(key)
+
+    if isinstance(merged.get("role_inputs"), dict) and "_geocoding" in merged["role_inputs"]:
+        if "role_inputs" in patch and isinstance(patch["role_inputs"], dict):
+            patch["role_inputs"] = {**patch["role_inputs"], "_geocoding": merged["role_inputs"]["_geocoding"]}
+        else:
+            role_inputs = parse_project_role_inputs(getattr(existing, "role_inputs", None))
+            role_inputs["_geocoding"] = merged["role_inputs"]["_geocoding"]
+            patch["role_inputs"] = role_inputs
+
+    return patch, warnings
+
+
 @router.post("", response_model=ProjectResponse)
 def create_project(
     req: ProjectCreateRequest,
@@ -264,14 +326,20 @@ def update_project(
     current_user: User = Depends(get_current_user),
     _: None = Depends(require_csrf),
 ) -> ProjectResponse:
-    project = project_service.update_project(db, current_user, project_id, req.model_dump(exclude_none=True))
+    # exclude_unset keeps partial PATCH semantics; explicit nulls remain so coordinates
+    # can be cleared when an address change requires re-geocoding.
+    patch = req.model_dump(exclude_unset=True)
+    existing = project_service.get_project(db, current_user, project_id)
+    patch, warnings = _prepare_project_update_payload(existing, patch)
+    project = project_service.update_project(db, current_user, project_id, patch)
     logger.info(
         "project_updated",
         project_id=project.id,
         user_id=current_user.id,
-        fields=sorted(req.model_dump(exclude_none=True).keys()),
+        fields=sorted(patch.keys()),
+        warnings=warnings or None,
     )
-    return _to_response(project, db, current_user)
+    return _to_response(project, db, current_user, warnings=warnings)
 
 
 @router.delete("/{project_id}")

@@ -207,7 +207,11 @@ def update_project(db: Session, user: User, project_id: int, payload: dict) -> P
         "latitude",
         "longitude",
     ):
-        if key in payload and payload[key] is not None:
+        if key not in payload:
+            continue
+        # latitude/longitude may be explicitly cleared (None) after an address change
+        # that requires re-geocoding; other fields still ignore null no-ops.
+        if key in {"latitude", "longitude"} or payload[key] is not None:
             setattr(project, key, payload[key])
     if "role_inputs" in payload and payload["role_inputs"] is not None:
         project.role_inputs = _json_text(payload["role_inputs"])

@@ -219,3 +219,121 @@ def test_geocoding_failure_returns_warning_not_500(monkeypatch):
         assert body["plz"] == "99998"
     finally:
         _close_client(client)
+
+
+def test_patch_address_regeocodes_and_replaces_stale_coordinates(monkeypatch):
+    """Address-only PATCH must not keep the create-time lat/lon of the old site."""
+    client = _build_client()
+    try:
+        tokens = _register_and_login(client, "patch-regeocode@example.com")
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        from api import projects as projects_api
+
+        def fake_geocode_address(**kwargs):
+            plz = str(kwargs.get("plz") or "")
+            if plz == "10117":
+                return {
+                    "latitude": 52.520008,
+                    "longitude": 13.404954,
+                    "confidence": 90,
+                    "source": "OpenStreetMap (Nominatim)",
+                    "data_class": "B",
+                    "raw_label": "Unter den Linden 1, 10117 Berlin",
+                    "has_house_number": True,
+                }
+            return {
+                "latitude": 48.137154,
+                "longitude": 11.576124,
+                "confidence": 88,
+                "source": "OpenStreetMap (Nominatim)",
+                "data_class": "B",
+                "raw_label": "Marienplatz 1, 80331 Muenchen",
+                "has_house_number": True,
+            }
+
+        monkeypatch.setattr(projects_api.geocoding_service, "geocode_address", fake_geocode_address)
+        monkeypatch.setattr(projects_api.geocoding_service, "reverse_geocode", lambda **kwargs: None)
+
+        created = client.post(
+            "/api/v1/projects",
+            headers=headers,
+            json={
+                "name": "Standortwechsel",
+                "street": "Unter den Linden",
+                "house_number": "1",
+                "plz": "10117",
+                "city": "Berlin",
+                "typ": "pv",
+                "leistung_kw": 500,
+            },
+        )
+        assert created.status_code == 200, created.text
+        project_id = created.json()["id"]
+        assert created.json()["latitude"] == 52.520008
+
+        patched = client.patch(
+            f"/api/v1/projects/{project_id}",
+            headers=headers,
+            json={
+                "street": "Marienplatz",
+                "house_number": "1",
+                "plz": "80331",
+                "city": "Muenchen",
+            },
+        )
+        assert patched.status_code == 200, patched.text
+        body = patched.json()
+        assert body["street"] == "Marienplatz"
+        assert body["plz"] == "80331"
+        assert body["latitude"] == 48.137154
+        assert body["longitude"] == 11.576124
+        assert body["warnings"] == []
+        assert body["role_inputs"]["_geocoding"]["mode"] == "forward"
+        assert "Muenchen" in (body["role_inputs"]["_geocoding"].get("raw_label") or "")
+    finally:
+        _close_client(client)
+
+
+def test_patch_plz_only_on_coordinate_project_keeps_lat_lon(monkeypatch):
+    """PLZ-only edit on a coordinate-created project must not wipe lat/lon."""
+    client = _build_client()
+    try:
+        tokens = _register_and_login(client, "patch-coords-keep@example.com")
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        from api import projects as projects_api
+
+        monkeypatch.setattr(
+            projects_api.geocoding_service,
+            "geocode_address",
+            lambda **kwargs: (_ for _ in ()).throw(AssertionError("forward geocode unexpected")),
+        )
+        monkeypatch.setattr(projects_api.geocoding_service, "reverse_geocode", lambda **kwargs: None)
+
+        created = client.post(
+            "/api/v1/projects",
+            headers=headers,
+            json={
+                "name": "Koordinaten Projekt",
+                "latitude": 50.110924,
+                "longitude": 8.682127,
+                "typ": "pv",
+                "leistung_kw": 400,
+            },
+        )
+        assert created.status_code == 200, created.text
+        project_id = created.json()["id"]
+
+        patched = client.patch(
+            f"/api/v1/projects/{project_id}",
+            headers=headers,
+            json={"plz": "60311"},
+        )
+        assert patched.status_code == 200, patched.text
+        body = patched.json()
+        assert body["plz"] == "60311"
+        assert body["latitude"] == 50.110924
+        assert body["longitude"] == 8.682127
+    finally:
+        _close_client(client)
