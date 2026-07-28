@@ -4,6 +4,8 @@ Provider: OpenStreetMap Nominatim (Datenklasse B, Community-Quelle).
 - Konservativer In-Process-Rate-Limit: min. 1 s zwischen Nominatim-Aufrufen.
 - In-Memory-LRU-Cache (max 1024 Eintraege) — Persistenz spaeter ueber Datenquellen-Pipeline.
 - Fail-soft: bei Netzfehler / Timeout / Rate-Limit-Verletzung kein Exception, sondern `None`.
+  Transport-/HTTP-Fehler werden NICHT negativ gecacht (Retry bleibt moeglich); echte
+  leere Provider-Antworten duerfen als Miss gecacht werden.
 - Keine neue Dependency: nutzt `httpx` (wird bereits in backend/geo/osm_nearby.py verwendet).
 
 Confidence-Mapping:
@@ -190,7 +192,8 @@ def geocode_address(
             user_agent=_user_agent(),
         )
     except Exception:
-        _cache_set(cache_key, None)
+        # Transport/HTTP/provider errors are transient — do NOT cache as a miss,
+        # or retries for the same address stay broken until LRU eviction.
         return None
 
     if not isinstance(payload, list) or not payload:
@@ -274,7 +277,7 @@ def reverse_geocode(
             user_agent=_user_agent(),
         )
     except Exception:
-        _cache_set(cache_key, None)
+        # Transient transport/HTTP errors must remain retryable (no negative cache).
         return None
 
     if not isinstance(payload, dict):
