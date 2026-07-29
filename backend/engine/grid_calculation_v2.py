@@ -39,7 +39,7 @@ from engine.nb_akzeptanz_screening import (
 from engine.plant_types import resolve_plant_context
 from engine.projektierer_output import build_projektierer_perspective
 
-CALCULATION_VERSION = "2.3.0"
+CALCULATION_VERSION = "2.3.1"
 
 THRESHOLDS = {
     "voltage_drop": {
@@ -79,12 +79,25 @@ def _voltage_level_from_kv(u_kv: float) -> str:
     return "medium"
 
 
-def _nominal_kv(voltage_level: str) -> float:
+def _default_nominal_kv(voltage_level: str) -> float:
+    """Fallback only when no explicit nennspannung was provided."""
     if voltage_level == "low":
         return 0.4
     if voltage_level == "high":
         return 110.0
     return 20.0
+
+
+def _resolve_nominal_kv(input_data: GridConnectionInput) -> float:
+    """Use the caller's actual kV; never collapse all MS/HS values to one default.
+
+    Bug history: mapping only voltage_level caused every MS analysis to run at 20 kV
+    (and every HS at 110 kV), understating I and ΔU for 10 kV projects.
+    """
+    explicit = input_data.nominal_voltage_kv
+    if explicit is not None and explicit > 0:
+        return float(explicit)
+    return _default_nominal_kv(input_data.voltage_level)
 
 
 def _infer_cable_type(eingabe: dict[str, Any], leitungstyp: str) -> str:
@@ -176,6 +189,7 @@ def grid_connection_input_from_engine(eingabe: dict[str, Any]) -> GridConnection
         reactive_power_mode=plant_ctx.reactive_power_mode,
         power_factor=plant_ctx.power_factor,
         voltage_level=voltage_level,  # type: ignore[arg-type]
+        nominal_voltage_kv=u_kv,
         connection_type="three_phase",
         cos_phi_known=bool(cos_known) if cos_known is not None else None,
         existing_connection=bool(eingabe.get("existing_connection"))
@@ -201,7 +215,7 @@ def calculate_voltage_drop(
     input_data: GridConnectionInput,
     assumptions: list[CalculationAssumption],
 ) -> VoltageDropResult:
-    u_n_kv = _nominal_kv(input_data.voltage_level)
+    u_n_kv = _resolve_nominal_kv(input_data)
     u_n_v = u_n_kv * 1000.0
     cos_phi = input_data.power_factor
     sin_phi = math.sqrt(max(0.0, 1.0 - cos_phi * cos_phi))
@@ -298,7 +312,7 @@ def calculate_short_circuit(
             disclaimer=SHORT_CIRCUIT_CANNOT_CALCULATE_DISCLAIMER,
         )
 
-    u_n_kv = _nominal_kv(input_data.voltage_level)
+    u_n_kv = _resolve_nominal_kv(input_data)
     c = 1.1
     uk = (input_data.transformer_impedance_percent or 6.0) / 100.0
     s_t_mva = (input_data.transformer_power_kva or 630.0) / 1000.0
