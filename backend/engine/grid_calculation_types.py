@@ -52,6 +52,15 @@ class GridConnectionInput(BaseModel):
     reactive_power_mode: ReactivePowerMode | None = None
     power_factor: float = Field(..., ge=0.8, le=1.0)
     voltage_level: Literal["low", "medium", "high"] = "medium"
+    nominal_voltage_kv: float | None = Field(
+        default=None,
+        gt=0,
+        le=380,
+        description=(
+            "Tatsaechliche Nennspannung in kV (z. B. 10/20/30 MS oder 110/220/380 HS). "
+            "Wenn gesetzt, hat diese Vorrang vor den Level-Defaults 0.4/20/110."
+        ),
+    )
     connection_type: Literal["single_phase", "three_phase"] = "three_phase"
     cos_phi_known: bool | None = None
     existing_connection: bool | None = None

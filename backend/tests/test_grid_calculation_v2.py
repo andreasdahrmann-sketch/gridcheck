@@ -97,4 +97,58 @@ class TestEngineAdapter:
     def test_adapter_maps_ms_voltage(self, basis_pv_ms):
         inp = grid_connection_input_from_engine(basis_pv_ms)
         assert inp.voltage_level == "medium"
+        assert inp.nominal_voltage_kv == pytest.approx(float(basis_pv_ms["nennspannung"]))
         assert inp.power_kw == pytest.approx(basis_pv_ms["leistung_mw"] * 1000)
+
+
+class TestNominalVoltagePreserved:
+    """Regression: MV must not collapse every nennspannung to 20 kV."""
+
+    def test_10kv_vs_20kv_changes_current_and_delta_u(self):
+        common = {
+            "project_type": "generation",
+            "power_kw": 5000.0,
+            "power_factor": 0.9,
+            "voltage_level": "medium",
+            "connection_type": "three_phase",
+            "cable_length_km": 5.0,
+            "cable_length_source": "user_input",
+            "cable_cross_section_mm2": 150,
+            "cable_material": "aluminum",
+            "cable_type": "underground",
+            "grid_topology": "ring",
+        }
+        result_20 = calculate_voltage_drop(
+            GridConnectionInput(**common, nominal_voltage_kv=20.0),
+            [],
+        )
+        result_10 = calculate_voltage_drop(
+            GridConnectionInput(**common, nominal_voltage_kv=10.0),
+            [],
+        )
+
+        assert result_20.inputs.voltage_kv == 20.0
+        assert result_10.inputs.voltage_kv == 10.0
+        # I ~ 1/U and ΔU% ~ 1/U² → 10 kV must be materially stricter than 20 kV.
+        assert result_10.inputs.current_a == pytest.approx(result_20.inputs.current_a * 2.0, rel=0.02)
+        assert result_10.delta_u_percent == pytest.approx(result_20.delta_u_percent * 4.0, rel=0.05)
+        assert result_20.compliant is True
+        assert result_10.compliant is False
+
+    def test_adapter_preserves_explicit_10kv(self):
+        eingabe = {
+            "nennspannung": 10,
+            "leistung_mw": 5.0,
+            "leitungstyp": "NA2XS2Y150",
+            "entfernung_km": 5.0,
+            "anschlussart": "Einspeisung",
+            "cos_phi": 0.9,
+            "plant_type": "pv",
+            "topologie": "ring",
+        }
+        inp = grid_connection_input_from_engine(eingabe)
+        assert inp.voltage_level == "medium"
+        assert inp.nominal_voltage_kv == 10.0
+        result = calculate_voltage_drop(inp, [])
+        assert result.inputs.voltage_kv == 10.0
+        assert result.compliant is False
