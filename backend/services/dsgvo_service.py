@@ -26,6 +26,7 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from core.anonymized_email import build_anonymized_email
 from core.auth import verify_password
 from core.security_log import log_security_event
 from db.models import (
@@ -491,7 +492,9 @@ def delete_user_account(
 
     user.deleted_at = now
     user.deleted_email_hash = email_hash
-    user.email = f"deleted_user_{user.id}@anonymized.local"
+    # Collision-resistant: deterministic deleted_user_{id}@anonymized.local can be
+    # pre-registered by an attacker and then block Art. 17 deletion via unique email.
+    user.email = build_anonymized_email(user.id)
     user.password_hash = ""
     user.is_active = False
     user.full_name = None

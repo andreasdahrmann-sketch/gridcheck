@@ -367,3 +367,68 @@ def test_deleted_user_cannot_login() -> None:
         assert reregister.json()["detail"]["code"] == "EMAIL_DELETED_BLOCKED"
     finally:
         _close_client(client)
+
+
+def test_register_rejects_reserved_anonymized_email_namespace() -> None:
+    client = build_client()
+    try:
+        res = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "deleted_user_1@anonymized.local",
+                "password": PASSWORD,
+                "role": "projektierer",
+            },
+        )
+        assert res.status_code == 400, res.text
+        assert res.json()["detail"]["code"] == "EMAIL_RESERVED"
+    finally:
+        _close_client(client)
+
+
+def test_delete_account_succeeds_when_legacy_anonymized_email_pre_reserved() -> None:
+    """Art. 17 must not fail if deleted_user_{id}@anonymized.local is already taken."""
+    from core.auth import hash_password
+
+    client = build_client()
+    try:
+        email = _unique_email("delete-collision")
+        _register(client, email)
+        token = _login(client, email)
+
+        with client._gridcheck_session_factory() as db:  # type: ignore[attr-defined]
+            victim = db.query(User).filter(User.email == email).first()
+            assert victim is not None
+            legacy = f"deleted_user_{victim.id}@anonymized.local"
+            db.add(
+                User(
+                    email=legacy,
+                    password_hash=hash_password(PASSWORD),
+                    role="endkunde",
+                    is_active=True,
+                )
+            )
+            db.commit()
+
+        res = client.post(
+            "/api/v1/users/me/delete-account",
+            headers=_auth(token),
+            json={"confirm_password": PASSWORD},
+        )
+        assert res.status_code == 204, res.text
+
+        with client._gridcheck_session_factory() as db:  # type: ignore[attr-defined]
+            victim = (
+                db.query(User)
+                .filter(User.deleted_email_hash.isnot(None), User.deleted_at.isnot(None))
+                .order_by(User.id.desc())
+                .first()
+            )
+            assert victim is not None
+            assert victim.email != f"deleted_user_{victim.id}@anonymized.local"
+            assert victim.email.startswith(f"deleted_user_{victim.id}_")
+            assert victim.email.endswith("@anonymized.local")
+            assert victim.is_active is False
+            assert victim.password_hash == ""
+    finally:
+        _close_client(client)
