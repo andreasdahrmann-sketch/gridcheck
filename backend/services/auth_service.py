@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from core.anonymized_email import is_reserved_anonymized_email
 from core.auth import create_token, decode_token, hash_password, password_hash_needs_upgrade, verify_password
 from core.security_log import log_security_event
 from core.vnb_access import VNB_STATUS_NONE, VNB_STATUS_PENDING, normalize_vnb_verification_status
@@ -61,6 +62,19 @@ def register_user(db: Session, *, email: str, password: str, role: str, full_nam
                 "code": "ADMIN_SELF_REGISTRATION_FORBIDDEN",
                 "message": "Admin-Konten duerfen nicht ueber die oeffentliche Registrierung angelegt werden.",
                 "hint": "Admin-Nutzer muessen intern vorprovisioniert werden.",
+            },
+        )
+    # DSGVO Soft-Delete nutzt @anonymized.local intern. Oeffentliche Reservierung
+    # dieses Namespaces darf die Art.-17-Loeschung nicht per Unique-Constraint
+    # auf users.email blockieren koennen.
+    if is_reserved_anonymized_email(normalized_email):
+        log_security_event("auth_register_reserved_anonymized_email", email=normalized_email)
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "EMAIL_RESERVED",
+                "message": "Diese E-Mail-Adresse ist nicht zulaessig.",
+                "hint": "Bitte eine andere E-Mail-Adresse verwenden.",
             },
         )
     existing = db.query(User).filter(User.email == normalized_email).first()
