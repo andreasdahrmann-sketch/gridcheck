@@ -7,6 +7,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import HTTPException
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from core.config import settings
@@ -1967,18 +1968,78 @@ def _mark_subscription_entitlements_inactive(db: Session, user: User) -> None:
         entitlement.updated_at = _utcnow()
 
 
-def _payment_entitlement_exists(db: Session, checkout_session_id: str | None, offer_id: str) -> bool:
+def _get_payment_entitlement(
+    db: Session,
+    checkout_session_id: str | None,
+    offer_id: str,
+) -> BillingEntitlement | None:
     if not checkout_session_id:
-        return False
+        return None
     return (
         db.query(BillingEntitlement)
         .filter(
             BillingEntitlement.checkout_session_id == checkout_session_id,
             BillingEntitlement.offer_id == offer_id,
         )
+        .order_by(BillingEntitlement.id.asc())
         .first()
-        is not None
     )
+
+
+def _ensure_payment_entitlement(
+    db: Session,
+    user: User,
+    *,
+    offer_id: str,
+    checkout_session_id: str | None,
+    payment_intent_id: str | None,
+    stripe_price_id: str | None,
+    status: str,
+) -> BillingEntitlement:
+    """Issue at most one entitlement per (checkout_session_id, offer_id).
+
+    Stripe webhook + success-page status poll can race after payment. Without
+    serialization, both paths observe "missing" and insert two active packs
+    for a single paid checkout (e.g. 2×1 credit for premium_pre_check).
+
+    Defense in depth:
+    1. Lock the user row so concurrent syncs for the same buyer serialize.
+    2. Re-check existence under that lock.
+    3. Insert inside a SAVEPOINT; unique index collisions become idempotent.
+    """
+    db.query(User).filter(User.id == user.id).with_for_update().one()
+
+    existing = _get_payment_entitlement(db, checkout_session_id, offer_id)
+    if existing is not None:
+        return existing
+
+    if not checkout_session_id:
+        return _issue_payment_entitlement(
+            db,
+            user,
+            offer_id=offer_id,
+            checkout_session_id=checkout_session_id,
+            payment_intent_id=payment_intent_id,
+            stripe_price_id=stripe_price_id,
+            status=status,
+        )
+
+    try:
+        with db.begin_nested():
+            return _issue_payment_entitlement(
+                db,
+                user,
+                offer_id=offer_id,
+                checkout_session_id=checkout_session_id,
+                payment_intent_id=payment_intent_id,
+                stripe_price_id=stripe_price_id,
+                status=status,
+            )
+    except IntegrityError:
+        existing = _get_payment_entitlement(db, checkout_session_id, offer_id)
+        if existing is not None:
+            return existing
+        raise
 
 
 def _session_offer_metadata(data_object: dict[str, Any]) -> tuple[str, str | None]:
@@ -2046,29 +2107,27 @@ def _sync_checkout_session_completion(
         )
         synced = True
     elif offer_id in PAYMENT_OFFER_IDS and payment_status == "paid":
-        if not _payment_entitlement_exists(db, checkout_session_id, offer_id):
-            _issue_payment_entitlement(
-                db,
-                user,
-                offer_id=offer_id,
-                checkout_session_id=checkout_session_id,
-                payment_intent_id=payment_intent_id,
-                stripe_price_id=price_id,
-                status="active",
-            )
+        _ensure_payment_entitlement(
+            db,
+            user,
+            offer_id=offer_id,
+            checkout_session_id=checkout_session_id,
+            payment_intent_id=payment_intent_id,
+            stripe_price_id=price_id,
+            status="active",
+        )
         _apply_payment_purchase_user_state(user, offer_id=offer_id, stripe_price_id=price_id)
         synced = True
     elif offer_id in ADDON_OFFER_IDS and payment_status == "paid":
-        if not _payment_entitlement_exists(db, checkout_session_id, offer_id):
-            _issue_payment_entitlement(
-                db,
-                user,
-                offer_id=offer_id,
-                checkout_session_id=checkout_session_id,
-                payment_intent_id=payment_intent_id,
-                stripe_price_id=price_id,
-                status="ops_pending",
-            )
+        _ensure_payment_entitlement(
+            db,
+            user,
+            offer_id=offer_id,
+            checkout_session_id=checkout_session_id,
+            payment_intent_id=payment_intent_id,
+            stripe_price_id=price_id,
+            status="ops_pending",
+        )
         synced = True
 
     if synced:
