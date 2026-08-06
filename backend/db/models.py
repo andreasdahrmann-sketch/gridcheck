@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Column, Date, Integer, Float, Numeric, String, DateTime, Boolean, Text, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import BigInteger, Column, Date, Integer, Float, Numeric, String, DateTime, Boolean, Text, ForeignKey, UniqueConstraint, Index, text
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from .database import Base
@@ -256,6 +256,16 @@ class BillingEntitlement(Base):
     __table_args__ = (
         Index("ix_billing_entitlements_user_status", "user_id", "status"),
         Index("ix_billing_entitlements_user_offer", "user_id", "offer_id"),
+        # One paid pack / addon per Stripe checkout session (+ offer). NULL session
+        # ids remain allowed (manual/admin grants). Partial unique index enforces
+        # webhook vs success-page race safety at the DB layer.
+        Index(
+            "uq_billing_entitlements_checkout_session_offer",
+            "checkout_session_id",
+            "offer_id",
+            unique=True,
+            postgresql_where=text("checkout_session_id IS NOT NULL"),
+        ),
     )
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
