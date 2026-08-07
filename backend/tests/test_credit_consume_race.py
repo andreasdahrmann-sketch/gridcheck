@@ -115,7 +115,6 @@ def test_consume_free_quota_raises_when_limit_reached(monkeypatch):
 
     db.query.side_effect = query
     monkeypatch.setattr(billing_service, "count_consumed_free_checks", lambda db, user: 3)
-    monkeypatch.setattr(billing_service.settings, "free_checks_limit", 3)
     monkeypatch.setattr(
         billing_service,
         "_paywall_detail",
@@ -139,7 +138,6 @@ def test_consume_free_quota_allows_when_under_limit(monkeypatch):
 
     db.query.side_effect = query
     monkeypatch.setattr(billing_service, "count_consumed_free_checks", lambda db, user: 2)
-    monkeypatch.setattr(billing_service.settings, "free_checks_limit", 3)
 
     assert _consume_access_quota(db, user, access) is None
 
