@@ -1461,6 +1461,57 @@ def _persist_gridcheck_result_audit(
     db.add(audit)
 
 
+def _lock_entitlement_for_consume(db: Session, entitlement_id: int) -> BillingEntitlement | None:
+    """SELECT … FOR UPDATE + populate_existing so concurrent sessions see fresh used_credits."""
+    return (
+        db.query(BillingEntitlement)
+        .filter(BillingEntitlement.id == entitlement_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+        .one_or_none()
+    )
+
+
+def _consume_access_quota(
+    db: Session,
+    user: User,
+    access: dict[str, Any],
+) -> BillingEntitlement | None:
+    """
+    Atomically consume prepaid/subscription credits or free-tier quota at persist time.
+
+    package_access_context runs before the (potentially long) engine calculation and only
+    snapshots entitlement/free-quota state. Two parallel analyze requests can both pass that
+    check against a 1-credit pack (or the last free check). Without a re-check under row
+    locks here, both would persist completed runs while used_credits stays at 1 (last-writer
+    wins) or free_quota_consumed exceeds FREE_CHECKS_LIMIT.
+    """
+    entitlement = access.get("entitlement")
+    if isinstance(entitlement, BillingEntitlement):
+        locked = _lock_entitlement_for_consume(db, int(entitlement.id))
+        if locked is None or not _entitlement_usable(locked):
+            raise HTTPException(status_code=402, detail=_paywall_detail(db, user))
+        locked.used_credits = int(locked.used_credits or 0) + 1
+        remaining = _remaining_credits(locked)
+        if remaining is not None and remaining <= 0:
+            locked.status = "consumed"
+        locked.updated_at = _utcnow()
+        access["entitlement"] = locked
+        return locked
+
+    if bool(access.get("free_quota_consumed")):
+        (
+            db.query(User)
+            .filter(User.id == user.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+            .one()
+        )
+        if count_consumed_free_checks(db, user) >= settings.free_checks_limit:
+            raise HTTPException(status_code=402, detail=_paywall_detail(db, user))
+    return None
+
+
 def persist_completed_analysis_run(
     db: Session,
     user: User,
@@ -1476,13 +1527,7 @@ def persist_completed_analysis_run(
         user,
         requested_offer_id=str(request_payload.get("requested_offer_id")) if request_payload.get("requested_offer_id") else None,
     )
-    entitlement = access.get("entitlement")
-    if isinstance(entitlement, BillingEntitlement):
-        entitlement.used_credits = int(entitlement.used_credits or 0) + 1
-        remaining = _remaining_credits(entitlement)
-        if remaining is not None and remaining <= 0:
-            entitlement.status = "consumed"
-        entitlement.updated_at = _utcnow()
+    entitlement = _consume_access_quota(db, user, access)
     run = AnalysisRun(
         user_id=user.id,
         project_id=project_id,
