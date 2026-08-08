@@ -78,6 +78,9 @@ def run_analysis_and_persist(db: Session, req_data: dict[str, Any], user: User) 
         owner_user_id=user.id,
     )
     db.add(project)
+    # Flush only: project.id is needed below. Do NOT commit before billing persist.
+    # Otherwise a later 402/error in persist_completed_analysis_run leaves an orphan
+    # Project+CheckResult that GET /api/v1/result/{id} can still return unpaid.
     db.flush()
     db.add(ProjectMember(project_id=project.id, user_id=user.id, project_role="owner"))
 
@@ -102,7 +105,8 @@ def run_analysis_and_persist(db: Session, req_data: dict[str, Any], user: User) 
         checksum=make_checksum(audit_payload),
     )
     db.add(audit)
-    db.commit()
+    # Single commit happens inside persist_completed_analysis_run so project/check/audit
+    # and billed AnalysisRun share one transaction. Consume failures roll everything back.
     persist_completed_analysis_run(
         db,
         user,
