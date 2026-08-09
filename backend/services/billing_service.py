@@ -365,6 +365,15 @@ def _entitlement_usable(entitlement: BillingEntitlement) -> bool:
     return remaining is None or remaining > 0
 
 
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Normalize DB/Stripe datetimes for safe period comparisons."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _get_subscription_entitlement(
     db: Session,
     user: User,
@@ -388,11 +397,20 @@ def _sync_subscription_quota(user: User, entitlement: BillingEntitlement, offer:
     included = offer.get("included_credits")
     if included is not None and entitlement.total_credits != included:
         entitlement.total_credits = int(included)
-    if entitlement.valid_until and user.billing_current_period_end:
-        if entitlement.valid_until != user.billing_current_period_end:
-            entitlement.valid_until = user.billing_current_period_end
-    elif user.billing_current_period_end:
-        entitlement.valid_until = user.billing_current_period_end
+
+    period_end = _as_utc(user.billing_current_period_end)
+    previous_valid_until = _as_utc(entitlement.valid_until)
+
+    if period_end is not None:
+        # Stripe advanced current_period_end → new inclusive credit window.
+        # Without this reset, a prior "consumed" row either remints forever
+        # (active-only lookup) or blocks the next paid period.
+        if previous_valid_until is not None and period_end > previous_valid_until:
+            entitlement.used_credits = 0
+            entitlement.status = "active"
+            entitlement.valid_from = _utcnow()
+        entitlement.valid_until = period_end
+
     entitlement.updated_at = _utcnow()
 
 
@@ -400,7 +418,13 @@ def _ensure_subscription_entitlement(db: Session, user: User) -> BillingEntitlem
     if user.plan_tier != "pro" or user.billing_status not in PAID_ACCESS_STATUSES:
         return None
     offer = _offer_lookup("pro_lizenz")
-    entitlement = _get_subscription_entitlement(db, user)
+    # Include consumed/pending so exhausting the 20 inclusive credits cannot
+    # mint a fresh pro_lizenz row with used_credits=0 in the same period.
+    entitlement = _get_subscription_entitlement(
+        db,
+        user,
+        statuses={"active", "consumed", "pending", "ops_pending"},
+    )
     if entitlement is None:
         entitlement = BillingEntitlement(
             user_id=user.id,
@@ -1915,7 +1939,11 @@ def _upsert_subscription_entitlement_from_offer(
     status: str = "active",
 ) -> BillingEntitlement:
     offer = _offer_lookup(offer_id)
-    entitlement = _get_subscription_entitlement(db, user, statuses={"active", "pending", "ops_pending"})
+    entitlement = _get_subscription_entitlement(
+        db,
+        user,
+        statuses={"active", "consumed", "pending", "ops_pending"},
+    )
     if entitlement is None:
         entitlement = BillingEntitlement(
             user_id=user.id,
@@ -1958,7 +1986,7 @@ def _mark_subscription_entitlements_inactive(db: Session, user: User) -> None:
         .filter(
             BillingEntitlement.user_id == user.id,
             BillingEntitlement.offer_id == "pro_lizenz",
-            BillingEntitlement.status.in_(["active", "pending", "ops_pending"]),
+            BillingEntitlement.status.in_(["active", "consumed", "pending", "ops_pending"]),
         )
         .all()
     )
