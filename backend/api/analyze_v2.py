@@ -252,6 +252,14 @@ class AnalyzeRequest(BaseModel):
             raise ValueError("PLZ muss genau 5 Ziffern haben.")
         if not self.leitungstyp:
             raise ValueError("Leitungstyp darf nicht leer sein.")
+        if self.ac_kw is not None:
+            expected_kw = self.leistung_mw * 1000.0
+            tol_kw = max(0.5, abs(expected_kw) * 0.001)
+            if abs(self.ac_kw - expected_kw) > tol_kw:
+                raise ValueError(
+                    "Leistung inkonsistent: leistung_mw und ac_kw muessen dieselbe "
+                    "Anschlussleistung beschreiben (Toleranz 0,5 kW bzw. 0,1 %)."
+                )
         if self.stakeholder_context and self.stakeholder_context.customer_type == "investor":
             self.stakeholder_context.investor_relevant = True
         if self.n1_datengrundlage == "dso_verified":

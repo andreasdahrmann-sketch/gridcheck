@@ -1,6 +1,8 @@
 ﻿"""
 Tests fuer engine.berechnung.berechne_netzanschluss (Integration).
 """
+import pytest
+
 from engine.berechnung import berechne_netzanschluss
 
 
@@ -175,3 +177,37 @@ class TestNSSpannungsebene:
         assert r["status"] in ("OK", "WARNUNG")
         assert r["spannung"]["spannungsebene"] == "NS"
         assert r["spannung"]["delta_u_hartgrenze_pct"] in (3.0, 5.0)
+
+
+class TestPowerFieldConsistency:
+    """leistung_mw und ac_kw duerfen keine Split-Brain-Diagnose erzeugen."""
+
+    def test_rejects_ac_kw_mismatch_that_would_false_green(self, basis_pv_ms):
+        e = dict(basis_pv_ms)
+        e["leistung_mw"] = 0.1
+        e["ac_kw"] = 5000.0
+        e["entfernung_km"] = 8
+        e["leitungstyp"] = "NA2XS2Y150"
+        e["topologie"] = "ring_offen"
+        e["redundanz"] = True
+        e["restkapazitaet_ms_mva"] = 20
+        r = berechne_netzanschluss(e, dry_run=True)
+        assert r["status"] == "FEHLER"
+        assert any("inkonsistent" in str(msg).lower() for msg in r.get("fehler", []))
+
+    def test_accepts_matching_ac_kw(self, basis_pv_ms):
+        e = dict(basis_pv_ms)
+        e["leistung_mw"] = 5.0
+        e["ac_kw"] = 5000.0
+        r = berechne_netzanschluss(e, dry_run=True)
+        assert r["status"] == "OK"
+        assert r["annahmen"]["leistung_mw_neuanlage"] == pytest.approx(5.0)
+        persp = (r.get("grid_calculation_v2") or {}).get("projektierer_perspective") or {}
+        assert persp.get("ac_kw") == pytest.approx(5000.0)
+
+    def test_accepts_float_noise_within_tolerance(self, basis_pv_ms):
+        e = dict(basis_pv_ms)
+        e["leistung_mw"] = 5.0
+        e["ac_kw"] = 5000.4  # < 0.5 kW absolute tolerance
+        r = berechne_netzanschluss(e, dry_run=True)
+        assert r["status"] == "OK"
