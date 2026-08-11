@@ -242,6 +242,21 @@ def validiere_eingabe(eingabe):
             warnungen.append(f'Leistung {p} MW in MS unueblich. HS-Anschluss pruefen.')
         if ebene == 'MS' and p < 0.01:
             warnungen.append(f'Leistung {p} MW sehr klein fuer MS. NS-Anschluss pruefen.')
+        # Split-brain-Schutz: leistung_mw und ac_kw/ac_power_kw muessen zusammenpassen.
+        # Sonst rechnet die Primaerdiagnose mit MW, Reports/v2 aber mit abweichendem ac_kw.
+        ac_raw = eingabe.get('ac_kw', eingabe.get('ac_power_kw'))
+        if ac_raw is not None:
+            try:
+                ac_kw = float(ac_raw)
+                expected_kw = p * 1000.0
+                tol_kw = max(0.5, abs(expected_kw) * 0.001)
+                if abs(ac_kw - expected_kw) > tol_kw:
+                    fehler.append(
+                        f'Leistung inkonsistent: leistung_mw={p} MW (~{expected_kw:.3f} kW) '
+                        f'vs ac_kw={ac_kw} kW. Bitte eine einheitliche Anschlussleistung angeben.'
+                    )
+            except (ValueError, TypeError):
+                fehler.append('ac_kw ist keine gueltige Zahl')
     except (ValueError, TypeError):
         fehler.append('Leistung ist keine gueltige Zahl')
 
@@ -1692,7 +1707,6 @@ def berechne_netzanschluss(eingabe, dry_run=False, revision_context=None):
 
     # Grunddaten
     u_kv = float(eingabe['nennspannung'])
-    p_mw = float(eingabe['leistung_mw'])
     leitungstyp = eingabe['leitungstyp']
     cable_info = estimate_cable_length_km(eingabe)
     entfernung_km = float(cable_info['entfernung_km'])
@@ -1702,6 +1716,9 @@ def berechne_netzanschluss(eingabe, dry_run=False, revision_context=None):
     plant_ctx = resolve_plant_context(eingabe)
     eingabe['plant_type'] = plant_ctx.plant_type.value
     eingabe['ac_kw'] = plant_ctx.ac_kw
+    # Eine autoritative AC-Leistung fuer Primaerdiagnose und Perspektiv-Layer.
+    p_mw = float(plant_ctx.ac_kw) / 1000.0
+    eingabe['leistung_mw'] = p_mw
     if plant_ctx.dc_kwp is not None:
         eingabe['dc_kwp'] = plant_ctx.dc_kwp
     if plant_ctx.overbuild_ratio is not None:
