@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from core.auth import hash_password, verify_password
 from core.security_log import log_security_event
-from db.models import User
+from db.models import PasswordResetToken, User
 from services.auth_service import validate_password_strength
 
 
@@ -40,7 +40,14 @@ def change_password(db: Session, user: User, *, current_password: str, new_passw
                 "hint": "Bitte ein neues starkes Passwort vergeben.",
             },
         )
+    now = datetime.now(timezone.utc)
     user.password_hash = hash_password(new_password)
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = now
+    # Outstanding reset links must not survive a voluntary password change
+    # (same invalidation pattern as request_password_reset / DSGVO delete).
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at.is_(None),
+    ).update({"used_at": now}, synchronize_session=False)
     db.commit()
     log_security_event("auth_password_change_success", user_id=user.id)
