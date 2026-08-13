@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import hashlib
+import hmac
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -139,8 +140,50 @@ def login_user(db: Session, *, email: str, password: str) -> User:
     return user
 
 
+def _password_binding(user: User) -> str:
+    """Short digest of the current password hash, embedded in JWTs.
+
+    Refresh tokens must die when the password changes or is reset. Binding the
+    token to sha256(password_hash) avoids a schema migration / token_version
+    column while still invalidating outstanding refresh JWTs.
+    """
+    raw = (user.password_hash or "").encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()[:16]
+
+
+def _auth_user_invalid() -> HTTPException:
+    return HTTPException(
+        status_code=401,
+        detail={
+            "code": "AUTH_USER_INVALID",
+            "message": "Benutzer ungueltig",
+            "hint": "Bitte erneut anmelden.",
+        },
+    )
+
+
+def _refresh_revoked() -> HTTPException:
+    return HTTPException(
+        status_code=401,
+        detail={
+            "code": "AUTH_REFRESH_REVOKED",
+            "message": "Refresh-Token wurde nach einer Passwortaenderung ungueltig",
+            "hint": "Bitte erneut einloggen.",
+        },
+    )
+
+
+def _token_payload(user: User) -> dict[str, str]:
+    return {
+        "sub": str(user.id),
+        "email": user.email,
+        "role": user.role,
+        "pwd_ver": _password_binding(user),
+    }
+
+
 def issue_token_pair(user: User) -> dict[str, str]:
-    payload = {"sub": str(user.id), "email": user.email, "role": user.role}
+    payload = _token_payload(user)
     return {
         "access_token": create_token(payload, ACCESS_TTL_MIN, refresh=False),
         "refresh_token": create_token(payload, REFRESH_TTL_MIN, refresh=True),
@@ -148,11 +191,29 @@ def issue_token_pair(user: User) -> dict[str, str]:
     }
 
 
-def refresh_access_token(refresh_token: str) -> dict[str, str]:
+def refresh_access_token(db: Session, refresh_token: str) -> dict[str, str]:
     payload = decode_token(refresh_token, refresh=True)
-    access_payload = {"sub": str(payload["sub"]), "email": payload["email"], "role": payload["role"]}
+    try:
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
+        raise _auth_user_invalid() from None
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise _auth_user_invalid()
+
+    expected = _password_binding(user)
+    provided = str(payload.get("pwd_ver") or "")
+    if (
+        not provided
+        or len(provided) != len(expected)
+        or not hmac.compare_digest(provided, expected)
+    ):
+        log_security_event("auth_refresh_revoked", user_id=user.id, reason="password_binding_mismatch")
+        raise _refresh_revoked()
+
     return {
-        "access_token": create_token(access_payload, ACCESS_TTL_MIN, refresh=False),
+        "access_token": create_token(_token_payload(user), ACCESS_TTL_MIN, refresh=False),
         "token_type": "bearer",
     }
 
