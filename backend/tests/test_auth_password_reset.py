@@ -80,6 +80,37 @@ def test_password_reset_roundtrip(client: TestClient, monkeypatch: pytest.Monkey
     assert login_old.status_code == 401
 
 
+def test_password_reset_revokes_outstanding_refresh_token(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    sent: list[str] = []
+
+    monkeypatch.setattr(
+        "services.email_service.send_password_reset_email",
+        lambda **kwargs: sent.append(kwargs.get("reset_url", "")) or True,
+    )
+
+    email = f"reset-refresh-{uuid.uuid4().hex}@example.com"
+    _register(client, email)
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": "SecurePass!99"})
+    assert login.status_code == 200, login.text
+    tokens = login.json()
+
+    client.post("/api/v1/auth/forgot-password", json={"email": email})
+    raw_token = sent[0].split("reset_token=")[-1]
+    reset = client.post(
+        "/api/v1/auth/reset-password",
+        json={"token": raw_token, "password": "ResetSecurePass!04"},
+    )
+    assert reset.status_code == 200, reset.text
+
+    revoked = client.post(
+        "/api/v1/auth/refresh",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+        json={"refresh_token": tokens["refresh_token"]},
+    )
+    assert revoked.status_code == 401, revoked.text
+    assert revoked.json()["detail"]["code"] == "AUTH_REFRESH_REVOKED"
+
+
 def test_reset_token_single_use(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     sent: list[str] = []
 

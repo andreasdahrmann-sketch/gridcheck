@@ -864,6 +864,38 @@ def test_analyze_v2_investor_path_is_sanitized_server_side(monkeypatch):
         _close_client(client)
 
 
+def test_refresh_rejected_after_password_change():
+    client = build_client()
+    try:
+        tokens = _register_and_login(client, "refresh-revoke@example.com")
+        auth = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        still_valid = client.post(
+            "/api/v1/auth/refresh",
+            headers=auth,
+            json={"refresh_token": tokens["refresh_token"]},
+        )
+        assert still_valid.status_code == 200, still_valid.text
+        assert still_valid.json()["access_token"]
+
+        changed = client.patch(
+            "/api/v1/users/me/password",
+            headers=auth,
+            json={"current_password": "Passwort123!", "new_password": "NeuPasswort123!"},
+        )
+        assert changed.status_code == 200, changed.text
+
+        revoked = client.post(
+            "/api/v1/auth/refresh",
+            headers=auth,
+            json={"refresh_token": tokens["refresh_token"]},
+        )
+        assert revoked.status_code == 401, revoked.text
+        assert revoked.json()["detail"]["code"] == "AUTH_REFRESH_REVOKED"
+    finally:
+        _close_client(client)
+
+
 def test_user_settings_and_contact(monkeypatch):
     client = build_client()
     try:
