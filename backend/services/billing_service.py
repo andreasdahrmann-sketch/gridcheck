@@ -1880,7 +1880,20 @@ def _resolve_user_for_event(db: Session, event_type: str, data_object: dict[str,
 
     subscription_id = data_object.get("id") if event_type.startswith("customer.subscription.") else data_object.get("subscription")
     if subscription_id:
-        return db.query(User).filter(User.stripe_subscription_id == str(subscription_id)).first()
+        user = db.query(User).filter(User.stripe_subscription_id == str(subscription_id)).first()
+        if user:
+            return user
+
+    payment_intent_id = _event_payment_intent_id(data_object)
+    if payment_intent_id:
+        entitlement = (
+            db.query(BillingEntitlement)
+            .filter(BillingEntitlement.stripe_payment_intent_id == payment_intent_id)
+            .order_by(BillingEntitlement.id.asc())
+            .first()
+        )
+        if entitlement:
+            return db.query(User).filter(User.id == entitlement.user_id).first()
     return None
 
 
@@ -1965,6 +1978,96 @@ def _mark_subscription_entitlements_inactive(db: Session, user: User) -> None:
     for entitlement in rows:
         entitlement.status = "canceled"
         entitlement.updated_at = _utcnow()
+
+
+_REVOCABLE_PAYMENT_STATUSES = {"active", "pending", "ops_pending"}
+
+
+def _event_payment_intent_id(data_object: dict[str, Any]) -> str | None:
+    payment_intent = data_object.get("payment_intent")
+    if isinstance(payment_intent, dict):
+        payment_intent = payment_intent.get("id")
+    value = str(payment_intent or "").strip()
+    return value or None
+
+
+def _is_full_charge_refund(data_object: dict[str, Any]) -> bool:
+    if data_object.get("refunded") is True:
+        return True
+    amount = data_object.get("amount")
+    amount_refunded = data_object.get("amount_refunded")
+    if isinstance(amount, int) and isinstance(amount_refunded, int) and amount > 0:
+        return amount_refunded >= amount
+    return False
+
+
+def _revoke_entitlements_for_payment_intent(
+    db: Session,
+    *,
+    payment_intent_id: str,
+    status: str,
+) -> list[BillingEntitlement]:
+    rows = (
+        db.query(BillingEntitlement)
+        .filter(
+            BillingEntitlement.stripe_payment_intent_id == payment_intent_id,
+            BillingEntitlement.status.in_(sorted(_REVOCABLE_PAYMENT_STATUSES)),
+        )
+        .all()
+    )
+    now = _utcnow()
+    for entitlement in rows:
+        entitlement.status = status
+        entitlement.updated_at = now
+    return rows
+
+
+def _recompute_user_state_after_prepaid_revoke(db: Session, user: User) -> None:
+    if user.billing_status in PAID_ACCESS_STATUSES:
+        return
+    remaining = [
+        entitlement
+        for entitlement in _active_entitlements(db, user)
+        if entitlement.offer_id in PAYMENT_OFFER_IDS and _entitlement_usable(entitlement)
+    ]
+    if remaining:
+        scopes = {str(entitlement.package_scope or "") for entitlement in remaining}
+        for scope in ("professional", "premium", "basic"):
+            if scope in scopes:
+                user.plan_tier = scope
+                break
+        user.updated_at = _utcnow()
+        return
+    if user.billing_status == "purchased" or user.plan_tier in {"basic", "premium", "professional"}:
+        user.plan_tier = "free"
+        user.billing_status = "refunded"
+        user.updated_at = _utcnow()
+
+
+def _apply_payment_reversal(
+    db: Session,
+    data_object: dict[str, Any],
+    *,
+    entitlement_status: str,
+    user: User | None = None,
+) -> User | None:
+    payment_intent_id = _event_payment_intent_id(data_object)
+    if not payment_intent_id:
+        return user
+    revoked = _revoke_entitlements_for_payment_intent(
+        db,
+        payment_intent_id=payment_intent_id,
+        status=entitlement_status,
+    )
+    if not revoked:
+        return user
+    db.flush()
+    affected_user = user
+    if affected_user is None:
+        affected_user = db.query(User).filter(User.id == revoked[0].user_id).first()
+    if affected_user is not None:
+        _recompute_user_state_after_prepaid_revoke(db, affected_user)
+    return affected_user
 
 
 def _payment_entitlement_exists(db: Session, checkout_session_id: str | None, offer_id: str) -> bool:
@@ -2244,6 +2347,11 @@ def handle_stripe_webhook(db: Session, payload: bytes, stripe_signature: str | N
         elif event_type == "invoice.payment_failed":
             user.billing_status = "past_due"
             user.updated_at = _utcnow()
+
+    if event_type == "charge.refunded" and _is_full_charge_refund(data_object):
+        user = _apply_payment_reversal(db, data_object, entitlement_status="refunded", user=user) or user
+    elif event_type in {"charge.dispute.created", "charge.dispute.funds_withdrawn"}:
+        user = _apply_payment_reversal(db, data_object, entitlement_status="disputed", user=user) or user
 
     _record_billing_event(
         db,

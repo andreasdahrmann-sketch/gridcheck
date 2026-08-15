@@ -1007,3 +1007,339 @@ def test_report_scope_differs_between_basic_and_premium(monkeypatch):
         assert "Paketgrenze" not in premium_html
     finally:
         _close_client(client)
+
+
+def _enable_fake_stripe_webhook(monkeypatch, billing_service):
+    fake_settings = replace(billing_service.settings, stripe_webhook_secret="whsec_test")
+    monkeypatch.setattr(billing_service, "settings", fake_settings)
+
+    class FakeWebhook:
+        next_event: dict = {}
+
+        @staticmethod
+        def construct_event(payload, signature, secret):
+            return FakeWebhook.next_event
+
+    class FakeStripeModule:
+        Webhook = FakeWebhook
+
+    monkeypatch.setattr(billing_service, "_load_stripe_module", lambda: FakeStripeModule)
+    return FakeWebhook
+
+
+def test_full_refund_revokes_prepaid_entitlement_and_blocks_paid_analyze(monkeypatch):
+    client = build_client()
+    try:
+        tokens = _register_and_login(client, "refund-prepaid@example.com")
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "refund-prepaid@example.com").first()
+            assert user is not None
+            user.stripe_customer_id = "cus_refund_prepaid"
+            db.commit()
+            user_id = user.id
+
+        from services import billing_service
+
+        FakeWebhook = _enable_fake_stripe_webhook(monkeypatch, billing_service)
+        FakeWebhook.next_event = {
+            "id": "evt_refund_checkout",
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_refund_basic",
+                    "customer": "cus_refund_prepaid",
+                    "payment_intent": "pi_refund_basic",
+                    "payment_status": "paid",
+                    "status": "complete",
+                    "metadata": {
+                        "user_id": str(user_id),
+                        "offer_id": "premium_pre_check",
+                    },
+                    "line_items": {"data": [{"price": {"id": "price_premium_refund"}}]},
+                }
+            },
+        }
+        issued = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert issued.status_code == 200, issued.text
+
+        FakeWebhook.next_event = {
+            "id": "evt_charge_refunded",
+            "type": "charge.refunded",
+            "data": {
+                "object": {
+                    "id": "ch_refund_basic",
+                    "customer": "cus_refund_prepaid",
+                    "payment_intent": "pi_refund_basic",
+                    "amount": 14900,
+                    "amount_refunded": 14900,
+                    "refunded": True,
+                }
+            },
+        }
+        refunded = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert refunded.status_code == 200, refunded.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            entitlement = (
+                db.query(BillingEntitlement)
+                .filter(
+                    BillingEntitlement.user_id == user_id,
+                    BillingEntitlement.offer_id == "premium_pre_check",
+                )
+                .one()
+            )
+            assert user is not None
+            assert user.plan_tier == "free"
+            assert user.billing_status == "refunded"
+            assert entitlement.status == "refunded"
+            assert entitlement.stripe_payment_intent_id == "pi_refund_basic"
+
+        blocked = client.post(
+            "/api/v1/analyze",
+            headers=_headers(tokens),
+            json={**_base_payload(), "requested_offer_id": "premium_pre_check"},
+        )
+        assert blocked.status_code == 402, blocked.text
+        assert blocked.json()["detail"]["code"] == "FREE_TIER_LIMIT"
+    finally:
+        _close_client(client)
+
+
+def test_partial_refund_keeps_prepaid_entitlement(monkeypatch):
+    client = build_client()
+    try:
+        _register_and_login(client, "partial-refund@example.com")
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "partial-refund@example.com").first()
+            assert user is not None
+            user.stripe_customer_id = "cus_partial_refund"
+            db.commit()
+            user_id = user.id
+
+        from services import billing_service
+
+        FakeWebhook = _enable_fake_stripe_webhook(monkeypatch, billing_service)
+        FakeWebhook.next_event = {
+            "id": "evt_partial_checkout",
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_partial_basic",
+                    "customer": "cus_partial_refund",
+                    "payment_intent": "pi_partial_basic",
+                    "payment_status": "paid",
+                    "status": "complete",
+                    "metadata": {
+                        "user_id": str(user_id),
+                        "offer_id": "basic_schnellcheck",
+                    },
+                    "line_items": {"data": [{"price": {"id": "price_basic_partial"}}]},
+                }
+            },
+        }
+        issued = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert issued.status_code == 200, issued.text
+
+        FakeWebhook.next_event = {
+            "id": "evt_partial_refund",
+            "type": "charge.refunded",
+            "data": {
+                "object": {
+                    "id": "ch_partial_basic",
+                    "customer": "cus_partial_refund",
+                    "payment_intent": "pi_partial_basic",
+                    "amount": 4900,
+                    "amount_refunded": 1000,
+                    "refunded": False,
+                }
+            },
+        }
+        partial = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert partial.status_code == 200, partial.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            entitlement = (
+                db.query(BillingEntitlement)
+                .filter(
+                    BillingEntitlement.user_id == user_id,
+                    BillingEntitlement.offer_id == "basic_schnellcheck",
+                )
+                .one()
+            )
+            assert user is not None
+            assert user.plan_tier == "basic"
+            assert user.billing_status == "purchased"
+            assert entitlement.status == "active"
+    finally:
+        _close_client(client)
+
+
+def test_dispute_without_customer_revokes_via_payment_intent(monkeypatch):
+    client = build_client()
+    try:
+        tokens = _register_and_login(client, "dispute-prepaid@example.com")
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "dispute-prepaid@example.com").first()
+            assert user is not None
+            user.stripe_customer_id = "cus_dispute_prepaid"
+            db.add(
+                BillingEntitlement(
+                    user_id=user.id,
+                    offer_id="professional_anschlussstrategie",
+                    offer_category="pay_per_use",
+                    package_scope="professional",
+                    source="checkout",
+                    status="active",
+                    total_credits=1,
+                    used_credits=0,
+                    valid_from=datetime.now(timezone.utc),
+                    stripe_payment_intent_id="pi_dispute_prof",
+                    metadata_json='{"report_scope":"professional"}',
+                )
+            )
+            user.plan_tier = "professional"
+            user.billing_status = "purchased"
+            db.commit()
+            user_id = user.id
+
+        from services import billing_service
+
+        FakeWebhook = _enable_fake_stripe_webhook(monkeypatch, billing_service)
+        FakeWebhook.next_event = {
+            "id": "evt_dispute_created",
+            "type": "charge.dispute.created",
+            "data": {
+                "object": {
+                    "id": "dp_dispute_prof",
+                    "payment_intent": "pi_dispute_prof",
+                    "amount": 24900,
+                    "status": "needs_response",
+                }
+            },
+        }
+        disputed = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert disputed.status_code == 200, disputed.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            entitlement = (
+                db.query(BillingEntitlement)
+                .filter(BillingEntitlement.stripe_payment_intent_id == "pi_dispute_prof")
+                .one()
+            )
+            other_status_event = (
+                db.query(BillingEvent)
+                .filter(BillingEvent.provider_event_id == "evt_dispute_created")
+                .one()
+            )
+            assert user is not None
+            assert user.plan_tier == "free"
+            assert user.billing_status == "refunded"
+            assert entitlement.status == "disputed"
+            assert other_status_event.user_id == user_id
+
+        blocked = client.post(
+            "/api/v1/analyze",
+            headers=_headers(tokens),
+            json={**_base_payload(), "requested_offer_id": "professional_anschlussstrategie"},
+        )
+        assert blocked.status_code == 402, blocked.text
+    finally:
+        _close_client(client)
+
+
+def test_refund_does_not_cancel_unrelated_or_subscription_entitlements(monkeypatch):
+    client = build_client()
+    try:
+        _register_and_login(client, "refund-scope@example.com")
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "refund-scope@example.com").first()
+            assert user is not None
+            user.stripe_customer_id = "cus_refund_scope"
+            user.stripe_subscription_id = "sub_refund_scope"
+            user.plan_tier = "pro"
+            user.billing_status = "active"
+            db.add(
+                BillingEntitlement(
+                    user_id=user.id,
+                    offer_id="basic_schnellcheck",
+                    offer_category="pay_per_use",
+                    package_scope="basic",
+                    source="checkout",
+                    status="active",
+                    total_credits=1,
+                    used_credits=0,
+                    valid_from=datetime.now(timezone.utc),
+                    stripe_payment_intent_id="pi_refund_scope",
+                    metadata_json='{"report_scope":"basic"}',
+                )
+            )
+            db.add(
+                BillingEntitlement(
+                    user_id=user.id,
+                    offer_id="premium_pre_check",
+                    offer_category="pay_per_use",
+                    package_scope="premium",
+                    source="checkout",
+                    status="active",
+                    total_credits=1,
+                    used_credits=0,
+                    valid_from=datetime.now(timezone.utc),
+                    stripe_payment_intent_id="pi_keep_other",
+                    metadata_json='{"report_scope":"premium"}',
+                )
+            )
+            db.add(
+                BillingEntitlement(
+                    user_id=user.id,
+                    offer_id="pro_lizenz",
+                    offer_category="subscription",
+                    package_scope="professional",
+                    source="subscription",
+                    status="active",
+                    total_credits=20,
+                    used_credits=0,
+                    valid_from=datetime.now(timezone.utc),
+                    stripe_subscription_id="sub_refund_scope",
+                    metadata_json='{"report_scope":"professional"}',
+                )
+            )
+            db.commit()
+            user_id = user.id
+
+        from services import billing_service
+
+        FakeWebhook = _enable_fake_stripe_webhook(monkeypatch, billing_service)
+        FakeWebhook.next_event = {
+            "id": "evt_refund_scope",
+            "type": "charge.refunded",
+            "data": {
+                "object": {
+                    "id": "ch_refund_scope",
+                    "customer": "cus_refund_scope",
+                    "payment_intent": "pi_refund_scope",
+                    "amount": 4900,
+                    "amount_refunded": 4900,
+                    "refunded": True,
+                }
+            },
+        }
+        refunded = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert refunded.status_code == 200, refunded.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            rows = {
+                row.offer_id: row
+                for row in db.query(BillingEntitlement).filter(BillingEntitlement.user_id == user_id).all()
+            }
+            assert user is not None
+            assert user.plan_tier == "pro"
+            assert user.billing_status == "active"
+            assert rows["basic_schnellcheck"].status == "refunded"
+            assert rows["premium_pre_check"].status == "active"
+            assert rows["pro_lizenz"].status == "active"
+    finally:
+        _close_client(client)
