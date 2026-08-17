@@ -2007,6 +2007,50 @@ def _extract_session_price_id(data_object: dict[str, Any]) -> str | None:
     return None
 
 
+def _release_incomplete_subscription_checkout(
+    db: Session,
+    user: User,
+    data_object: dict[str, Any],
+) -> None:
+    """Unlock a Pro checkout that never activated after delayed payment failure.
+
+    Stripe sends ``checkout.session.completed`` with ``payment_status=unpaid`` for
+    delayed methods (SEPA/BACS). That path already stores ``checkout_completed``
+    plus a pending entitlement, which blocks a new Pro checkout. If the later
+    ``checkout.session.async_payment_failed`` event is ignored, the buyer cannot
+    retry after a failed debit.
+    """
+    offer_id, _ = _session_offer_metadata(data_object)
+    checkout_session_id = str(data_object.get("id") or "") or None
+    if offer_id not in SUBSCRIPTION_OFFER_IDS:
+        return
+    if str(user.billing_status or "") != "checkout_completed":
+        return
+
+    user.billing_status = "free"
+    user.plan_tier = "free"
+    user.updated_at = _utcnow()
+
+    pending_rows = (
+        db.query(BillingEntitlement)
+        .filter(
+            BillingEntitlement.user_id == user.id,
+            BillingEntitlement.offer_id == "pro_lizenz",
+            BillingEntitlement.status == "pending",
+        )
+        .all()
+    )
+    for entitlement in pending_rows:
+        if (
+            checkout_session_id
+            and entitlement.checkout_session_id
+            and entitlement.checkout_session_id != checkout_session_id
+        ):
+            continue
+        entitlement.status = "canceled"
+        entitlement.updated_at = _utcnow()
+
+
 def _sync_checkout_session_completion(
     db: Session,
     user: User,
@@ -2213,8 +2257,10 @@ def handle_stripe_webhook(db: Session, payload: bytes, stripe_signature: str | N
 
     user = _resolve_user_for_event(db, event_type, data_object)
     if user:
-        if event_type == "checkout.session.completed":
+        if event_type in {"checkout.session.completed", "checkout.session.async_payment_succeeded"}:
             _sync_checkout_session_completion(db, user, data_object)
+        elif event_type == "checkout.session.async_payment_failed":
+            _release_incomplete_subscription_checkout(db, user, data_object)
         elif event_type in {"customer.subscription.created", "customer.subscription.updated"}:
             _apply_subscription_state(user, data_object)
             if user.billing_status in PAID_ACCESS_STATUSES:
