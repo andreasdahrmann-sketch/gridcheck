@@ -274,6 +274,233 @@ def test_stripe_webhooks_create_payment_and_subscription_entitlements(monkeypatc
         _close_client(client)
 
 
+def test_async_payment_succeeded_issues_prepaid_entitlement_after_unpaid_checkout(monkeypatch):
+    """Delayed methods (SEPA/BACS) complete checkout unpaid; credits must wait for async success."""
+    client = build_client()
+    try:
+        _register_and_login(client, "async-paid@example.com")
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "async-paid@example.com").first()
+            assert user is not None
+            user.stripe_customer_id = "cus_async_paid"
+            db.commit()
+            user_id = user.id
+
+        from services import billing_service
+
+        fake_settings = replace(billing_service.settings, stripe_webhook_secret="whsec_test")
+        monkeypatch.setattr(billing_service, "settings", fake_settings)
+
+        class FakeWebhook:
+            next_event: dict = {}
+
+            @staticmethod
+            def construct_event(payload, signature, secret):
+                return FakeWebhook.next_event
+
+        class FakeStripeModule:
+            Webhook = FakeWebhook
+
+        monkeypatch.setattr(billing_service, "_load_stripe_module", lambda: FakeStripeModule)
+
+        session_object = {
+            "id": "cs_async_basic",
+            "customer": "cus_async_paid",
+            "payment_intent": "pi_async_basic",
+            "payment_status": "unpaid",
+            "status": "complete",
+            "metadata": {
+                "user_id": str(user_id),
+                "offer_id": "basic_schnellcheck",
+            },
+            "line_items": {"data": [{"price": {"id": "price_basic_async"}}]},
+        }
+        FakeWebhook.next_event = {
+            "id": "evt_async_completed",
+            "type": "checkout.session.completed",
+            "data": {"object": session_object},
+        }
+        completed = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert completed.status_code == 200, completed.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.plan_tier != "basic"
+            assert user.billing_status != "purchased"
+            assert (
+                db.query(BillingEntitlement)
+                .filter(
+                    BillingEntitlement.user_id == user_id,
+                    BillingEntitlement.offer_id == "basic_schnellcheck",
+                )
+                .first()
+                is None
+            )
+
+        FakeWebhook.next_event = {
+            "id": "evt_async_succeeded",
+            "type": "checkout.session.async_payment_succeeded",
+            "data": {"object": {**session_object, "payment_status": "paid"}},
+        }
+        succeeded = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert succeeded.status_code == 200, succeeded.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.plan_tier == "basic"
+            assert user.billing_status == "purchased"
+            entitlement = (
+                db.query(BillingEntitlement)
+                .filter(
+                    BillingEntitlement.user_id == user_id,
+                    BillingEntitlement.offer_id == "basic_schnellcheck",
+                )
+                .one()
+            )
+            assert entitlement.status == "active"
+            assert entitlement.stripe_payment_intent_id == "pi_async_basic"
+
+        FakeWebhook.next_event = {
+            "id": "evt_async_succeeded_dup",
+            "type": "checkout.session.async_payment_succeeded",
+            "data": {"object": {**session_object, "payment_status": "paid"}},
+        }
+        duplicate = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert duplicate.status_code == 200, duplicate.text
+
+        with _db_session(client) as db:
+            count = (
+                db.query(BillingEntitlement)
+                .filter(
+                    BillingEntitlement.user_id == user_id,
+                    BillingEntitlement.offer_id == "basic_schnellcheck",
+                )
+                .count()
+            )
+            assert count == 1
+    finally:
+        _close_client(client)
+
+
+def test_async_payment_failed_releases_pending_subscription_checkout(monkeypatch):
+    """Failed delayed Pro debit must not leave checkout_pending as a permanent lock."""
+    client = build_client()
+    try:
+        _register_and_login(client, "async-failed@example.com")
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "async-failed@example.com").first()
+            assert user is not None
+            user.stripe_customer_id = "cus_async_failed"
+            db.commit()
+            user_id = user.id
+
+        from services import billing_service
+
+        fake_settings = replace(billing_service.settings, stripe_webhook_secret="whsec_test")
+        monkeypatch.setattr(billing_service, "settings", fake_settings)
+
+        class FakeWebhook:
+            next_event: dict = {}
+
+            @staticmethod
+            def construct_event(payload, signature, secret):
+                return FakeWebhook.next_event
+
+        class FakeStripeModule:
+            Webhook = FakeWebhook
+
+        monkeypatch.setattr(billing_service, "_load_stripe_module", lambda: FakeStripeModule)
+
+        session_object = {
+            "id": "cs_async_pro",
+            "customer": "cus_async_failed",
+            "subscription": "sub_async_failed",
+            "payment_status": "unpaid",
+            "status": "complete",
+            "metadata": {
+                "user_id": str(user_id),
+                "offer_id": "pro_lizenz",
+            },
+            "line_items": {"data": [{"price": {"id": "price_pro_async"}}]},
+        }
+        FakeWebhook.next_event = {
+            "id": "evt_async_pro_completed",
+            "type": "checkout.session.completed",
+            "data": {"object": session_object},
+        }
+        completed = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert completed.status_code == 200, completed.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.billing_status == "checkout_completed"
+            pending = (
+                db.query(BillingEntitlement)
+                .filter(
+                    BillingEntitlement.user_id == user_id,
+                    BillingEntitlement.offer_id == "pro_lizenz",
+                )
+                .one()
+            )
+            assert pending.status == "pending"
+
+        FakeWebhook.next_event = {
+            "id": "evt_async_pro_failed",
+            "type": "checkout.session.async_payment_failed",
+            "data": {"object": session_object},
+        }
+        failed = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert failed.status_code == 200, failed.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.billing_status == "free"
+            assert user.plan_tier == "free"
+            entitlement = (
+                db.query(BillingEntitlement)
+                .filter(
+                    BillingEntitlement.user_id == user_id,
+                    BillingEntitlement.offer_id == "pro_lizenz",
+                )
+                .one()
+            )
+            assert entitlement.status == "canceled"
+
+            fake_settings = replace(
+                billing_service.settings,
+                stripe_secret_key="sk_test",
+                stripe_price_pro_license_id="price_pro_async",
+            )
+            monkeypatch.setattr(billing_service, "settings", fake_settings)
+
+            class FakeCheckoutSession:
+                @staticmethod
+                def create(**kwargs):
+                    return {"id": "cs_retry_pro", "url": "https://checkout.stripe.test/cs_retry_pro"}
+
+            class FakeCustomer:
+                @staticmethod
+                def create(**kwargs):
+                    return {"id": "cus_async_failed"}
+
+            class RetryStripeModule:
+                class checkout:
+                    Session = FakeCheckoutSession
+
+                class Customer:
+                    create = staticmethod(FakeCustomer.create)
+
+            monkeypatch.setattr(billing_service, "_load_stripe_module", lambda: RetryStripeModule)
+            retry = billing_service.create_checkout_session(db, user, "pro_lizenz")
+            assert retry["session_id"] == "cs_retry_pro"
+    finally:
+        _close_client(client)
+
+
 def test_billing_status_exposes_subscription_attention_states(monkeypatch):
     client = build_client()
     try:
