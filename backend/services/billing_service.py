@@ -1967,6 +1967,72 @@ def _mark_subscription_entitlements_inactive(db: Session, user: User) -> None:
         entitlement.updated_at = _utcnow()
 
 
+def _invoice_subscription_id(data_object: dict[str, Any]) -> str | None:
+    raw_subscription = data_object.get("subscription")
+    if isinstance(raw_subscription, dict):
+        raw_subscription = raw_subscription.get("id")
+    if not raw_subscription:
+        return None
+    return str(raw_subscription)
+
+
+def _cancel_pending_pro_entitlements(
+    db: Session,
+    user: User,
+    *,
+    stripe_subscription_id: str | None = None,
+) -> None:
+    pending_rows = (
+        db.query(BillingEntitlement)
+        .filter(
+            BillingEntitlement.user_id == user.id,
+            BillingEntitlement.offer_id == "pro_lizenz",
+            BillingEntitlement.status == "pending",
+        )
+        .all()
+    )
+    for entitlement in pending_rows:
+        if (
+            stripe_subscription_id
+            and entitlement.stripe_subscription_id
+            and entitlement.stripe_subscription_id != stripe_subscription_id
+        ):
+            continue
+        entitlement.status = "canceled"
+        entitlement.updated_at = _utcnow()
+
+
+def _apply_invoice_payment_failed(db: Session, user: User, data_object: dict[str, Any]) -> None:
+    """Gate past_due so a failed first invoice cannot permanently lock Pro checkout.
+
+    Stripe sends ``invoice.payment_failed`` for the initial subscription invoice
+    (SEPA bounce, incomplete Checkout) and for later renewals. Setting
+    ``billing_status=past_due`` unconditionally blocks ``create_checkout_session``.
+    The Billing Portal is often useless for never-activated /
+    ``incomplete_expired`` subscriptions, and delayed webhook retries can also
+    overwrite ``canceled`` back to ``past_due``.
+    """
+    subscription_id = _invoice_subscription_id(data_object)
+    if not subscription_id:
+        return
+
+    current_status = str(user.billing_status or "free")
+    if current_status in SUBSCRIPTION_ANALYSIS_ACCESS_STATUSES or current_status == "past_due":
+        user.billing_status = "past_due"
+        user.updated_at = _utcnow()
+        return
+
+    if current_status in {"checkout_completed", "free"}:
+        user.billing_status = "free"
+        user.plan_tier = "free"
+        user.updated_at = _utcnow()
+        _cancel_pending_pro_entitlements(
+            db,
+            user,
+            stripe_subscription_id=subscription_id,
+        )
+
+
 def _payment_entitlement_exists(db: Session, checkout_session_id: str | None, offer_id: str) -> bool:
     if not checkout_session_id:
         return False
@@ -2242,8 +2308,7 @@ def handle_stripe_webhook(db: Session, payload: bytes, stripe_signature: str | N
                     status="active",
                 )
         elif event_type == "invoice.payment_failed":
-            user.billing_status = "past_due"
-            user.updated_at = _utcnow()
+            _apply_invoice_payment_failed(db, user, data_object)
 
     _record_billing_event(
         db,
