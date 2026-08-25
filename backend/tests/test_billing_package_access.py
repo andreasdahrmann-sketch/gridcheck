@@ -1007,3 +1007,237 @@ def test_report_scope_differs_between_basic_and_premium(monkeypatch):
         assert "Paketgrenze" not in premium_html
     finally:
         _close_client(client)
+
+
+def _install_fake_stripe_webhook(monkeypatch, billing_service, **setting_overrides):
+    fake_settings = replace(
+        billing_service.settings,
+        stripe_webhook_secret="whsec_test",
+        **setting_overrides,
+    )
+    monkeypatch.setattr(billing_service, "settings", fake_settings)
+
+    class FakeWebhook:
+        next_event: dict = {}
+
+        @staticmethod
+        def construct_event(payload, signature, secret):
+            return FakeWebhook.next_event
+
+    class FakeStripeModule:
+        Webhook = FakeWebhook
+
+    monkeypatch.setattr(billing_service, "_load_stripe_module", lambda: FakeStripeModule)
+    return FakeWebhook
+
+
+def test_delayed_invoice_paid_does_not_reactivate_canceled_pro(monkeypatch):
+    """Stripe retries invoice.paid after subscription.deleted must not restore Pro."""
+    client = build_client()
+    try:
+        tokens = _register_and_login(client, "canceled-invoice-paid@example.com")
+        from services import billing_service
+
+        FakeWebhook = _install_fake_stripe_webhook(
+            monkeypatch, billing_service, stripe_secret_key="sk_test", free_checks_limit=0
+        )
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "canceled-invoice-paid@example.com").first()
+            assert user is not None
+            user.plan_tier = "free"
+            user.billing_status = "canceled"
+            user.stripe_customer_id = "cus_canceled_invoice"
+            user.stripe_subscription_id = "sub_canceled_invoice"
+            user.billing_current_period_end = datetime.now(timezone.utc) - timedelta(days=1)
+            db.add(
+                BillingEntitlement(
+                    user_id=user.id,
+                    offer_id="pro_lizenz",
+                    offer_category="subscription",
+                    package_scope="professional",
+                    source="subscription",
+                    status="canceled",
+                    total_credits=20,
+                    used_credits=20,
+                    valid_from=datetime.now(timezone.utc) - timedelta(days=40),
+                    stripe_subscription_id="sub_canceled_invoice",
+                    metadata_json='{"report_scope":"professional"}',
+                )
+            )
+            db.commit()
+            user_id = user.id
+
+        FakeWebhook.next_event = {
+            "id": "evt_invoice_paid_after_cancel",
+            "type": "invoice.paid",
+            "data": {
+                "object": {
+                    "id": "in_canceled_retry",
+                    "customer": "cus_canceled_invoice",
+                    "subscription": "sub_canceled_invoice",
+                    "amount_paid": 4900,
+                    "currency": "eur",
+                    "status": "paid",
+                    "billing_reason": "subscription_cycle",
+                }
+            },
+        }
+        response = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == "processed"
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.plan_tier == "free"
+            assert user.billing_status == "canceled"
+            entitlements = (
+                db.query(BillingEntitlement)
+                .filter(BillingEntitlement.user_id == user.id, BillingEntitlement.offer_id == "pro_lizenz")
+                .all()
+            )
+            assert entitlements
+            assert all(row.status == "canceled" for row in entitlements)
+            assert not any(row.status == "active" for row in entitlements)
+
+        billing = client.get("/api/v1/billing/status", headers=_headers(tokens))
+        assert billing.status_code == 200, billing.text
+        billing_body = billing.json()
+        assert billing_body["subscription_state"] == "canceled"
+        assert billing_body["has_active_subscription"] is False
+        assert billing_body["can_run_analysis"] is False
+
+        blocked = client.post(
+            "/api/v1/analyze",
+            headers=_headers(tokens),
+            json={**_base_payload(), "requested_offer_id": "pro_lizenz"},
+        )
+        assert blocked.status_code == 402, blocked.text
+        assert blocked.json()["detail"]["code"] == "FREE_TIER_LIMIT"
+    finally:
+        _close_client(client)
+
+
+def test_invoice_paid_activates_pending_checkout_subscription(monkeypatch):
+    """Legitimate first invoice.paid after checkout_completed must still unlock Pro."""
+    client = build_client()
+    try:
+        tokens = _register_and_login(client, "invoice-paid-activate@example.com")
+        from services import billing_service
+
+        FakeWebhook = _install_fake_stripe_webhook(monkeypatch, billing_service, stripe_secret_key="sk_test")
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "invoice-paid-activate@example.com").first()
+            assert user is not None
+            user.plan_tier = "free"
+            user.billing_status = "checkout_completed"
+            user.stripe_customer_id = "cus_invoice_activate"
+            user.stripe_subscription_id = "sub_invoice_activate"
+            user.billing_current_period_end = datetime.now(timezone.utc) + timedelta(days=30)
+            db.add(
+                BillingEntitlement(
+                    user_id=user.id,
+                    offer_id="pro_lizenz",
+                    offer_category="subscription",
+                    package_scope="professional",
+                    source="subscription",
+                    status="pending",
+                    total_credits=20,
+                    used_credits=0,
+                    valid_from=datetime.now(timezone.utc),
+                    stripe_subscription_id="sub_invoice_activate",
+                    metadata_json='{"report_scope":"professional"}',
+                )
+            )
+            db.commit()
+            user_id = user.id
+
+        FakeWebhook.next_event = {
+            "id": "evt_invoice_paid_activate",
+            "type": "invoice.paid",
+            "data": {
+                "object": {
+                    "id": "in_activate",
+                    "customer": "cus_invoice_activate",
+                    "subscription": "sub_invoice_activate",
+                    "amount_paid": 4900,
+                    "currency": "eur",
+                    "status": "paid",
+                    "billing_reason": "subscription_create",
+                }
+            },
+        }
+        response = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert response.status_code == 200, response.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.plan_tier == "pro"
+            assert user.billing_status == "active"
+            entitlement = (
+                db.query(BillingEntitlement)
+                .filter(BillingEntitlement.user_id == user.id, BillingEntitlement.offer_id == "pro_lizenz")
+                .one()
+            )
+            assert entitlement.status == "active"
+
+        billing = client.get("/api/v1/billing/status", headers=_headers(tokens))
+        assert billing.status_code == 200, billing.text
+        assert billing.json()["has_active_subscription"] is True
+    finally:
+        _close_client(client)
+
+
+def test_stale_invoice_paid_does_not_override_new_subscription(monkeypatch):
+    """An old invoice.paid must not attach to a newer checkout subscription id."""
+    client = build_client()
+    try:
+        _register_and_login(client, "stale-invoice-paid@example.com")
+        from services import billing_service
+
+        FakeWebhook = _install_fake_stripe_webhook(monkeypatch, billing_service)
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "stale-invoice-paid@example.com").first()
+            assert user is not None
+            user.plan_tier = "free"
+            user.billing_status = "checkout_completed"
+            user.stripe_customer_id = "cus_stale_invoice"
+            user.stripe_subscription_id = "sub_new_checkout"
+            db.commit()
+            user_id = user.id
+
+        FakeWebhook.next_event = {
+            "id": "evt_stale_invoice_paid",
+            "type": "invoice.paid",
+            "data": {
+                "object": {
+                    "id": "in_old_sub",
+                    "customer": "cus_stale_invoice",
+                    "subscription": "sub_old_canceled",
+                    "amount_paid": 4900,
+                    "currency": "eur",
+                    "status": "paid",
+                }
+            },
+        }
+        response = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert response.status_code == 200, response.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.plan_tier == "free"
+            assert user.billing_status == "checkout_completed"
+            assert user.stripe_subscription_id == "sub_new_checkout"
+            assert (
+                db.query(BillingEntitlement)
+                .filter(BillingEntitlement.user_id == user.id, BillingEntitlement.offer_id == "pro_lizenz")
+                .first()
+                is None
+            )
+    finally:
+        _close_client(client)

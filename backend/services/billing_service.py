@@ -18,6 +18,16 @@ from services.conversion_tracking_service import track_checkout_completed, track
 PAID_ACCESS_STATUSES = {"active", "trialing", "past_due"}
 SUBSCRIPTION_ANALYSIS_ACCESS_STATUSES = {"active", "trialing"}
 PORTAL_ELIGIBLE_STATES = {"active", "trialing", "past_due", "canceled"}
+# invoice.paid may confirm a live or pending subscription, but must never
+# revive a canceled/refunded/free account from a delayed webhook retry.
+INVOICE_PAID_ACTIVATION_STATUSES = {
+    "checkout_completed",
+    "incomplete",
+    "trialing",
+    "active",
+    "past_due",
+    "unpaid",
+}
 PAYMENT_OFFER_IDS = {"basic_schnellcheck", "premium_pre_check", "professional_anschlussstrategie"}
 SUBSCRIPTION_OFFER_IDS = {"pro_lizenz"}
 ADDON_OFFER_IDS = {"express_upgrade"}
@@ -1905,6 +1915,37 @@ def _apply_subscription_state(user: User, data_object: dict[str, Any]) -> None:
     user.updated_at = _utcnow()
 
 
+def _apply_invoice_paid(db: Session, user: User, data_object: dict[str, Any]) -> None:
+    """Confirm Pro access from invoice.paid without reviving ended accounts.
+
+    Stripe delivers webhooks at-least-once and out of order. A delayed
+    invoice.paid for a previously paid period must not overwrite
+    customer.subscription.deleted (canceled) or grant Pro to free/prepaid
+    accounts. Matching subscription id is required once we already stored one.
+    """
+    subscription_id = data_object.get("subscription")
+    if not subscription_id:
+        return
+    invoice_sub = str(subscription_id)
+    current_sub = str(user.stripe_subscription_id or "")
+    if current_sub and current_sub != invoice_sub:
+        return
+    if user.billing_status not in INVOICE_PAID_ACTIVATION_STATUSES:
+        return
+    user.billing_status = "active"
+    user.plan_tier = "pro"
+    if not current_sub:
+        user.stripe_subscription_id = invoice_sub
+    user.updated_at = _utcnow()
+    _upsert_subscription_entitlement_from_offer(
+        db,
+        user,
+        offer_id="pro_lizenz",
+        stripe_subscription_id=invoice_sub,
+        status="active",
+    )
+
+
 def _upsert_subscription_entitlement_from_offer(
     db: Session,
     user: User,
@@ -2230,17 +2271,7 @@ def handle_stripe_webhook(db: Session, payload: bytes, stripe_signature: str | N
             user.billing_status = "canceled"
             _mark_subscription_entitlements_inactive(db, user)
         elif event_type == "invoice.paid":
-            if data_object.get("subscription"):
-                user.billing_status = "active"
-                user.plan_tier = "pro"
-                user.updated_at = _utcnow()
-                _upsert_subscription_entitlement_from_offer(
-                    db,
-                    user,
-                    offer_id="pro_lizenz",
-                    stripe_subscription_id=str(data_object.get("subscription")),
-                    status="active",
-                )
+            _apply_invoice_paid(db, user, data_object)
         elif event_type == "invoice.payment_failed":
             user.billing_status = "past_due"
             user.updated_at = _utcnow()
