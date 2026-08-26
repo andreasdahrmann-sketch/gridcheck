@@ -359,7 +359,8 @@ def _entitlement_usable(entitlement: BillingEntitlement) -> bool:
     now = _utcnow()
     if entitlement.status not in {"active", "ops_pending"}:
         return False
-    if entitlement.valid_until and entitlement.valid_until < now:
+    until = _as_utc(entitlement.valid_until)
+    if until is not None and until < now:
         return False
     remaining = _remaining_credits(entitlement)
     return remaining is None or remaining > 0
@@ -560,6 +561,20 @@ def list_entitlement_history(db: Session, user: User, *, limit: int = 20) -> lis
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Normalize ORM datetimes for comparison.
+
+    PostgreSQL ``TIMESTAMP WITHOUT TIME ZONE`` round-trips as naive datetimes
+    even when we persist UTC-aware values. Comparing those to ``_utcnow()``
+    raises TypeError and 500s paid analysis / package-access paths.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def _json_text(value: Any) -> str:

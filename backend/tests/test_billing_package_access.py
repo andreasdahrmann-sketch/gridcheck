@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -90,6 +91,84 @@ def _base_payload() -> dict:
             "route_complexity": "hoch",
         },
     }
+
+
+def _entitlement_stub(**overrides) -> SimpleNamespace:
+    payload = {
+        "status": "active",
+        "total_credits": 20,
+        "used_credits": 0,
+        "valid_until": None,
+    }
+    payload.update(overrides)
+    return SimpleNamespace(**payload)
+
+
+def test_entitlement_usable_accepts_naive_postgres_valid_until() -> None:
+    from services.billing_service import _entitlement_usable
+
+    future_naive = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30)
+    assert _entitlement_usable(_entitlement_stub(valid_until=future_naive)) is True
+
+    past_naive = datetime(2020, 1, 1, 12, 0, 0)
+    assert _entitlement_usable(_entitlement_stub(valid_until=past_naive)) is False
+
+    future_aware = datetime.now(timezone.utc) + timedelta(days=30)
+    assert _entitlement_usable(_entitlement_stub(valid_until=future_aware)) is True
+
+
+def test_pro_analyze_survives_postgres_naive_period_end(monkeypatch) -> None:
+    """Stripe period-end is stored as TIMESTAMP WITHOUT TIME ZONE (naive on read).
+
+    package_access_context must not TypeError when comparing that to aware _utcnow().
+    """
+    client = build_client()
+    try:
+        tokens = _register_and_login(client, "pro-naive-until@example.com")
+        seen_payload: dict = {}
+
+        from api import analyze_v2 as analyze_v2_api
+
+        def fake_run(payload: dict, **kwargs) -> dict:
+            seen_payload.clear()
+            seen_payload.update(payload)
+            return {
+                "status": "OK",
+                "scores": {"gesamt": 71},
+                "fazit": {"entscheidung": "B"},
+                "warnungen": [],
+                "empfehlungen": ["Pro-Report erstellt"],
+                "revision": {"hash": "c" * 64},
+            }
+
+        monkeypatch.setattr(analyze_v2_api, "run_v1_analysis", fake_run)
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "pro-naive-until@example.com").first()
+            assert user is not None
+            user.plan_tier = "pro"
+            user.billing_status = "active"
+            user.stripe_customer_id = "cus_pro_naive_until"
+            user.stripe_subscription_id = "sub_pro_naive_until"
+            user.billing_current_period_end = datetime.now(timezone.utc) + timedelta(days=20)
+            db.commit()
+            db.expire_all()
+            reloaded = db.query(User).filter(User.email == "pro-naive-until@example.com").first()
+            assert reloaded is not None
+            assert reloaded.billing_current_period_end is not None
+            assert reloaded.billing_current_period_end.tzinfo is None
+
+        response = client.post(
+            "/api/v1/analyze",
+            headers=_headers(tokens),
+            json={**_base_payload(), "requested_offer_id": "pro_lizenz"},
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["billing_access"]["offer_id"] == "pro_lizenz"
+        assert seen_payload["requested_offer_id"] == "pro_lizenz"
+    finally:
+        _close_client(client)
 
 
 def test_basic_package_strips_premium_only_inputs(monkeypatch):
