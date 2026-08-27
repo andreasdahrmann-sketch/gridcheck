@@ -1007,3 +1007,242 @@ def test_report_scope_differs_between_basic_and_premium(monkeypatch):
         assert "Paketgrenze" not in premium_html
     finally:
         _close_client(client)
+
+
+def _install_fake_stripe_webhook(monkeypatch, billing_service, **setting_overrides):
+    fake_settings = replace(
+        billing_service.settings,
+        stripe_webhook_secret="whsec_test",
+        **setting_overrides,
+    )
+    monkeypatch.setattr(billing_service, "settings", fake_settings)
+
+    class FakeWebhook:
+        next_event: dict = {}
+
+        @staticmethod
+        def construct_event(payload, signature, secret):
+            return FakeWebhook.next_event
+
+    class FakeStripeModule:
+        Webhook = FakeWebhook
+
+    monkeypatch.setattr(billing_service, "_load_stripe_module", lambda: FakeStripeModule)
+    return FakeWebhook
+
+
+def test_delayed_subscription_updated_does_not_reactivate_canceled_pro(monkeypatch):
+    """Retried customer.subscription.updated after deleted must not restore Pro."""
+    client = build_client()
+    try:
+        tokens = _register_and_login(client, "canceled-sub-updated@example.com")
+        from services import billing_service
+
+        FakeWebhook = _install_fake_stripe_webhook(
+            monkeypatch, billing_service, stripe_secret_key="sk_test", free_checks_limit=0
+        )
+
+        future_period_end = int((datetime.now(timezone.utc) + timedelta(days=20)).timestamp())
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "canceled-sub-updated@example.com").first()
+            assert user is not None
+            user.plan_tier = "free"
+            user.billing_status = "canceled"
+            user.stripe_customer_id = "cus_canceled_sub_updated"
+            user.stripe_subscription_id = "sub_canceled_sub_updated"
+            user.billing_current_period_end = datetime.now(timezone.utc) - timedelta(days=1)
+            db.add(
+                BillingEntitlement(
+                    user_id=user.id,
+                    offer_id="pro_lizenz",
+                    offer_category="subscription",
+                    package_scope="professional",
+                    source="subscription",
+                    status="canceled",
+                    total_credits=20,
+                    used_credits=20,
+                    valid_from=datetime.now(timezone.utc) - timedelta(days=40),
+                    stripe_subscription_id="sub_canceled_sub_updated",
+                    metadata_json='{"report_scope":"professional"}',
+                )
+            )
+            db.commit()
+            user_id = user.id
+
+        FakeWebhook.next_event = {
+            "id": "evt_sub_updated_after_cancel",
+            "type": "customer.subscription.updated",
+            "data": {
+                "object": {
+                    "id": "sub_canceled_sub_updated",
+                    "customer": "cus_canceled_sub_updated",
+                    "status": "active",
+                    "current_period_end": future_period_end,
+                    "items": {"data": [{"price": {"id": "price_pro_stale"}}]},
+                }
+            },
+        }
+        response = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == "processed"
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.plan_tier == "free"
+            assert user.billing_status == "canceled"
+            entitlements = (
+                db.query(BillingEntitlement)
+                .filter(BillingEntitlement.user_id == user.id, BillingEntitlement.offer_id == "pro_lizenz")
+                .all()
+            )
+            assert entitlements
+            assert all(row.status == "canceled" for row in entitlements)
+            assert not any(row.status == "active" for row in entitlements)
+
+        blocked = client.post(
+            "/api/v1/analyze",
+            headers=_headers(tokens),
+            json={**_base_payload(), "requested_offer_id": "pro_lizenz"},
+        )
+        assert blocked.status_code == 402, blocked.text
+        assert blocked.json()["detail"]["code"] == "FREE_TIER_LIMIT"
+    finally:
+        _close_client(client)
+
+
+def test_delayed_subscription_deleted_does_not_cancel_newer_pro(monkeypatch):
+    """Delayed deleted for an old subscription must not wipe a newer live Pro."""
+    client = build_client()
+    try:
+        _register_and_login(client, "newer-sub-kept@example.com")
+        from services import billing_service
+
+        FakeWebhook = _install_fake_stripe_webhook(monkeypatch, billing_service)
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "newer-sub-kept@example.com").first()
+            assert user is not None
+            user.plan_tier = "pro"
+            user.billing_status = "active"
+            user.stripe_customer_id = "cus_newer_sub_kept"
+            user.stripe_subscription_id = "sub_new_live"
+            user.billing_current_period_end = datetime.now(timezone.utc) + timedelta(days=25)
+            db.add(
+                BillingEntitlement(
+                    user_id=user.id,
+                    offer_id="pro_lizenz",
+                    offer_category="subscription",
+                    package_scope="professional",
+                    source="subscription",
+                    status="active",
+                    total_credits=20,
+                    used_credits=0,
+                    valid_from=datetime.now(timezone.utc),
+                    stripe_subscription_id="sub_new_live",
+                    metadata_json='{"report_scope":"professional"}',
+                )
+            )
+            db.commit()
+            user_id = user.id
+
+        FakeWebhook.next_event = {
+            "id": "evt_old_sub_deleted",
+            "type": "customer.subscription.deleted",
+            "data": {
+                "object": {
+                    "id": "sub_old_canceled",
+                    "customer": "cus_newer_sub_kept",
+                    "status": "canceled",
+                }
+            },
+        }
+        response = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert response.status_code == 200, response.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.plan_tier == "pro"
+            assert user.billing_status == "active"
+            assert user.stripe_subscription_id == "sub_new_live"
+            entitlement = (
+                db.query(BillingEntitlement)
+                .filter(BillingEntitlement.user_id == user.id, BillingEntitlement.offer_id == "pro_lizenz")
+                .one()
+            )
+            assert entitlement.status == "active"
+            assert entitlement.stripe_subscription_id == "sub_new_live"
+    finally:
+        _close_client(client)
+
+
+def test_subscription_updated_activates_new_sub_after_cancel(monkeypatch):
+    """A new Stripe subscription id after cancel must still activate Pro."""
+    client = build_client()
+    try:
+        _register_and_login(client, "resub-after-cancel@example.com")
+        from services import billing_service
+
+        FakeWebhook = _install_fake_stripe_webhook(monkeypatch, billing_service)
+        future_period_end = int((datetime.now(timezone.utc) + timedelta(days=30)).timestamp())
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "resub-after-cancel@example.com").first()
+            assert user is not None
+            user.plan_tier = "free"
+            user.billing_status = "canceled"
+            user.stripe_customer_id = "cus_resub_after_cancel"
+            user.stripe_subscription_id = "sub_old_canceled"
+            db.add(
+                BillingEntitlement(
+                    user_id=user.id,
+                    offer_id="pro_lizenz",
+                    offer_category="subscription",
+                    package_scope="professional",
+                    source="subscription",
+                    status="canceled",
+                    total_credits=20,
+                    used_credits=20,
+                    valid_from=datetime.now(timezone.utc) - timedelta(days=40),
+                    stripe_subscription_id="sub_old_canceled",
+                    metadata_json='{"report_scope":"professional"}',
+                )
+            )
+            db.commit()
+            user_id = user.id
+
+        FakeWebhook.next_event = {
+            "id": "evt_new_sub_created",
+            "type": "customer.subscription.updated",
+            "data": {
+                "object": {
+                    "id": "sub_new_resubscribe",
+                    "customer": "cus_resub_after_cancel",
+                    "status": "active",
+                    "current_period_end": future_period_end,
+                    "items": {"data": [{"price": {"id": "price_pro_resub"}}]},
+                }
+            },
+        }
+        response = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert response.status_code == 200, response.text
+
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.id == user_id).first()
+            assert user is not None
+            assert user.plan_tier == "pro"
+            assert user.billing_status == "active"
+            assert user.stripe_subscription_id == "sub_new_resubscribe"
+            active = (
+                db.query(BillingEntitlement)
+                .filter(
+                    BillingEntitlement.user_id == user.id,
+                    BillingEntitlement.offer_id == "pro_lizenz",
+                    BillingEntitlement.status == "active",
+                )
+                .one()
+            )
+            assert active.stripe_subscription_id == "sub_new_resubscribe"
+    finally:
+        _close_client(client)

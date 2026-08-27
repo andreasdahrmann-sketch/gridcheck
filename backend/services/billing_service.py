@@ -1905,6 +1905,52 @@ def _apply_subscription_state(user: User, data_object: dict[str, Any]) -> None:
     user.updated_at = _utcnow()
 
 
+def _subscription_id_from_event(event_type: str, data_object: dict[str, Any]) -> str | None:
+    raw = data_object.get("id") if event_type.startswith("customer.subscription.") else data_object.get("subscription")
+    if not raw:
+        return None
+    return str(raw)
+
+
+def _should_apply_subscription_webhook(user: User, event_type: str, data_object: dict[str, Any]) -> bool:
+    """Drop out-of-order Stripe subscription events that undo cancel or a newer sub.
+
+    Stripe delivers webhooks at-least-once and unordered. A retried
+    customer.subscription.updated with status=active for a subscription that
+    already ended via customer.subscription.deleted must not remint Pro.
+    A delayed deleted event for an old subscription must not cancel a newer one.
+    A new subscription id after cancel (portal/checkout resubscribe) is applied.
+    """
+    event_sub = _subscription_id_from_event(event_type, data_object)
+    stored_sub = str(user.stripe_subscription_id or "") or None
+    current_status = str(user.billing_status or "")
+
+    if event_type in {"customer.subscription.created", "customer.subscription.updated"}:
+        event_status = str(data_object.get("status") or "")
+        if (
+            current_status == "canceled"
+            and stored_sub
+            and event_sub == stored_sub
+            and event_status in PAID_ACCESS_STATUSES
+        ):
+            return False
+        if (
+            stored_sub
+            and event_sub
+            and event_sub != stored_sub
+            and current_status in (PAID_ACCESS_STATUSES | {"checkout_completed"})
+        ):
+            return False
+        return True
+
+    if event_type == "customer.subscription.deleted":
+        if stored_sub and event_sub and event_sub != stored_sub:
+            return False
+        return True
+
+    return True
+
+
 def _upsert_subscription_entitlement_from_offer(
     db: Session,
     user: User,
@@ -2216,19 +2262,21 @@ def handle_stripe_webhook(db: Session, payload: bytes, stripe_signature: str | N
         if event_type == "checkout.session.completed":
             _sync_checkout_session_completion(db, user, data_object)
         elif event_type in {"customer.subscription.created", "customer.subscription.updated"}:
-            _apply_subscription_state(user, data_object)
-            if user.billing_status in PAID_ACCESS_STATUSES:
-                _upsert_subscription_entitlement_from_offer(
-                    db,
-                    user,
-                    offer_id="pro_lizenz",
-                    stripe_subscription_id=user.stripe_subscription_id,
-                )
+            if _should_apply_subscription_webhook(user, event_type, data_object):
+                _apply_subscription_state(user, data_object)
+                if user.billing_status in PAID_ACCESS_STATUSES:
+                    _upsert_subscription_entitlement_from_offer(
+                        db,
+                        user,
+                        offer_id="pro_lizenz",
+                        stripe_subscription_id=user.stripe_subscription_id,
+                    )
         elif event_type == "customer.subscription.deleted":
-            _apply_subscription_state(user, data_object)
-            user.plan_tier = "free"
-            user.billing_status = "canceled"
-            _mark_subscription_entitlements_inactive(db, user)
+            if _should_apply_subscription_webhook(user, event_type, data_object):
+                _apply_subscription_state(user, data_object)
+                user.plan_tier = "free"
+                user.billing_status = "canceled"
+                _mark_subscription_entitlements_inactive(db, user)
         elif event_type == "invoice.paid":
             if data_object.get("subscription"):
                 user.billing_status = "active"
