@@ -5,6 +5,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -29,6 +30,65 @@ from engine.revision import speichere_revision
 
 def _json_text(value: dict | None) -> str:
     return json.dumps(value or {}, ensure_ascii=False, sort_keys=True)
+
+
+def join_address_hint(
+    *,
+    street: str | None = None,
+    house_number: str | None = None,
+    plz: str | None = None,
+    city: str | None = None,
+    ort: str | None = None,
+) -> str | None:
+    street_line = " ".join(
+        part for part in ((street or "").strip(), (house_number or "").strip()) if part
+    )
+    locality = (city or "").strip() or (ort or "").strip()
+    hint = ", ".join(part for part in (street_line, (plz or "").strip(), locality) if part)
+    return hint or None
+
+
+def format_project_address_hint(project: Project) -> str | None:
+    return join_address_hint(
+        street=getattr(project, "street", None),
+        house_number=getattr(project, "house_number", None),
+        plz=getattr(project, "plz", None),
+        city=getattr(project, "city", None),
+        ort=getattr(project, "ort", None),
+    )
+
+
+def hydrate_analyze_location_from_project(
+    payload: dict[str, Any],
+    project: Project,
+) -> dict[str, Any]:
+    """Fill omitted analyze/report coordinates from the persisted Project row.
+
+    Dual-location create stores WGS84 on `projects.latitude/longitude`, but the
+    workspace analyze payload historically sent only `role_inputs.project_location`.
+    That field stays empty unless the profile form was filled, so reports persisted
+    the Germany-center placeholder (51.1657, 10.4515) for an otherwise geocoded site.
+    Explicit request coordinates are never overwritten.
+    """
+    hydrated = dict(payload)
+    loc_raw = hydrated.get("project_location")
+    loc: dict[str, Any] = dict(loc_raw) if isinstance(loc_raw, dict) else {}
+
+    has_coords = loc.get("latitude") is not None and loc.get("longitude") is not None
+    project_lat = getattr(project, "latitude", None)
+    project_lon = getattr(project, "longitude", None)
+    if not has_coords and project_lat is not None and project_lon is not None:
+        loc["latitude"] = float(project_lat)
+        loc["longitude"] = float(project_lon)
+
+    if not str(loc.get("address_hint") or "").strip():
+        hint = format_project_address_hint(project)
+        if hint:
+            loc["address_hint"] = hint
+
+    if loc.get("latitude") is not None or loc.get("longitude") is not None or loc.get("address_hint"):
+        hydrated["project_location"] = loc
+    return hydrated
 
 
 def _can_read(user: User, project: Project, db: Session) -> bool:

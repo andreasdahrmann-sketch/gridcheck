@@ -338,12 +338,17 @@ def _resolve_engine_result(
     ensure_analysis_allowed(db, current_user)
     request_payload = req.analyze_request.model_dump(exclude_none=False)
     project_id = request_payload.get("project_id")
+    stakeholder_path: str | None = None
     if project_id is not None:
-        _, _, stakeholder_path = project_service.get_project_access_context(
+        project, _, stakeholder_path = project_service.get_project_access_context(
             db,
             current_user,
             int(project_id),
             require_write=True,
+        )
+        request_payload = project_service.hydrate_analyze_location_from_project(
+            request_payload,
+            project,
         )
         _assert_project_report_path(report_type, stakeholder_path)
     access = package_access_context(

@@ -103,6 +103,11 @@ def test_create_project_with_address_geocodes_lat_lon(monkeypatch):
         assert geocoding_meta["mode"] == "forward"
         assert geocoding_meta["confidence"] == 87
         assert geocoding_meta["data_class"] == "B"
+        loc = body["role_inputs"].get("project_location")
+        assert loc is not None
+        assert loc["latitude"] == 52.520008
+        assert loc["longitude"] == 13.404954
+        assert "Unter den Linden" in loc["address_hint"]
     finally:
         _close_client(client)
 
@@ -136,6 +141,10 @@ def test_create_project_with_latlon_only_works(monkeypatch):
         body = response.json()
         assert body["latitude"] == 50.110924
         assert body["longitude"] == 8.682127
+        loc = body["role_inputs"].get("project_location")
+        assert loc is not None
+        assert loc["latitude"] == 50.110924
+        assert loc["longitude"] == 8.682127
         assert body["plz"] is None or body["plz"] == ""
     finally:
         _close_client(client)

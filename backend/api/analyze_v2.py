@@ -324,13 +324,17 @@ def analyze_v2(
     )
     stakeholder_path = derive_stakeholder_path(request_payload, fallback_user_role=current_user.role)
     if project_id is not None:
-        _, _, stakeholder_path = project_service.get_project_access_context(
+        project, _, stakeholder_path = project_service.get_project_access_context(
             db,
             current_user,
             int(project_id),
             require_write=True,
         )
-    eingabe = req.model_dump(exclude_none=False, exclude={"project_id"})
+        request_payload = project_service.hydrate_analyze_location_from_project(
+            request_payload,
+            project,
+        )
+    eingabe = {key: value for key, value in request_payload.items() if key != "project_id"}
     eingabe = enforce_package_rights(eingabe, access_context)
     source = "project" if project_id is not None else "interactive"
 
