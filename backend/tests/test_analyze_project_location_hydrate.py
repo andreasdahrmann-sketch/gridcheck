@@ -16,9 +16,11 @@ from fastapi.testclient import TestClient
 from db.database import Base, get_db
 from db.models import AnalysisRun
 from main import app
-from services.project_service import hydrate_analyze_location_from_project, join_address_hint
+from services.project_service import (
+    hydrate_analyze_location_from_project,
+    join_address_hint,
+)
 from tests.postgres_test_utils import build_isolated_postgres_session_factory
-
 
 _PLACEHOLDER_LAT = 51.1657
 _PLACEHOLDER_LON = 10.4515

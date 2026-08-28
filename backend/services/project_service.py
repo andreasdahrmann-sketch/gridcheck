@@ -17,6 +17,7 @@ from services.visibility_service import (
     get_project_access_level,
     resolve_project_stakeholder_path,
 )
+
 _ALLOWED_UPLOAD_TYPES = {
     "application/pdf",
     "image/png",
