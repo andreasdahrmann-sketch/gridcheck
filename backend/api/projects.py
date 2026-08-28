@@ -213,7 +213,30 @@ def _enrich_location_with_geocoding(payload: dict[str, Any]) -> list[str]:
 
     if geocoding_meta:
         role_inputs["_geocoding"] = geocoding_meta
-        payload["role_inputs"] = role_inputs
+
+    # Keep role_inputs.project_location aligned with the persisted Project row so
+    # workspace analyze/report payloads inherit geocoded or explicit WGS84 coords.
+    loc_raw = role_inputs.get("project_location")
+    loc = dict(loc_raw) if isinstance(loc_raw, dict) else {}
+    has_role_coords = loc.get("latitude") is not None and loc.get("longitude") is not None
+    latitude = payload.get("latitude")
+    longitude = payload.get("longitude")
+    if not has_role_coords and latitude is not None and longitude is not None:
+        loc["latitude"] = float(latitude)
+        loc["longitude"] = float(longitude)
+    if not str(loc.get("address_hint") or "").strip():
+        hint = project_service.join_address_hint(
+            street=payload.get("street"),
+            house_number=payload.get("house_number"),
+            plz=payload.get("plz"),
+            city=payload.get("city"),
+            ort=payload.get("ort"),
+        )
+        if hint:
+            loc["address_hint"] = hint
+    if loc:
+        role_inputs["project_location"] = loc
+    payload["role_inputs"] = role_inputs
 
     return warnings
 
