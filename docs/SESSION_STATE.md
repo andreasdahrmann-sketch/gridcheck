@@ -1,4 +1,13 @@
-﻿# SESSION STATE — Letzter Stand
+﻿> ## HINWEIS: HISTORISCHES DOKUMENT — NICHT MASSGEBLICH
+>
+> Dieses Dokument beschreibt den Stand vom **2026-05-06** (Phase-B-Planung) und ist
+> **ueberholt**. Es bleibt nur zur Nachvollziehbarkeit erhalten.
+>
+> **Massgeblicher Projektstand: `docs/PROJECT_STATUS.md`.**
+>
+> Ob diese Datei ganz entfernt wird, ist eine offene Nutzer-Entscheidung.
+
+# SESSION STATE — Letzter Stand
 
 **Stand:** 2026-05-06 06:37
 **Letzter Meilenstein:** Backend-Engine + Testsuite 25/25 gruen

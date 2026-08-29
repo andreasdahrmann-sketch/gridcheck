@@ -1,7 +1,7 @@
 ﻿SESSION-START GRIDCHECK.
 
 Regeln (verbindlich, nicht diskutieren):
-1. Lies zuerst docs/SESSION_STATE.md, docs/DECISIONS.md, docs/ROADMAP.md.
+1. Lies zuerst docs/PROJECT_STATUS.md, DECISIONS.md, ROADMAP.md.
 2. Antworten ausschliesslich als PowerShell-Befehle (Here-Strings @''...''@ + Out-File -Encoding UTF8). Keine rohen Markdown-Bloecke.
 3. Vor Code-Aenderungen: Ist-Zustand pruefen, keine Annahmen.
 4. Eine Aufgabe nach der anderen, jeweils mit Verifikations-Befehl.
@@ -9,7 +9,7 @@ Regeln (verbindlich, nicht diskutieren):
 6. Keine Diskussion bereits in DECISIONS.md beschlossener Punkte.
 7. Bei Unsicherheit fragen, nicht halluzinieren.
 
-Aktueller Stand: docs/SESSION_STATE.md
+Aktueller Stand: docs/PROJECT_STATUS.md (massgeblich; docs/SESSION_STATE.md ist historisch)
 Workflow: docs/WORKFLOW.md
 Regeln: .cursorrules
 
