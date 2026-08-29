@@ -51,7 +51,7 @@ Regeln:
 
 - Nur **Origin** (kein `/api`, kein `/api/v1`).
 - **https://** (ausser lokales `http://localhost:8000`).
-- Nach Aenderung: **Redeploy** (Build bricht ohne `BACKEND_URL` ab).
+- Nach Aenderung: **Redeploy** (ohne Redeploy bleibt der alte Build aktiv). Ohne `BACKEND_URL` bricht der Build **nicht** ab — `next.config.mjs` faellt bei `VERCEL=1` still auf einen hart verdrahteten Prod-Host zurueck. Ein gesetzter, aber falsch formatierter Wert bricht den Build ab.
 
 Optional (Default passt):
 
