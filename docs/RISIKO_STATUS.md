@@ -40,8 +40,11 @@
 - Wirkung: Keine produktive Demo moeglich.
 - Massnahme: Railway + Vercel stabilisieren. Health-Checks einrichten.
 - Status: TEILWEISE UMGESETZT
-- Stand 2026-05-16: `backend/railway.toml` mit `healthcheckPath=/health`; `frontend/next.config.mjs` fail-fast ohne `BACKEND_URL` auf Vercel; `frontend/vercel.json` mit `npm ci` + `npm run build`.
+- Stand 2026-05-16: `backend/railway.toml` mit `healthcheckPath=/health`; `frontend/vercel.json` mit `npm ci` + `npm run build`.
 - Stand 2026-05-17: `scripts/validate_env.py`, `docs/RAILWAY_ENV_SETUP.md`; Smoke mit `--frontend-url` und Register-Probe.
+- Korrektur 2026-08-29 (Code-Pruefung gegen HEAD `f3a2d99`): Die fruehere Angabe „`frontend/next.config.mjs` fail-fast ohne `BACKEND_URL` auf Vercel“ war falsch. Tatsaechliches Verhalten: Auf Vercel (`process.env.VERCEL === "1"`, `frontend/next.config.mjs` Z. 12-19) wird eine fehlende `BACKEND_URL` nur per `console.warn` gemeldet und still auf den fest verdrahteten Host `https://gridcheck-production.up.railway.app` gesetzt. Die drei `throw new Error(...)`-Zweige sind mit `if (rawBackendUrl && ...)` bewacht (Guards in Z. 21, 30, 36) und greifen nur bei gesetzter, aber falsch formatierter Variable (fehlendes `http(s)://`, `http://` ausser localhost, `/api`- bzw. `/api/v1`-Suffix). Ohne Vercel-Flag gilt still `http://localhost:8000` (Z. 28). `frontend/lib/server/backend-config.ts` (Z. 9-12, 26-30) verhaelt sich zur Laufzeit identisch.
+- Konsequenz: Ein Vercel-Deploy ohne gesetzte `BACKEND_URL` baut erfolgreich und zeigt gegen den fest verdrahteten Produktions-Host. Ein falsch konfiguriertes Preview-Deployment spricht damit unbemerkt gegen Produktion — der Rewrite `/api/backend/:path*` leitet auch schreibende Aufrufe weiter.
+- Offen (Nutzer-Entscheidung, nicht erledigt): Entweder Fail-Fast in `next.config.mjs` + `frontend/lib/server/backend-config.ts` nachruesten (Abbruch statt Fallback, wenn `BACKEND_URL` auf Vercel fehlt) oder den Fallback als gewollt dokumentieren und Preview-Deployments separat absichern. Bis zur Entscheidung bleibt das Verhalten unveraendert.
 - Offen: Railway `JWT_*` + Migrationen; DNS `app`/`api.gridcheck.de`.
 
 ### R-03 - Disclaimer / Haftungsausschluss fehlt im Frontend
@@ -283,4 +286,5 @@ Die Demo muss in unter 5 Minuten zeigen:
 | 2026-05-16 | Status-Update nach Code-Audit: Auth-Guard, API-Bearer, Disclaimer, PLZ-VNB, THD-Transparenz | Agent |
 | 2026-06-11 | Statisches Code-Audit + 6 Bugfixes (Stripe-Addon-Mode, Blank-Screen Rollen-Routen, projectId-Bind, 401-Redirect, Szenarien-Standalone, Query-Key); R-09 umgesetzt; MVP-Checkliste aktualisiert | Agent |
 | 2026-06-11 | Eingabe-Quellen-Markierung je Feld (`transparenz.eingabe_quellen`, Engine+API+UI); GIS-Pipeline als BL-GIS-001…005 sequenziert (Plan, kein Blind-Code) | Agent |
+| 2026-08-29 | R-02: Falsche `BACKEND_URL`-Fail-Fast-Behauptung korrigiert; Prod-Fallback-Risiko als offene Entscheidung aufgenommen (Code-Pruefung, kein Code geaendert) | Agent |
 
