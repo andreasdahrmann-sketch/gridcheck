@@ -78,19 +78,20 @@ Die folgenden 15 Commits liegen nach dem letzten Stand der alten Statusdokumente
 
 | # | Prio | Thema | Naechster Schritt |
 |---|------|-------|-------------------|
-| 1 | Kritisch (Nutzer-Aktion) | **Go-Live** | `docs/LAUNCH_CHECKLIST_PRINT.md`, 15 Schritte, unerledigt. Ohne `JWT_SECRET`/`JWT_REFRESH_SECRET` + `alembic upgrade head` auf Railway liefert `/api/auth/register` **503**; ohne `BACKEND_URL` in Vercel ist der Proxy-Pfad tot. |
+| 1 | Kritisch (Nutzer-Aktion) | **Go-Live** | `docs/LAUNCH_CHECKLIST_PRINT.md`, 15 Schritte, unerledigt. Ohne `JWT_SECRET`/`JWT_REFRESH_SECRET` + `alembic upgrade head` auf Railway liefert `/api/auth/register` **503**; ohne `BACKEND_URL` in Vercel greift der hart verdrahtete Prod-Fallback statt eines Build-Abbruchs (siehe Punkt 6). |
 | 2 | Kritisch (Entscheidung) | **ADR-013** | Kumulations-Check + NB-Georeferenz steht in `DECISIONS.md` auf „Vorgeschlagen". BL-NB-001 darf laut `docs/ROADMAP_BACKLOG.md` erst nach Freigabe **und** Beantwortung der Fragen in `docs/PAINPOINT_NB_DASHBOARD.md` §8 starten. Sperre eingehalten: keine `grid_requests`-Migration vorhanden. |
 | 3 | Kritisch (Fachlichkeit) | **GIS-/Netzdaten** | Echte GIS-/Netzdaten fehlen (Risiko R-08, `docs/RISIKO_STATUS.md`). `asset_candidates` existiert als Tabelle/Modell aus Migration `20260510_01_data_source_models.py`, aber es gibt **keinen** `backend/services/osm_etl.py` — BL-GIS-001…005 sind reiner Plan. MaStR ist nur ETL-Skelett. |
 | 4 | Hoch (Revisionssicherheit) | **Audit-Bug `v2_reports`** | `backend/api/v2_reports.py` (~Z. 339–363): `persist_completed_analysis_run(..., request_payload=request_payload)` speichert den **unsanitierten** Payload, waehrend die Berechnung auf dem via `enforce_package_rights` gefilterten `payload` laeuft. Das Audit dokumentiert damit nicht, was tatsaechlich gerechnet wurde. Inkonsistenz, kein Crash. **Bewusst noch nicht gefixt** (eigene Aufgabe). |
 | 5 | Hoch (Nutzer-Aufgabe) | **Impressum juristisch** | Token-Platzhalter aus `4cca715` durch geprueften Text ersetzen; Anwalts-Briefing-Bundle aus `a888074` nutzen. |
-| 6 | Mittel | **ENV Railway** | `NORM_VERSION` + `APP_VERSION` setzen — `docs/RAILWAY_ENV_SETUP.md` |
-| 7 | Mittel | **Consent** | Opt-in vor Sentry/Analytics durchziehen (TTDSG-Cookie-Banner ist da, Kopplung pruefen) |
-| 8 | Mittel | **Pilotangebot** | Parameter in `docs/sales/PILOTANGEBOT.md` fuellen (N Analysen, Preis, Laufzeit) |
-| 9 | Mittel | **Enterprise** | Security-Onepager + AVV-Entwurf (juristisch pruefen) |
-| 10 | Mittel | **Perf-Baselines** | BL-PERF-006 steht in `docs/ROADMAP_BACKLOG.md` auf `in_progress` (Setup geliefert, Baseline-Runs ausstehend) |
-| 11 | Niedrig | **DNS** | `app`/`api.gridcheck.de` — `docs/DNS_APP_API.md` |
-| 12 | Niedrig | **Stripe Checkout** | Test-Price-IDs — `docs/STRIPE_TEST_SETUP.md` |
-| 13 | Niedrig | **E2E** | `scripts/smoke_go_live.py --frontend-url` gegen Prod |
+| 6 | Hoch (Entscheidung) | **`BACKEND_URL`: Fallback statt Fail-Fast** | `frontend/next.config.mjs` (Z. 12–19) und `frontend/lib/server/backend-config.ts` (Z. 9–12) ersetzen eine fehlende `BACKEND_URL` bei `VERCEL=1` still durch den fest verdrahteten Host `https://gridcheck-production.up.railway.app` (nur `console.warn`). Der Build bricht **nicht** ab — die `throw`-Zweige (Guards in Z. 21, 30, 36) greifen nur bei gesetztem, aber falsch formatiertem Wert. Folge: Ein Preview-Deployment ohne eigenen Wert spricht unbemerkt gegen Produktion, inkl. schreibender Aufrufe ueber den Rewrite `/api/backend/:path*`. Offen: Fail-Fast nachruesten **oder** Fallback als gewollt dokumentieren und Preview separat absichern. Risikobezug: R-02 in `docs/RISIKO_STATUS.md`. **Bewusst kein Code geaendert** (Nutzer-Entscheidung). |
+| 7 | Mittel | **ENV Railway** | `NORM_VERSION` + `APP_VERSION` setzen — `docs/RAILWAY_ENV_SETUP.md` |
+| 8 | Mittel | **Consent** | Opt-in vor Sentry/Analytics durchziehen (TTDSG-Cookie-Banner ist da, Kopplung pruefen) |
+| 9 | Mittel | **Pilotangebot** | Parameter in `docs/sales/PILOTANGEBOT.md` fuellen (N Analysen, Preis, Laufzeit) |
+| 10 | Mittel | **Enterprise** | Security-Onepager + AVV-Entwurf (juristisch pruefen) |
+| 11 | Mittel | **Perf-Baselines** | BL-PERF-006 steht in `docs/ROADMAP_BACKLOG.md` auf `in_progress` (Setup geliefert, Baseline-Runs ausstehend) |
+| 12 | Niedrig | **DNS** | `app`/`api.gridcheck.de` — `docs/DNS_APP_API.md` |
+| 13 | Niedrig | **Stripe Checkout** | Test-Price-IDs — `docs/STRIPE_TEST_SETUP.md` |
+| 14 | Niedrig | **E2E** | `scripts/smoke_go_live.py --frontend-url` gegen Prod |
 
 ## Technische Schulden
 

@@ -38,7 +38,7 @@ Erwartung: HTTP 200, JSON mit `"status":"ok"`. Mit `APP_ENV=prod` und gültiger 
 
 4. **Save** → danach **Redeploy** (Deployments → … → Redeploy), sonst nutzt die Live-App noch den letzten Build.
 
-**Build-Regel:** Ohne `BACKEND_URL` bricht der Vercel-Build ab (`next.config.mjs`). Ein leerer Wert in der UI zählt als „fehlt“ — genau das wirkt wie „URL ist weg“.
+**Build-Regel (korrigiert 2026-08-29):** Ohne `BACKEND_URL` bricht der Vercel-Build **nicht** ab. `next.config.mjs` (Z. 12–19) warnt bei `VERCEL=1` nur per `console.warn` und fällt still auf den hart verdrahteten Host `https://gridcheck-production.up.railway.app` zurück. Ein leerer Wert in der UI zählt als „fehlt“ — das Deployment zeigt dann auf diesen Fallback statt auf die gewünschte URL, genau das wirkt wie „URL ist weg“. Nur ein **gesetzter, aber falsch formatierter** Wert bricht den Build ab (kein `http(s)://`, `http://` außer localhost, `/api`- bzw. `/api/v1`-Suffix).
 
 **Veraltete Variablen entfernen oder ignorieren:**
 
@@ -62,7 +62,7 @@ Invoke-WebRequest -Uri "https://gridcheck.vercel.app/api/backend/health" -UseBas
 ```
 
 - **HTTP 200** + Response-Header `X-Railway-*` → Vercel leitet auf ein **laufendes** Railway-Backend (oft noch alter Build mit gesetzter `BACKEND_URL`).  
-- **502 / Build-Fehler** → `BACKEND_URL` in Vercel leer oder falsch → Schritt 1 + 2.
+- **502** → `BACKEND_URL` leer (dann antwortet der Fallback-Host) oder auf ein nicht laufendes Backend gesetzt; **Build-Fehler** → `BACKEND_URL` gesetzt, aber falsch formatiert → Schritt 1 + 2.
 
 Die Railway-**Hostname** steht **nicht** in den Response-Headern — nur Hinweise (`X-Railway-Edge`, `X-Railway-Request-Id`).
 
@@ -72,7 +72,7 @@ Die Railway-**Hostname** steht **nicht** in den Response-Headern — nur Hinweis
 
 | Ursache | Was passiert | Gegenmaßnahme |
 |---------|----------------|---------------|
-| **Vercel `BACKEND_URL` geleert** | Neuer Deploy schlägt fehl oder Proxy bricht; alte Deployment-URL kann noch kurz funktionieren | Wert in Vercel + Passwortmanager notieren; `vercel env ls` |
+| **Vercel `BACKEND_URL` geleert** | Deploy läuft weiter durch und zeigt still auf den Prod-Fallback-Host (kein Build-Abbruch); alte Deployment-URL kann noch kurz funktionieren | Wert in Vercel + Passwortmanager notieren; `vercel env ls` |
 | **Nur in `.env.example` / Docs eingetragen** | Beim nächsten Deploy nicht gesetzt | Nie Prod-URL nur in Beispiel-Dateien |
 | **Railway-Service neu erstellt** | Neuer `*.up.railway.app`-Host | Custom Domain oder Service-Name stabil halten |
 | **`railway-variables.generated.txt` gelöscht** | Datei ist **gitignored**, enthält **keine** URL — nur ENV-Vorlage | URL separat speichern (Passwortmanager) |

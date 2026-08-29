@@ -55,7 +55,10 @@
 - Vor Code-Ausgabe: Konsistenzpruefung mit bisherigem Code
 
 ## SERVER STARTEN
-cd C:\Users\andre\gridcheck\backend; .\venv\Scripts\Activate.ps1; uvicorn main:app --reload --port 8000
+Korrektur 2026-08-29: Das venv heisst `backend\.venv` (mit Punkt), nicht `backend\venv`.
+Massgeblich ist `scripts/start-local.ps1` (Z. 40-41) — direkter Interpreter-Aufruf ohne Aktivierung.
+
+cd C:\Users\andre\gridcheck\backend; .\.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000
 
 ## TESTS LAUFEN LASSEN
-cd C:\Users\andre\gridcheck\backend; .\venv\Scripts\Activate.ps1; python -m pytest tests\ -v
+cd C:\Users\andre\gridcheck\backend; .\.venv\Scripts\python.exe -m pytest tests\ -v

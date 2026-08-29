@@ -40,7 +40,7 @@ NEXT_PUBLIC_MAPBOX_STYLE_ID=mapbox/dark-v11
 Hinweise:
 
 - `BACKEND_URL` muss eine absolute `https://...`-URL sein
-- in Vercel faellt der Build jetzt bewusst aus, wenn `BACKEND_URL` fehlt
+- in Vercel bricht der Build **nicht** ab, wenn `BACKEND_URL` fehlt: `frontend/next.config.mjs` (Z. 12-19) warnt nur per `console.warn` und faellt still auf einen hart verdrahteten Prod-Host zurueck. Nur ein gesetzter, aber falsch formatierter Wert bricht den Build ab (Guards in Z. 21, 30, 36). Offener Entscheidungspunkt: Punkt 6 in `docs/PROJECT_STATUS.md`
 - `NEXT_PUBLIC_API_BASE` bleibt fuer den MVP auf `/api/backend`, damit der Browser immer nur gegen denselben Origin spricht
 
 ## 2. Backend separat deployen
