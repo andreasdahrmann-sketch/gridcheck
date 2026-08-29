@@ -1,52 +1,59 @@
-﻿# SESSION RESUME — GridCheck (Stand: 2026-06-11, statisches Audit + Bugfixes)
+﻿# SESSION RESUME — GridCheck (Stand: 2026-06-14, HEAD `f3a2d99`)
+
+> **Massgeblicher Stand: `docs/PROJECT_STATUS.md`.**
+> Diese Datei ist nur der Session-Einstieg. Alles Inhaltliche (Commits, Migrationen,
+> offene Punkte, Prioritaeten) steht in `docs/PROJECT_STATUS.md` und wird hier nicht dupliziert.
 
 ## Erster Befehl an die KI:
-Lies zuerst .cursorrules, .cursor/rules/06-arbeitsweise-gridcheck.mdc, PROJECT_RULES.md, docs/WORKFLOW.md und DECISIONS.md.
+Lies zuerst .cursorrules, .cursor/rules/06-arbeitsweise-gridcheck.mdc,
+.cursor/rules/05-workflow.mdc, .cursor/rules/08-decisions-binding.mdc,
+PROJECT_RULES.md, docs/WORKFLOW.md und DECISIONS.md.
+Danach docs/PROJECT_STATUS.md fuer den aktuellen Stand.
 Arbeite strikt danach. Eine Aufgabe pro Antwort. Backup vor jeder Dateiänderung.
 Stack: FastAPI + PostgreSQL 16 + PostGIS + Alembic + Next.js 14. Kein Supabase, kein Drizzle.
 
-## Wo wir stehen (2026-06-11)
-- ✅ L3.1 Billing-FK-Fix ist im Code erledigt (`db/models.py`: `foreign_keys=` an `billing_entitlements`, `ops_assignee`)
-- ✅ Passwort-Reset-UI vorhanden (`/login/forgot-password`, `/reset-password`)
-- ✅ Szenarienvergleich UI vorhanden (Projekt + Standalone)
-- ✅ 6 Bugfixes per statischem Audit (Shell war nicht verfuegbar, daher OHNE Testlauf):
-  1. `backend/services/billing_service.py`: Stripe-Checkout-Mode "addon" -> "payment" gemappt (Express-Upgrade war 502)
-  2. `frontend/components/GridCheckForm.tsx`: "Zurueck"-Button auf Rollen-Routen ausgeblendet (Blank-Screen-Fix)
-  3. `frontend/components/projects/ProjectDetailWorkspace.tsx`: `projectId` an `analyzeGridcheck` uebergeben
-  4. `frontend/lib/api/projects.ts` + Workspace: `ProjectsApiError` mit Status; Login-Redirect nur bei 401
-  5. `GridCheckForm.tsx`: Snapshot-Persistenz fuer `/projektierer/szenarien-vergleich` ergaenzt
-  6. Workspace: Query-Key `["auth-me"]` -> `["me"]`
+## Kurzueberblick (Details in docs/PROJECT_STATUS.md)
+- Auth, Engine + N-1-Screening, Stakeholder-PDFs, Szenarienvergleich und Rollen-Routen
+  (`/projektierer`, `/vnb`, `/invest`) sind vorhanden.
+- Seit 2026-06-11 zusaetzlich: Report-Profil-Overhaul, duale Standorteingabe mit Geocoding,
+  Sentry + structlog, Security-Header, Legal-Seiten, DSGVO-Self-Service, MaStR-ETL-Skelett,
+  Billing-ENV-Schalter.
+- CI laeuft ueber `.github/workflows/ci.yml` (Backend: PostGIS + `alembic upgrade head` +
+  `pytest -q tests`; Frontend: `npm ci` + `verify:toolchain` + `lint` + `build`).
 
-## NEU 2026-06-11 (nach den 6 Bugfixes): Eingabe-Quellen-Markierung
-- Engine: `baue_eingabe_quellen(...)` in `backend/engine/berechnung.py`; Ergebnis unter `transparenz['eingabe_quellen']` (additiv, KEIN Einfluss auf Berechnung/Revisionshash — `build_revision_data` enthaelt transparenz nicht).
-- Whitelist: `transparenz.eingabe_quellen` in `backend/services/visibility_service.py` (_COMMON_RESULT_SPEC) ergaenzt.
-- Frontend: Typ `EingabeQuelle`/`TransparenzResult` (types/index.ts), Mapping in `lib/api/analyze.ts`, Quellen-Tabelle in `GridCheckForm.tsx` (Step-2 Transparenz-Sektion).
-- Quelle-Enum: `nutzer` | `standardwert` | `modell`. Markierte Felder: nennspannung, leistung_mw, leitungstyp, anschlussart, entfernung_km, cos_phi, sk_mva, rx_ratio, trafo_s_mva, trafo_uk_prozent.
-- PDF-Pfad bewusst NICHT angefasst (byte-identity-Test `test_perf_002` schuetzen).
+## Historischer Verlauf (gekuerzt, 2026-06-11)
+- L3.1 Billing-FK-Fix im Code erledigt (`db/models.py`: `foreign_keys=`).
+- 6 Bugfixes aus statischem Audit (Stripe-Checkout-Mode, Blank-Screen auf Rollen-Routen,
+  `projectId`-Bindung, 401-Redirect, Snapshot-Persistenz Szenarienvergleich, Query-Key `["me"]`).
+- Eingabe-Quellen-Markierung: `baue_eingabe_quellen(...)` in `backend/engine/berechnung.py`,
+  Ergebnis unter `transparenz['eingabe_quellen']` (additiv, KEIN Einfluss auf Revisionshash).
+  Whitelist in `backend/services/visibility_service.py`, Frontend-Mapping in `lib/api/analyze.ts`.
+  Quelle-Enum: `nutzer` | `standardwert` | `modell`. PDF-Pfad bewusst nicht angefasst
+  (byte-identity-Test `test_perf_002`).
 
 ## GIS-Pipeline: Plan statt Blind-Code
-- Interaktive OSM-Suche ist live (`geo/osm_nearby.py`). Persistente ETL offen.
+- Interaktive OSM-Suche ist live (`geo/osm_nearby.py`). Persistente ETL offen —
+  es gibt keinen `backend/services/osm_etl.py`.
+- MaStR: nur ETL-Skelett (`backend/services/mastr_import_service.py`).
 - Sequenzierter Plan: `docs/ROADMAP_BACKLOG.md` → „GIS-/Netzdatenpipeline" (BL-GIS-001…005).
 - Start erst mit lauffaehiger PostgreSQL+PostGIS und gruener Testsuite (Rule 06 / Tests-gruen).
 
-## NAECHSTE AUFGABE: Verifikation
-Sobald Terminal verfuegbar:
-1. cd backend; .\venv\Scripts\Activate.ps1; python -m pytest tests\ -q   (Fokus: test_berechnung, test_analyze_v2_route, test_demo_scenarios, test_perf_002_pdf_byte_identity)
-2. cd frontend; npm run build   (Typcheck eingabe_quellen)
-3. Bei Gruen: Commit Bugfixes + Eingabe-Quellen-Feature + Doku-Updates
+## NAECHSTE AUFGABEN (priorisiert, Details in docs/PROJECT_STATUS.md)
+1. **Go-Live-Checkliste** `docs/LAUNCH_CHECKLIST_PRINT.md` abarbeiten (Nutzer-Aktion).
+   Ohne `JWT_*` + `alembic upgrade head` auf Railway bleibt Register **503**;
+   ohne `BACKEND_URL` in Vercel ist der Proxy-Pfad tot.
+2. **ADR-013 entscheiden** („Vorgeschlagen" → „Angenommen"/abgelehnt) inkl. Fragen in
+   `docs/PAINPOINT_NB_DASHBOARD.md` §8. Erst danach BL-NB-001.
+3. **Audit-Fix `backend/api/v2_reports.py`**: unsanitierter `request_payload` wird persistiert,
+   gerechnet wird auf dem gefilterten `payload` (Revisionssicherheits-Inkonsistenz).
 
-## Danach (priorisierte Offene Punkte — Nutzer-Aktionen noetig)
-- Railway: `JWT_*`-ENV setzen + `alembic upgrade head` (docs/RAILWAY_ENV_SETUP.md) — Register 503 bis dahin
+## Weitere offene Punkte (Nutzer-Aktionen)
 - DNS: app./api.gridcheck.de (docs/DNS_APP_API.md)
 - Stripe: Test-Price-IDs anlegen + ENV (docs/STRIPE_TEST_SETUP.md)
 - Prod-Smoke: `python scripts/smoke_go_live.py --base-url <railway> --frontend-url https://gridcheck.vercel.app`
-- ADR-013: Nutzer-Entscheidung "Vorgeschlagen" -> "Angenommen" (+ Fragen in docs/PAINPOINT_NB_DASHBOARD.md §8), erst dann BL-NB-001
+- Impressum juristisch pruefen (Token-Platzhalter ersetzen)
+- `NORM_VERSION` / `APP_VERSION` in Railway setzen
 - Pilotangebot: Platzhalter in docs/sales/PILOTANGEBOT.md fuellen (N Analysen, Preis, Laufzeit)
-
-## Groessere offene Meilensteine (Code)
-- GIS-/Netzdatenpipeline (docs/DATA_SOURCE_PIPELINE.md) — eigener Meilenstein
-- "Jede Eingabe mit Quelle markiert (User/Default/Modell)" — Engine-Feature, teilweise vorhanden
-- Notiert (nicht angefasst): `v2_reports._resolve_engine_result()` speichert unsanitierten `request_payload` im Audit (Inkonsistenz, kein Crash)
 
 ## Wichtige Regeln (aus .cursorrules)
 - Revisionssicherheit: append-only, Hash-Chain
