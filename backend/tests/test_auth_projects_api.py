@@ -571,19 +571,39 @@ def test_project_viewer_receives_server_side_redacted_fields():
         viewer_id = viewer.json()["id"]
         owner_headers = {"Authorization": f"Bearer {owner_tokens['access_token']}"}
 
+        role_inputs = _rich_project_inputs()
+        role_inputs["_geocoding"] = {
+            "mode": "forward",
+            "source": "OpenStreetMap (Nominatim)",
+            "data_class": "B",
+            "confidence": 87,
+            "raw_label": "Invalidenstrasse 117, 10115 Berlin",
+        }
         created = client.post(
             "/api/v1/projects",
             headers=owner_headers,
             json={
                 "name": "Investor Scope",
                 "plz": "10115",
+                "ort": "Berlin",
+                "street": "Invalidenstrasse",
+                "house_number": "117",
+                "city": "Berlin",
+                "latitude": 52.530827,
+                "longitude": 13.384472,
                 "typ": "pv",
                 "leistung_kw": 1200,
-                "role_inputs": _rich_project_inputs(),
+                "role_inputs": role_inputs,
             },
         )
         assert created.status_code == 200, created.text
         project_id = created.json()["id"]
+        owner_view = created.json()
+        assert owner_view["street"] == "Invalidenstrasse"
+        assert owner_view["house_number"] == "117"
+        assert owner_view["latitude"] == 52.530827
+        assert owner_view["longitude"] == 13.384472
+        assert owner_view["role_inputs"]["_geocoding"]["raw_label"] == "Invalidenstrasse 117, 10115 Berlin"
 
         updated = client.patch(
             f"/api/v1/projects/{project_id}",
@@ -606,14 +626,32 @@ def test_project_viewer_receives_server_side_redacted_fields():
         assert viewer_login.status_code == 200, viewer_login.text
         viewer_headers = {"Authorization": f"Bearer {viewer_login.json()['access_token']}"}
 
+        owner_after_share = client.get(f"/api/v1/projects/{project_id}", headers=owner_headers)
+        assert owner_after_share.status_code == 200, owner_after_share.text
+        owner_body = owner_after_share.json()
+        assert owner_body["street"] == "Invalidenstrasse"
+        assert owner_body["latitude"] == 52.530827
+        assert owner_body["role_inputs"]["_geocoding"]["raw_label"] == "Invalidenstrasse 117, 10115 Berlin"
+
         fetched = client.get(f"/api/v1/projects/{project_id}", headers=viewer_headers)
         assert fetched.status_code == 200, fetched.text
         body = fetched.json()
 
-        assert body["owner_user_id"] is None
-        assert "antragsteller" not in body["role_inputs"]
-        assert "project_location" not in body["role_inputs"]
-        assert "umspannwerk" not in body["role_inputs"]
+        listed = client.get("/api/v1/projects", headers=viewer_headers)
+        assert listed.status_code == 200, listed.text
+        listed_body = next(item for item in listed.json() if item["id"] == project_id)
+
+        for payload in (body, listed_body):
+            assert payload["owner_user_id"] is None
+            assert payload["street"] is None
+            assert payload["house_number"] is None
+            assert payload["latitude"] is None
+            assert payload["longitude"] is None
+            assert payload["plz"] == "10115"
+            assert "antragsteller" not in payload["role_inputs"]
+            assert "project_location" not in payload["role_inputs"]
+            assert "umspannwerk" not in payload["role_inputs"]
+            assert "_geocoding" not in payload["role_inputs"]
         assert body["role_results"]["kosten_indikation_eur"] == 1_500_000
         assert body["role_results"]["route_environment"]["risk_level"] == "hoch"
         assert "kurzschluss" not in body["role_results"]

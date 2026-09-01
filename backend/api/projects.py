@@ -119,16 +119,17 @@ def _to_response(
     role_inputs = parse_project_role_inputs(project.role_inputs)
     access_level = get_project_access_level(db, current_user, project)
     stakeholder_path = derive_stakeholder_path(role_inputs, fallback_user_role=current_user.role)
+    can_see_precise_location = access_level in {"admin", "owner", "editor"}
     return ProjectResponse(
         id=project.id,
         name=project.name,
         plz=project.plz,
         ort=project.ort,
-        street=getattr(project, "street", None),
-        house_number=getattr(project, "house_number", None),
+        street=getattr(project, "street", None) if can_see_precise_location else None,
+        house_number=getattr(project, "house_number", None) if can_see_precise_location else None,
         city=getattr(project, "city", None),
-        latitude=getattr(project, "latitude", None),
-        longitude=getattr(project, "longitude", None),
+        latitude=getattr(project, "latitude", None) if can_see_precise_location else None,
+        longitude=getattr(project, "longitude", None) if can_see_precise_location else None,
         typ=project.typ,
         leistung_kw=project.leistung_kw,
         description=project.description,
@@ -138,7 +139,7 @@ def _to_response(
             stakeholder_path=stakeholder_path,
             access_level=access_level,
         ),
-        owner_user_id=project.owner_user_id if access_level in {"admin", "owner", "editor"} else None,
+        owner_user_id=project.owner_user_id if can_see_precise_location else None,
         created_at=project.created_at,
         updated_at=project.updated_at,
         warnings=list(warnings or []),

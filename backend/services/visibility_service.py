@@ -98,6 +98,8 @@ def sanitize_project_inputs(
     sanitized.pop("antragsteller", None)
     sanitized.pop("project_location", None)
     sanitized.pop("umspannwerk", None)
+    # Dual-location geocoding metadata (raw_label) must not bypass project_location redaction.
+    sanitized.pop("_geocoding", None)
 
     netzanschlusspunkt = _as_dict(sanitized.get("netzanschlusspunkt"))
     if netzanschlusspunkt:
