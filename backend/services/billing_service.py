@@ -388,10 +388,12 @@ def _sync_subscription_quota(user: User, entitlement: BillingEntitlement, offer:
     included = offer.get("included_credits")
     if included is not None and entitlement.total_credits != included:
         entitlement.total_credits = int(included)
-    if entitlement.valid_until and user.billing_current_period_end:
-        if entitlement.valid_until != user.billing_current_period_end:
+    current_period_end = _as_utc(user.billing_current_period_end)
+    existing_valid_until = _as_utc(entitlement.valid_until)
+    if existing_valid_until and current_period_end:
+        if existing_valid_until != current_period_end:
             entitlement.valid_until = user.billing_current_period_end
-    elif user.billing_current_period_end:
+    elif current_period_end:
         entitlement.valid_until = user.billing_current_period_end
     entitlement.updated_at = _utcnow()
 
@@ -560,6 +562,15 @@ def list_entitlement_history(db: Session, user: User, *, limit: int = 20) -> lis
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Normalize DB-naive and in-memory aware datetimes to UTC before compare."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def _json_text(value: Any) -> str:

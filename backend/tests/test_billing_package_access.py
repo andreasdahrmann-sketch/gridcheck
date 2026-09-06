@@ -274,6 +274,99 @@ def test_stripe_webhooks_create_payment_and_subscription_entitlements(monkeypatc
         _close_client(client)
 
 
+def test_subscription_updated_syncs_naive_valid_until_without_typeerror(monkeypatch):
+    """Second customer.subscription.updated used to TypeError: naive DB valid_until vs aware period_end."""
+    client = build_client()
+    try:
+        _register_and_login(client, "stripe-renew@example.com")
+        with _db_session(client) as db:
+            user = db.query(User).filter(User.email == "stripe-renew@example.com").first()
+            assert user is not None
+            user.stripe_customer_id = "cus_renew_123"
+            db.commit()
+
+        from services import billing_service
+
+        fake_settings = replace(billing_service.settings, stripe_webhook_secret="whsec_test")
+        monkeypatch.setattr(billing_service, "settings", fake_settings)
+
+        class FakeWebhook:
+            next_event: dict = {}
+
+            @staticmethod
+            def construct_event(payload, signature, secret):
+                return FakeWebhook.next_event
+
+        class FakeStripeModule:
+            Webhook = FakeWebhook
+
+        monkeypatch.setattr(billing_service, "_load_stripe_module", lambda: FakeStripeModule)
+
+        first_period_end = int((datetime.now(timezone.utc) + timedelta(days=30)).timestamp())
+        FakeWebhook.next_event = {
+            "id": "evt_sub_create",
+            "type": "customer.subscription.updated",
+            "data": {
+                "object": {
+                    "id": "sub_renew_123",
+                    "customer": "cus_renew_123",
+                    "status": "active",
+                    "current_period_end": first_period_end,
+                    "items": {"data": [{"price": {"id": "price_pro_renew"}}]},
+                }
+            },
+        }
+        first = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert first.status_code == 200, first.text
+
+        with _db_session(client) as db:
+            entitlement = (
+                db.query(BillingEntitlement)
+                .filter(
+                    BillingEntitlement.offer_id == "pro_lizenz",
+                    BillingEntitlement.stripe_subscription_id == "sub_renew_123",
+                )
+                .first()
+            )
+            assert entitlement is not None
+            assert entitlement.valid_until is not None
+            assert entitlement.valid_until.tzinfo is None
+
+        renewed_period_end = int((datetime.now(timezone.utc) + timedelta(days=60)).timestamp())
+        FakeWebhook.next_event = {
+            "id": "evt_sub_renew",
+            "type": "customer.subscription.updated",
+            "data": {
+                "object": {
+                    "id": "sub_renew_123",
+                    "customer": "cus_renew_123",
+                    "status": "active",
+                    "current_period_end": renewed_period_end,
+                    "items": {"data": [{"price": {"id": "price_pro_renew"}}]},
+                }
+            },
+        }
+        second = client.post("/api/v1/billing/webhook", content=b"{}", headers={"Stripe-Signature": "sig"})
+        assert second.status_code == 200, second.text
+
+        with _db_session(client) as db:
+            entitlement = (
+                db.query(BillingEntitlement)
+                .filter(
+                    BillingEntitlement.offer_id == "pro_lizenz",
+                    BillingEntitlement.stripe_subscription_id == "sub_renew_123",
+                )
+                .first()
+            )
+            assert entitlement is not None
+            assert entitlement.valid_until is not None
+            expected = datetime.fromtimestamp(renewed_period_end, tz=timezone.utc).replace(tzinfo=None)
+            stored = entitlement.valid_until.replace(tzinfo=None) if entitlement.valid_until.tzinfo else entitlement.valid_until
+            assert abs((stored - expected).total_seconds()) < 2
+    finally:
+        _close_client(client)
+
+
 def test_billing_status_exposes_subscription_attention_states(monkeypatch):
     client = build_client()
     try:
